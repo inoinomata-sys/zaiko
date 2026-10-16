@@ -16,6 +16,24 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 # 接続プール（最小1・最大5）
 _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
 
+# ── メモリキャッシュ ─────────────────────────────────────────────────────────
+_cache = {}
+
+def cache_get(key):
+    return _cache.get(key)
+
+def cache_set(key, val):
+    _cache[key] = val
+
+def cache_del(*keys):
+    for k in keys:
+        _cache.pop(k, None)
+    # プレフィックス一致で削除
+    for k in list(_cache.keys()):
+        for prefix in keys:
+            if k.startswith(str(prefix)):
+                _cache.pop(k, None)
+
 
 @app.template_filter('n')
 def num_fmt(v):
@@ -66,6 +84,10 @@ def release_db(conn):
 
 
 def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
+    key = f'pws:{store}:{supplier}'
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
     db = get_db()
     cur = db.cursor()
     cur.execute("""
@@ -78,10 +100,15 @@ def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
     """, (store, supplier))
     rows = cur.fetchall()
     release_db(db)
+    cache_set(key, rows)
     return rows
 
 
 def products_with_stock(store='イノ', cat=None):
+    key = f'pw:{store}:{cat}'
+    hit = cache_get(key)
+    if hit is not None:
+        return hit
     db = get_db()
     cur = db.cursor()
     where = "WHERE p.is_active=true"
@@ -100,6 +127,7 @@ def products_with_stock(store='イノ', cat=None):
     """, params)
     rows = cur.fetchall()
     release_db(db)
+    cache_set(key, rows)
     return rows
 
 
@@ -146,6 +174,7 @@ def api_update_stock():
     """, (product_id, store, qty, datetime.now().strftime('%Y-%m-%d %H:%M')))
     db.commit()
     release_db(db)
+    cache_del(f'pw:{store}:', f'pws:{store}:')
     return jsonify(ok=True)
 
 
@@ -166,6 +195,7 @@ def api_bulk_stock():
         """, (int(item['product_id']), store, float(item['qty']), now))
     db.commit()
     release_db(db)
+    cache_del(f'pw:{store}:', f'pws:{store}:')
     return jsonify(ok=True)
 
 
@@ -446,6 +476,7 @@ def product_add():
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
     release_db(db)
+    cache_del('pw:', 'pws:')
     return redirect(url_for('products'))
 
 
@@ -456,6 +487,7 @@ def product_toggle(pid):
     cur.execute("UPDATE products SET is_active = NOT is_active WHERE id=%s", (pid,))
     db.commit()
     release_db(db)
+    cache_del('pw:', 'pws:')
     return redirect(url_for('products'))
 
 
@@ -467,6 +499,7 @@ def product_base(pid):
                (float(request.form['base_qty']), pid))
     db.commit()
     release_db(db)
+    cache_del('pw:', 'pws:')
     return jsonify(ok=True)
 
 
@@ -478,6 +511,7 @@ def product_supplier(pid):
                (request.form['supplier'], pid))
     db.commit()
     release_db(db)
+    cache_del('pw:', 'pws:')
     return jsonify(ok=True)
 
 
