@@ -1,34 +1,55 @@
 {% extends 'base.html' %}
 {% block title %}発注履歴{% endblock %}
+{% block head %}
+<style>
+.sup-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.sup-tab {
+  padding: 7px 18px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg2); font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.sup-tab.active { background: var(--acc); color: #fff; border-color: var(--acc); }
+.hist-row { display: none; }
+.hist-row.show { display: table-row; }
+</style>
+{% endblock %}
 {% block content %}
-<h1 style="font-size:20px;font-weight:700;margin-bottom:16px">発注履歴</h1>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:14px">発注履歴</h1>
+
+<div class="sup-tabs">
+  <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
+  <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">🧴 ワールド美容</button>
+  <button class="sup-tab" onclick="filterSup(this,'トピー商事')">📦 トピー商事</button>
+  <button class="sup-tab" onclick="filterSup(this,'アイテム美容')">✂️ アイテム美容</button>
+</div>
+
 <div class="card">
   <table>
     <thead>
       <tr>
         <th>#</th>
         <th>発注日</th>
-        <th>店舗</th>
         <th>仕入先</th>
-        <th>状態</th>
+        <th>品目数</th>
+        <th>合計数</th>
         <th>作成日時</th>
         <th></th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="hist-body">
     {% for o in orders %}
-    <tr>
-      <td>{{ o.id }}</td>
-      <td>{{ o.order_month }}月{{ o.order_day }}日</td>
-      <td>{{ o.store }}</td>
-      <td>{{ o.supplier }}</td>
+    <tr class="hist-row show" data-supplier="{{ o.supplier or '' }}">
+      <td style="color:var(--fg2);font-size:12px">{{ o.id }}</td>
+      <td style="font-weight:600">{{ o.order_month }}月{{ o.order_day }}日</td>
       <td>
-        {% if o.status == 'confirmed' %}
-          <span class="badge badge-ok">確定</span>
-        {% else %}
-          <span class="badge badge-warn">下書き</span>
+        {% if o.supplier == 'ワールド美容' %}🧴
+        {% elif o.supplier == 'トピー商事' %}📦
+        {% elif o.supplier == 'アイテム美容' %}✂️
         {% endif %}
+        {{ o.supplier or '—' }}
       </td>
+      <td class="r">{{ o.item_count }} 品</td>
+      <td class="r">{{ o.total_qty|int }} 点</td>
       <td style="font-size:12px;color:var(--fg2)">{{ o.created_at }}</td>
       <td><a href="/order/{{ o.id }}/print" class="btn btn-ghost btn-sm">表示</a></td>
     </tr>
@@ -39,4 +60,16 @@
     </tbody>
   </table>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filterSup(btn, sup) {
+  document.querySelectorAll('.sup-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.hist-row').forEach(tr => {
+    const match = sup === '' || tr.dataset.supplier === sup;
+    tr.classList.toggle('show', match);
+  });
+}
+</script>
 {% endblock %}

@@ -244,7 +244,16 @@ def order_print(order_id):
 def order_history():
     db = get_db()
     cur = db.cursor()
-    cur.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 50")
+    cur.execute("""
+        SELECT o.*,
+               COUNT(oi.id)          AS item_count,
+               COALESCE(SUM(oi.order_qty), 0) AS total_qty
+        FROM orders o
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT 100
+    """)
     orders = cur.fetchall()
     db.close()
     return render_template('history.html', orders=orders)
