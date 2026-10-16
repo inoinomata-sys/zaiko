@@ -170,7 +170,7 @@ def send_line_message(to_user_id, text):
 STORES = ['イノ', 'リッチ']
 
 SUPPLIERS = [
-    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071', 'line_user_id': ''},
+    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071', 'line_user_id': 'U949cf27934e18f3af9ad96a9c3fc9206'},
     {'name': 'トピー商事',          'contact': '',                               'line_user_id': ''},
     {'name': 'アイテム',            'contact': '',                               'line_user_id': ''},
     {'name': '三井コーポレーション', 'contact': '',                               'line_user_id': ''},
