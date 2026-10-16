@@ -81,13 +81,14 @@ body {
 
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
-  {% set has_line = sup_info.contacts | selectattr('line_user_id') | list %}
-  {% if has_line %}
+  {% set line_contacts = [] %}
+  {% for c in sup_info.contacts %}{% if c.line_user_id %}{% set _ = line_contacts.append(c) %}{% endif %}{% endfor %}
+  {% if line_contacts %}
   <div style="display:flex;align-items:center;gap:8px">
     <select id="contact-sel" style="padding:7px 10px;border:1px solid #ccc;border-radius:7px;font-size:14px;font-family:inherit">
       {% for c in sup_info.contacts %}
       {% if c.line_user_id %}
-      <option value="{{ loop.index0 }}">{{ c.name if c.name else '担当者' + loop.index|string }}</option>
+      <option value="{{ loop.index0 }}">{{ c.name if c.name else '担当者' }}</option>
       {% endif %}
       {% endfor %}
     </select>
