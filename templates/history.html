@@ -16,12 +16,18 @@
 {% block content %}
 <h1 style="font-size:20px;font-weight:700;margin-bottom:14px">発注履歴</h1>
 
+<div class="sup-tabs" style="margin-bottom:8px">
+  <button class="sup-tab active" onclick="filterStore(this,'')">全店舗</button>
+  <button class="sup-tab" onclick="filterStore(this,'イノ')">イノ</button>
+  <button class="sup-tab" onclick="filterStore(this,'リッチ')">リッチ</button>
+</div>
+
 <div class="sup-tabs">
   <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
-  <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">🧴 ワールド美容</button>
-  <button class="sup-tab" onclick="filterSup(this,'トピー商事')">📦 トピー商事</button>
-  <button class="sup-tab" onclick="filterSup(this,'アイテム')">✂️ アイテム</button>
-  <button class="sup-tab" onclick="filterSup(this,'三井コーポレーション')">🏢 三井コーポレーション</button>
+  <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">ワールド美容</button>
+  <button class="sup-tab" onclick="filterSup(this,'トピー商事')">トピー商事</button>
+  <button class="sup-tab" onclick="filterSup(this,'アイテム')">アイテム</button>
+  <button class="sup-tab" onclick="filterSup(this,'三井コーポレーション')">三井コーポレーション</button>
 </div>
 
 <div class="card">
@@ -30,6 +36,7 @@
       <tr>
         <th>#</th>
         <th>発注日</th>
+        <th>店舗</th>
         <th>仕入先</th>
         <th>品目数</th>
         <th>合計数</th>
@@ -39,17 +46,11 @@
     </thead>
     <tbody id="hist-body">
     {% for o in orders %}
-    <tr class="hist-row show" data-supplier="{{ o.supplier or '' }}">
+    <tr class="hist-row show" data-supplier="{{ o.supplier or '' }}" data-store="{{ o.store or '' }}">
       <td style="color:var(--fg2);font-size:12px">{{ o.id }}</td>
       <td style="font-weight:600">{{ o.order_month }}月{{ o.order_day }}日</td>
-      <td>
-        {% if o.supplier == 'ワールド美容' %}🧴
-        {% elif o.supplier == 'トピー商事' %}📦
-        {% elif o.supplier == 'アイテム' %}✂️
-        {% elif o.supplier == '三井コーポレーション' %}🏢
-        {% endif %}
-        {{ o.supplier or '—' }}
-      </td>
+      <td>{{ o.store or '—' }}</td>
+      <td>{{ o.supplier or '—' }}</td>
       <td class="r">{{ o.item_count }} 品</td>
       <td class="r">{{ o.total_qty|int }} 点</td>
       <td style="font-size:12px;color:var(--fg2)">{{ o.created_at }}</td>
@@ -57,7 +58,7 @@
     </tr>
     {% endfor %}
     {% if not orders %}
-    <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fg2)">発注履歴はありません</td></tr>
+    <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--fg2)">発注履歴はありません</td></tr>
     {% endif %}
     </tbody>
   </table>
@@ -65,12 +66,27 @@
 {% endblock %}
 {% block scripts %}
 <script>
-function filterSup(btn, sup) {
-  document.querySelectorAll('.sup-tab').forEach(b => b.classList.remove('active'));
+let currentStore = '', currentSup = '';
+
+function filterStore(btn, store) {
+  document.querySelectorAll('.sup-tabs:first-of-type .sup-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  currentStore = store;
+  applyFilter();
+}
+
+function filterSup(btn, sup) {
+  document.querySelectorAll('.sup-tabs:last-of-type .sup-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentSup = sup;
+  applyFilter();
+}
+
+function applyFilter() {
   document.querySelectorAll('.hist-row').forEach(tr => {
-    const match = sup === '' || tr.dataset.supplier === sup;
-    tr.classList.toggle('show', match);
+    const storeMatch = currentStore === '' || tr.dataset.store === currentStore;
+    const supMatch   = currentSup   === '' || tr.dataset.supplier === currentSup;
+    tr.classList.toggle('show', storeMatch && supMatch);
   });
 }
 </script>

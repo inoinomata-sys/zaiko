@@ -131,15 +131,18 @@ def api_bulk_stock():
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
+STORES = ['イノ', 'リッチ']
+
 SUPPLIERS = [
-    {'name': 'ワールド美容',      'icon': '🧴', 'contact': '担当 大橋様　FAX: 06-6696-0071'},
-    {'name': 'トピー商事',        'icon': '📦', 'contact': ''},
-    {'name': 'アイテム',          'icon': '✂️',  'contact': ''},
-    {'name': '三井コーポレーション', 'icon': '🏢', 'contact': ''},
+    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071'},
+    {'name': 'トピー商事',          'contact': ''},
+    {'name': 'アイテム',            'contact': ''},
+    {'name': '三井コーポレーション', 'contact': ''},
 ]
 
 @app.route('/order')
 def order_top():
+    store = request.args.get('store', '')
     db = get_db()
     cur = db.cursor()
     supplier_list = []
@@ -148,7 +151,7 @@ def order_top():
         cnt = cur.fetchone()['count']
         supplier_list.append({**s, 'count': cnt})
     db.close()
-    return render_template('order_top.html', suppliers=supplier_list)
+    return render_template('order_top.html', suppliers=supplier_list, stores=STORES, store=store)
 
 
 @app.route('/order/form')

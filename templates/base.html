@@ -168,7 +168,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
 </head>
 <body>
 <nav>
-  <span class="brand">📦 在庫管理</span>
+  <span class="brand">在庫管理</span>
   <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">在庫</a>
   <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注書作成</a>
   <a href="/order/history" class="nav-link {% if request.path == '/order/history' %}active{% endif %}">発注履歴</a>
@@ -177,7 +177,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   <span class="store-badge">イノ</span>
 </nav>
 <div id="pwa-banner" style="display:none;background:#1a6fbf;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;">
-  <span>📱 ホーム画面に追加してアプリとして使えます</span>
+  <span>ホーム画面に追加してアプリとして使えます</span>
   <button onclick="installPWA()" style="background:#fff;color:#1a6fbf;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">追加する</button>
   <button onclick="this.parentElement.style.display='none'" style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:18px;margin-left:auto;">✕</button>
 </div>

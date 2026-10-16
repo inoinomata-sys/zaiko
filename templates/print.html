@@ -74,13 +74,13 @@ body {
 <body>
 
 <div class="screen-header">
-  <h2>📄 発注書 — {{ order.order_month }}月{{ order.order_day }}日 ({{ order.store }})</h2>
+  <h2>発注書 — {{ order.order_month }}月{{ order.order_day }}日 ({{ order.store }})</h2>
   <a href="/order/history" style="color:rgba(255,255,255,.8);text-decoration:none;font-size:13px">← 履歴へ</a>
 </div>
 
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
-  <button class="btn btn-print" onclick="window.print()">🖨 印刷（PDF保存）</button>
+  <button class="btn btn-print" onclick="window.print()">印刷（PDF保存）</button>
 </div>
 
 <div class="order-summary">

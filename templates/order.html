@@ -94,9 +94,11 @@
       <input type="number" id="order-day" min="1" max="31"
              style="width:64px; font-size:16px; padding:8px 6px; text-align:center">
       <span style="font-size:15px">日</span>
+      {% if sup_info.contact %}
       <span class="hide-sp" style="color:var(--fg2); font-size:13px; margin-left:8px">
-        宛先: ワールド美容御中　担当 大橋様　FAX: 06-6696-0071
+        宛先: {{ supplier }}御中　{{ sup_info.contact }}
       </span>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -163,7 +165,7 @@
     計 <strong id="order-total">0</strong> 点
   </div>
   <div class="footer-btns">
-    <button class="btn btn-primary" onclick="saveOrder()" id="save-btn">📄 発注書を確定して印刷</button>
+    <button class="btn btn-primary" onclick="saveOrder()" id="save-btn">発注書を確定して印刷</button>
   </div>
 </div>
 {% endblock %}
