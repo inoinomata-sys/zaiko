@@ -62,6 +62,7 @@ body {
 @media print {
   body { background: #fff; padding: 0; margin: 0; }
   .screen-header, .btn-row, .order-summary { display: none !important; }
+  #pdf-modal { display: none !important; }
   .print-wrap { border: none; padding: 0; box-shadow: none; border-radius: 0; }
   .doc-header { font-size: 10pt; }
   .cat-head { background: #bbb !important; font-size: 8.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -116,15 +117,21 @@ function printPDF() {
   const isIOS = /iPhone|iPad|iPod/.test(ua);
   const isMac = /Macintosh/.test(ua) && !isIOS;
   const isAndroid = /Android/.test(ua);
-  const isChrome = /Chrome/.test(ua);
+  const isChrome = /Chrome/.test(ua) && !/Edg/.test(ua);
   const isSafari = /Safari/.test(ua) && !isChrome;
 
   let guide = '';
   if (isIOS) {
-    guide = '① このまま画面下の <strong>共有ボタン（↑）</strong> をタップ<br>'
+    guide = '① 画面下の <strong>共有ボタン（↑）</strong> をタップ<br>'
           + '② 「<strong>PDFを作成</strong>」を選択<br>'
           + '③「完了」→「ファイルに保存」';
-  } else if (isAndroid && isChrome) {
+    document.getElementById('pdf-guide').innerHTML = guide;
+    document.getElementById('pdf-modal').style.display = 'flex';
+    return; // iOSはwindow.printではなく共有ボタンから行う
+  }
+
+  // iOS以外: 先にprint()を呼んでからモーダル表示
+  if (isAndroid && isChrome) {
     guide = '① 右上メニュー（⋮）→「<strong>印刷</strong>」をタップ<br>'
           + '② 送信先を「<strong>PDFとして保存</strong>」に変更<br>'
           + '③「保存」をタップ';
@@ -138,8 +145,10 @@ function printPDF() {
   }
 
   document.getElementById('pdf-guide').innerHTML = guide;
-  document.getElementById('pdf-modal').style.display = 'flex';
   window.print();
+  setTimeout(() => {
+    document.getElementById('pdf-modal').style.display = 'flex';
+  }, 500);
 }
 </script>
 
