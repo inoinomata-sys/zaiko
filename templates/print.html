@@ -56,41 +56,20 @@ body {
   font-size: 12px;
 }
 
-/* グループ列 */
-.col-group { vertical-align: top; border: 2px solid #333; width: 20%; }
-.col-group table {
-  width: 100%;
-  border-collapse: collapse;
+/* 発注リスト */
+.order-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.order-table th {
+  padding: 4px 8px; border: 1px solid #999; background: #e8f0fb;
+  font-size: 11px; font-weight: 700; text-align: center;
 }
-.col-group table th {
-  padding: 2px 3px;
-  font-size: 10px;
-  font-weight: 600;
-  text-align: right;
-  border-bottom: 1px solid #aaa;
-  border-right: 1px solid #ccc;
-  background: #f0f4f8;
-  color: #444;
-}
-.col-group table th.name-h { text-align: left; }
-.col-group table td {
-  padding: 1px 3px;
-  border-bottom: 1px solid #e0e0e0;
-  border-right: 1px solid #ddd;
+.order-table td {
+  padding: 3px 8px; border: 1px solid #ccc;
   font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
 }
-.col-group table td:first-child { text-align: left; font-size: 10.5px; }
-.col-group table td:last-child { border-right: none; }
-.cat-label {
-  background: #d8e8f8; font-weight: 700; font-size: 11px;
-  padding: 2px 4px; border-bottom: 1px solid #aaa;
-}
-.cat-label td { background: #d8e8f8; font-weight: 700; }
-.has-order { background: #fffde6; font-weight: 700; }
-.has-order td { background: #fffde6; font-weight: 700; }
-.order-val { color: #c0392b; font-weight: 700; font-size: 12px; }
+.order-table td.name-col { text-align: left; }
+.order-table td.num-col  { text-align: right; }
+.order-table td.qty-col  { text-align: right; font-weight: 700; color: #c0392b; font-size: 13px; }
+.cat-header td { background: #d8e8f8; font-weight: 700; font-size: 11px; padding: 2px 8px; }
 .zero-stock { color: #c0392b; }
 
 /* ── 印刷用スタイル ── */
@@ -101,7 +80,7 @@ body {
   .fax-form { font-size: 9pt; }
   .col-group table td, .col-group table th { padding: 0px 2px; font-size: 8.5pt; }
   .cat-label { font-size: 9pt; }
-  @page { size: A4 landscape; margin: 6mm 4mm; }
+  @page { size: A4 portrait; margin: 8mm 6mm; }
 }
 </style>
 </head>
@@ -125,68 +104,54 @@ body {
 </div>
 
 <div class="print-wrap">
-<!-- 発注書本体 -->
-<table class="fax-form" style="width:100%; border-collapse:collapse">
-<!-- ヘッダー -->
-<tr>
-  <td colspan="5" style="border:1.5px solid #333; padding:5px 8px; font-size:12px">
-    <table style="width:100%; border-collapse:collapse">
-      <tr>
-        <td style="font-size:14px; font-weight:700; width:45%">ワールド美容御中　担当 大橋様</td>
-        <td style="text-align:right; width:20%">FAX: 06-6696-0071</td>
-        <td style="text-align:center; width:20%; font-size:13px; font-weight:700">
-          {{ order.order_month }}月 {{ order.order_day }}日
-        </td>
-        <td style="text-align:right; width:15%">(有)イノ　担当<br>
-          <span style="font-size:10px">TEL: 072-999-6571</span>
-        </td>
-      </tr>
-    </table>
-  </td>
-</tr>
-<!-- 5 列グループ -->
-<tr style="vertical-align:top">
-{% for grp_num in [1,2,3,4,5] %}
-{% set prods = groups.get(grp_num, []) %}
-<td class="col-group">
-  <table>
-    <thead>
-      <tr>
-        <th class="name-h" style="width:48%">商品名</th>
-        <th style="width:13%">基準</th>
-        <th style="width:13%">仮数</th>
-        <th style="width:13%">発注</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% set ns = namespace(current_cat='') %}
-    {% for p in prods %}
+<!-- 発注書ヘッダー -->
+<table style="width:100%; border-collapse:collapse; border:1.5px solid #333; margin-bottom:10px">
+  <tr>
+    <td style="padding:6px 10px; font-size:15px; font-weight:700; width:45%">ワールド美容御中　担当 大橋様</td>
+    <td style="padding:6px 10px; text-align:right; width:20%">FAX: 06-6696-0071</td>
+    <td style="padding:6px 10px; text-align:center; width:20%; font-size:14px; font-weight:700">
+      {{ order.order_month }}月 {{ order.order_day }}日
+    </td>
+    <td style="padding:6px 10px; text-align:right; width:15%">(有)イノ　担当<br>
+      <span style="font-size:10px">TEL: 072-999-6571</span>
+    </td>
+  </tr>
+</table>
+
+<!-- 発注品リスト（発注数>0のみ） -->
+<table class="order-table">
+  <thead>
+    <tr>
+      <th class="name-col" style="width:45%; text-align:left">商品名</th>
+      <th style="width:15%">基準数</th>
+      <th style="width:15%">現在庫</th>
+      <th style="width:10%">不足数</th>
+      <th style="width:15%">発注数</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% set ns = namespace(current_cat='') %}
+  {% for grp_num in [1,2,3,4,5] %}
+  {% for p in groups.get(grp_num, []) %}
+    {% set item = order_map.get(p.id) %}
+    {% set oq = item.order_qty if item else 0 %}
+    {% if oq > 0 %}
       {% if p.category != ns.current_cat %}
         {% set ns.current_cat = p.category %}
-        <tr class="cat-label"><td colspan="4">{{ p.category }}</td></tr>
+        <tr class="cat-header"><td colspan="5">{{ p.category }}</td></tr>
       {% endif %}
-      {% set item = order_map.get(p.id) %}
-      {% set oq = item.order_qty if item else 0 %}
-      <tr class="{% if oq > 0 %}has-order{% endif %}">
-        <td>{{ p.name }}{% if p.note %}<span style="font-size:9px;color:#888"> ({{ p.note }})</span>{% endif %}</td>
-        <td>{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
-        <td class="{% if p.current_qty == 0 %}zero-stock{% endif %}">
-          {{ p.current_qty if p.current_qty else '' }}
-        </td>
-        <td class="{% if oq > 0 %}order-val{% endif %}">
-          {% if oq > 0 %}{{ oq|int }}{% endif %}
-        </td>
+      {% set shortage = p.base_qty - p.current_qty %}
+      <tr>
+        <td class="name-col">{{ p.name }}{% if p.note %} <span style="font-size:9px;color:#888">({{ p.note }})</span>{% endif %}</td>
+        <td class="num-col">{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
+        <td class="num-col {% if p.current_qty == 0 %}zero-stock{% endif %}">{{ p.current_qty }}</td>
+        <td class="num-col">{{ shortage|int if shortage > 0 else 0 }}</td>
+        <td class="qty-col">{{ oq|int }}</td>
       </tr>
-    {% endfor %}
-    <!-- 空行（予備） -->
-    {% for _ in range(3) %}
-    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</td>
-{% endfor %}
-</tr>
+    {% endif %}
+  {% endfor %}
+  {% endfor %}
+  </tbody>
 </table>
 </div>
 
