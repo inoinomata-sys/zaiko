@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}在庫管理{% endblock %}
+
+{% block head %}
+<style>
+.cat-bar {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.cat-btn {
+  padding: 5px 14px; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--fg2); font: inherit; font-size: 13px;
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+.cat-btn.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+.qty-input {
+  width: 60px; text-align: right; padding: 4px 6px;
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: #f8fafc;
+}
+.qty-input:focus { background: #fff; outline: 2px solid var(--acc); }
+.shortage { color: var(--warn); font-weight: 700; }
+.zero { color: var(--danger); font-weight: 700; }
+.ok { color: #237a4e; }
+.ts { font-size: 11px; color: var(--fg2); }
+.section-head td {
+  background: #f0f4fa; font-weight: 700; font-size: 13px;
+  color: var(--acc); padding: 5px 10px; border-bottom: 1px solid var(--border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px">
+  <h1 style="font-size:20px; font-weight:700">在庫管理</h1>
+  <a href="/order" class="btn btn-primary">🛒 発注書を作成</a>
+</div>
+
+<!-- カテゴリフィルタ -->
+<div class="cat-bar">
+  <a href="/?store={{ store }}" class="cat-btn {% if not current_cat %}on{% endif %}">すべて</a>
+  {% for c in cats %}
+  <a href="/?store={{ store }}&cat={{ c|urlencode }}" class="cat-btn {% if current_cat == c %}on{% endif %}">{{ c }}</a>
+  {% endfor %}
+</div>
+
+{% for cat, prods in grouped.items() %}
+<div class="card">
+  <div class="card-head">
+    <span>{{ cat if cat else '（未分類）' }}</span>
+    <span style="font-size:13px; color:var(--fg2); font-weight:400">{{ prods|length }} 品</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:220px">商品名</th>
+        <th class="r" style="width:80px">基準</th>
+        <th class="r" style="width:100px">現在庫</th>
+        <th class="r" style="width:80px">不足数</th>
+        <th style="width:110px">最終更新</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in prods %}
+    {% set shortage = (p.base_qty - p.current_qty)|round(1) %}
+    <tr data-id="{{ p.id }}">
+      <td class="name">
+        {{ p.name }}
+        {% if p.note %}<span class="badge badge-muted" style="font-size:10px">{{ p.note }}</span>{% endif %}
+      </td>
+      <td class="r">{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
+      <td class="r">
+        <input class="qty-input" type="number" min="0" step="0.5"
+               value="{{ p.current_qty }}"
+               data-id="{{ p.id }}" data-orig="{{ p.current_qty }}"
+               onchange="updateStock(this)">
+      </td>
+      <td class="r">
+        {% if shortage > 0 %}
+          <span class="shortage">{{ shortage|int if shortage == shortage|int else shortage }}</span>
+        {% else %}
+          <span class="ok">—</span>
+        {% endif %}
+      </td>
+      <td class="ts">{{ p.updated_at or '—' }}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="setZero({{ p.id }}, this)">0 にする</button>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+
+{% if not grouped %}
+<div style="text-align:center; padding:60px; color:var(--fg2)">
+  商品が登録されていません。<a href="/products">商品マスター</a>から追加してください。
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORE = '{{ store }}';
+
+async function updateStock(input) {
+  const id  = input.dataset.id;
+  const qty = parseFloat(input.value);
+  if (isNaN(qty) || qty < 0) { input.value = input.dataset.orig; return; }
+
+  const res = await fetch('/api/stock', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({product_id: id, qty, store: STORE})
+  });
+  if (res.ok) {
+    input.dataset.orig = qty;
+    input.style.background = '#d1fae5';
+    setTimeout(() => input.style.background = '', 800);
+    // 不足数を更新
+    const row = input.closest('tr');
+    const baseCell = row.querySelectorAll('td')[1];
+    const base = parseFloat(baseCell.textContent) || 0;
+    const shortageCell = row.querySelectorAll('td')[3];
+    const sh = base - qty;
+    shortageCell.innerHTML = sh > 0
+      ? `<span class="shortage">${Number.isInteger(sh)?sh:sh.toFixed(1)}</span>`
+      : `<span class="ok">—</span>`;
+    toast('保存しました');
+  } else {
+    toast('保存失敗');
+  }
+}
+
+async function setZero(id, btn) {
+  const row   = btn.closest('tr');
+  const input = row.querySelector('.qty-input');
+  input.value = 0;
+  await updateStock(input);
+}
+</script>
+{% endblock %}

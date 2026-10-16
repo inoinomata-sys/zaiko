@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}在庫・発注管理{% endblock %} — イノ</title>
+<style>
+:root {
+  --bg: #f4f6f9;
+  --surface: #fff;
+  --border: #dde3eb;
+  --fg: #1b2133;
+  --fg2: #637089;
+  --acc: #1a6fbf;
+  --acc-h: #155ca0;
+  --ok: #1a9e5a;
+  --warn: #d4820a;
+  --danger: #c0392b;
+  --nav-h: 52px;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans', 'Meiryo', system-ui, sans-serif;
+       font-size: 14px; background: var(--bg); color: var(--fg); }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* NAV */
+nav {
+  background: var(--acc);
+  color: #fff;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+nav .brand { font-size: 16px; font-weight: 700; margin-right: 16px; color: #fff; white-space: nowrap; }
+nav a.nav-link {
+  padding: 6px 14px;
+  border-radius: 6px;
+  color: rgba(255,255,255,.85);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .15s;
+}
+nav a.nav-link:hover { background: rgba(255,255,255,.15); text-decoration: none; color: #fff; }
+nav a.nav-link.active { background: rgba(255,255,255,.22); color: #fff; }
+nav .spacer { flex: 1; }
+nav .store-badge {
+  background: rgba(255,255,255,.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* MAIN */
+main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.card-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* TABLES */
+table { width: 100%; border-collapse: collapse; }
+th {
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg2);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  background: #f8fafc;
+}
+th.r, td.r { text-align: right; }
+td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f3f7fc; }
+td.name { font-weight: 500; }
+td.low  { color: var(--warn); font-weight: 700; }
+td.out  { color: var(--danger); font-weight: 700; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 14px; border-radius: 7px; border: none;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn-primary { background: var(--acc); color: #fff; }
+.btn-primary:hover { background: var(--acc-h); }
+.btn-success { background: var(--ok); color: #fff; }
+.btn-danger  { background: var(--danger); color: #fff; }
+.btn-ghost   { background: transparent; color: var(--acc); border: 1px solid var(--acc); }
+.btn-ghost:hover { background: #e8f0f9; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* BADGE */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-warn { background: #fef3cd; color: #856404; }
+.badge-ok   { background: #d1fae5; color: #065f46; }
+.badge-muted{ background: #e9ecef; color: #6c757d; }
+
+/* FORM */
+.form-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--fg2); }
+input[type=text], input[type=number], select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  font-family: inherit; font-size: 14px; background: #fff; color: var(--fg);
+  min-width: 0;
+}
+input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--acc); }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(15,20,35,.88); color: #fff;
+  padding: 10px 18px; border-radius: 20px; font-size: 13px;
+  opacity: 0; transition: all .2s; pointer-events: none;
+  white-space: nowrap; z-index: 999;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav>
+  <span class="brand">📦 在庫管理</span>
+  <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">在庫</a>
+  <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注書作成</a>
+  <a href="/order/history" class="nav-link {% if request.path == '/order/history' %}active{% endif %}">発注履歴</a>
+  <a href="/products" class="nav-link {% if request.path == '/products' %}active{% endif %}">商品マスター</a>
+  <span class="spacer"></span>
+  <span class="store-badge">イノ</span>
+</nav>
+<main>
+{% block content %}{% endblock %}
+</main>
+<div id="toast"></div>
+<script>
+function toast(msg, dur=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

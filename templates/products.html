@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}商品マスター{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <h1 style="font-size:20px;font-weight:700">商品マスター</h1>
+  <button class="btn btn-primary" onclick="document.getElementById('add-form').style.display='block'">＋ 商品追加</button>
+</div>
+
+<!-- 追加フォーム -->
+<div class="card" id="add-form" style="display:none;margin-bottom:16px">
+  <div class="card-head">商品を追加</div>
+  <form method="post" action="/products/add" style="padding:16px">
+    <div class="form-row">
+      <div class="form-group">
+        <label>列グループ (1〜5)</label>
+        <select name="col_group" required style="width:80px">
+          {% for i in range(1,6) %}<option>{{ i }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>カテゴリ</label>
+        <input type="text" name="category" placeholder="プライム" style="width:160px">
+      </div>
+      <div class="form-group">
+        <label>商品名</label>
+        <input type="text" name="name" required placeholder="例: 7NB" style="width:160px">
+      </div>
+      <div class="form-group">
+        <label>基準数</label>
+        <input type="number" name="base_qty" value="1" min="0" step="0.5" style="width:80px">
+      </div>
+      <div class="form-group">
+        <label>備考</label>
+        <input type="text" name="note" placeholder="ネット" style="width:100px">
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:18px">追加</button>
+      <button type="button" class="btn btn-ghost" style="margin-top:18px"
+              onclick="document.getElementById('add-form').style.display='none'">キャンセル</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>列</th>
+        <th>カテゴリ</th>
+        <th>商品名</th>
+        <th class="r">基準</th>
+        <th>備考</th>
+        <th>状態</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for p in rows %}
+    <tr {% if not p.is_active %}style="opacity:.45"{% endif %}>
+      <td style="font-size:11px;color:var(--fg2)">{{ p.id }}</td>
+      <td>{{ p.col_group }}</td>
+      <td style="font-size:12px;color:var(--fg2)">{{ p.category }}</td>
+      <td class="name" {% if not p.is_active %}style="text-decoration:line-through"{% endif %}>{{ p.name }}</td>
+      <td class="r">
+        <input type="number" value="{{ p.base_qty }}" min="0" step="0.5" style="width:60px;text-align:right"
+               onchange="updateBase({{ p.id }}, this.value)">
+      </td>
+      <td style="font-size:12px;color:var(--fg2)">{{ p.note or '' }}</td>
+      <td>
+        {% if p.is_active %}
+          <span class="badge badge-ok">有効</span>
+        {% else %}
+          <span class="badge badge-muted">無効</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/products/{{ p.id }}/toggle" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm">
+            {{ '無効化' if p.is_active else '有効化' }}
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function updateBase(id, val) {
+  const fd = new FormData();
+  fd.append('base_qty', val);
+  const res = await fetch(`/products/${id}/base`, {method:'POST', body:fd});
+  if (res.ok) toast('基準数を更新しました');
+}
+</script>
+{% endblock %}

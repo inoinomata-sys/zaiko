@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>発注書 — {{ order.order_month }}月{{ order.order_day }}日 {{ order.store }}</title>
+<style>
+/* ── 画面用 ── */
+body {
+  font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+  font-size: 13px;
+  background: #eef2f7;
+  margin: 0; padding: 20px;
+  color: #111;
+}
+.screen-header {
+  background: #1a6fbf; color: #fff;
+  padding: 12px 20px; border-radius: 8px 8px 0 0;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 0;
+}
+.screen-header h2 { font-size: 16px; font-weight: 700; margin: 0; }
+.print-wrap {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 0 0 8px 8px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.1);
+}
+.btn-row {
+  display: flex; gap: 10px; padding: 12px 0 16px;
+  justify-content: flex-end;
+}
+.btn {
+  padding: 8px 18px; border-radius: 7px; border: none;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+.btn-print { background: #1a6fbf; color: #fff; }
+.btn-back  { background: transparent; color: #1a6fbf; border: 1px solid #1a6fbf; }
+.order-summary {
+  margin-bottom: 12px; font-size: 13px; color: #555;
+}
+.order-summary strong { color: #111; }
+
+/* ── 発注書本体 ── */
+.fax-form {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+/* ヘッダー行 */
+.fax-header td {
+  padding: 4px 6px;
+  border: 1px solid #666;
+  font-size: 12px;
+}
+
+/* グループ列 */
+.col-group { vertical-align: top; border: 2px solid #333; width: 20%; }
+.col-group table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.col-group table th {
+  padding: 2px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+  border-bottom: 1px solid #aaa;
+  border-right: 1px solid #ccc;
+  background: #f0f4f8;
+  color: #444;
+}
+.col-group table th.name-h { text-align: left; }
+.col-group table td {
+  padding: 1px 3px;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #ddd;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.col-group table td:first-child { text-align: left; font-size: 10.5px; }
+.col-group table td:last-child { border-right: none; }
+.cat-label {
+  background: #d8e8f8; font-weight: 700; font-size: 11px;
+  padding: 2px 4px; border-bottom: 1px solid #aaa;
+}
+.cat-label td { background: #d8e8f8; font-weight: 700; }
+.has-order { background: #fffde6; font-weight: 700; }
+.has-order td { background: #fffde6; font-weight: 700; }
+.order-val { color: #c0392b; font-weight: 700; font-size: 12px; }
+.zero-stock { color: #c0392b; }
+
+/* ── 印刷用スタイル ── */
+@media print {
+  body { background: #fff; padding: 4mm; }
+  .screen-header, .btn-row, .order-summary { display: none !important; }
+  .print-wrap { border: none; padding: 0; box-shadow: none; border-radius: 0; }
+  .fax-form { font-size: 9pt; }
+  .col-group table td, .col-group table th { padding: 0px 2px; font-size: 8.5pt; }
+  .cat-label { font-size: 9pt; }
+  @page { size: A4 landscape; margin: 6mm 4mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="screen-header">
+  <h2>📄 発注書 — {{ order.order_month }}月{{ order.order_day }}日 ({{ order.store }})</h2>
+  <div style="display:flex;gap:10px">
+    <a href="/order/history" style="color:rgba(255,255,255,.8);text-decoration:none;font-size:13px">← 履歴へ</a>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="btn btn-back" onclick="history.back()">← 戻る</button>
+  <button class="btn btn-print" onclick="window.print()">🖨 印刷（PDF保存）</button>
+</div>
+
+<div class="order-summary">
+  発注品目 <strong>{{ order_map|length }}</strong> 品　／
+  合計 <strong>{{ order_map.values()|sum(attribute='order_qty')|int }}</strong> 点
+</div>
+
+<div class="print-wrap">
+<!-- 発注書本体 -->
+<table class="fax-form" style="width:100%; border-collapse:collapse">
+<!-- ヘッダー -->
+<tr>
+  <td colspan="5" style="border:1.5px solid #333; padding:5px 8px; font-size:12px">
+    <table style="width:100%; border-collapse:collapse">
+      <tr>
+        <td style="font-size:14px; font-weight:700; width:45%">ワールド美容御中　担当 大橋様</td>
+        <td style="text-align:right; width:20%">FAX: 06-6696-0071</td>
+        <td style="text-align:center; width:20%; font-size:13px; font-weight:700">
+          {{ order.order_month }}月 {{ order.order_day }}日
+        </td>
+        <td style="text-align:right; width:15%">(有)イノ　担当<br>
+          <span style="font-size:10px">TEL: 072-999-6571</span>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<!-- 5 列グループ -->
+<tr style="vertical-align:top">
+{% for grp_num in [1,2,3,4,5] %}
+{% set prods = groups.get(grp_num, []) %}
+<td class="col-group">
+  <table>
+    <thead>
+      <tr>
+        <th class="name-h" style="width:48%">商品名</th>
+        <th style="width:13%">基準</th>
+        <th style="width:13%">仮数</th>
+        <th style="width:13%">発注</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% set ns = namespace(current_cat='') %}
+    {% for p in prods %}
+      {% if p.category != ns.current_cat %}
+        {% set ns.current_cat = p.category %}
+        <tr class="cat-label"><td colspan="4">{{ p.category }}</td></tr>
+      {% endif %}
+      {% set item = order_map.get(p.id) %}
+      {% set oq = item.order_qty if item else 0 %}
+      <tr class="{% if oq > 0 %}has-order{% endif %}">
+        <td>{{ p.name }}{% if p.note %}<span style="font-size:9px;color:#888"> ({{ p.note }})</span>{% endif %}</td>
+        <td>{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
+        <td class="{% if p.current_qty == 0 %}zero-stock{% endif %}">
+          {{ p.current_qty if p.current_qty else '' }}
+        </td>
+        <td class="{% if oq > 0 %}order-val{% endif %}">
+          {% if oq > 0 %}{{ oq|int }}{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    <!-- 空行（予備） -->
+    {% for _ in range(3) %}
+    <tr><td>&nbsp;</td><td></td><td></td><td></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</td>
+{% endfor %}
+</tr>
+</table>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}発注履歴{% endblock %}
+{% block content %}
+<h1 style="font-size:20px;font-weight:700;margin-bottom:16px">発注履歴</h1>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>発注日</th>
+        <th>店舗</th>
+        <th>仕入先</th>
+        <th>状態</th>
+        <th>作成日時</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for o in orders %}
+    <tr>
+      <td>{{ o.id }}</td>
+      <td>{{ o.order_month }}月{{ o.order_day }}日</td>
+      <td>{{ o.store }}</td>
+      <td>{{ o.supplier }}</td>
+      <td>
+        {% if o.status == 'confirmed' %}
+          <span class="badge badge-ok">確定</span>
+        {% else %}
+          <span class="badge badge-warn">下書き</span>
+        {% endif %}
+      </td>
+      <td style="font-size:12px;color:var(--fg2)">{{ o.created_at }}</td>
+      <td><a href="/order/{{ o.id }}/print" class="btn btn-ghost btn-sm">表示</a></td>
+    </tr>
+    {% endfor %}
+    {% if not orders %}
+    <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fg2)">発注履歴はありません</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
