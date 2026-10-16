@@ -25,6 +25,7 @@
   --nav-h: 52px;
 }
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+button, a { touch-action: manipulation; }
 body { font-family: 'Hiragino Sans', 'Meiryo', system-ui, sans-serif;
        font-size: 14px; background: var(--bg); color: var(--fg); }
 a { color: var(--acc); text-decoration: none; }
@@ -124,6 +125,7 @@ td.out  { color: var(--danger); font-weight: 700; }
   padding: 7px 14px; border-radius: 7px; border: none;
   font-family: inherit; font-size: 14px; font-weight: 600;
   cursor: pointer; transition: all .15s; white-space: nowrap;
+  touch-action: manipulation;
 }
 .btn-primary { background: var(--acc); color: #fff; }
 .btn-primary:hover { background: var(--acc-h); }
