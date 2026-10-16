@@ -114,11 +114,15 @@ def order_form():
     rows  = products_with_stock(store)
 
     grouped = {}
+    cats = []
     for r in rows:
-        grouped.setdefault(r['category'], []).append(r)
+        c = r['category']
+        grouped.setdefault(c, []).append(r)
+        if c and c not in cats:
+            cats.append(c)
 
     return render_template('order.html', store=store, grouped=grouped,
-                           rows=rows, now=datetime.now())
+                           cats=cats, rows=rows, now=datetime.now())
 
 
 @app.route('/order/save', methods=['POST'])

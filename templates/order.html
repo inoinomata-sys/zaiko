@@ -16,6 +16,14 @@
 .date-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .filter-check { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.cat-tab {
+  padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg2); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.cat-tab:hover { border-color: var(--acc); color: var(--acc); }
+.cat-tab.active { background: var(--acc); color: #fff; border-color: var(--acc); }
 </style>
 {% endblock %}
 
@@ -42,6 +50,14 @@
   </div>
 </div>
 
+<!-- カテゴリタブ -->
+<div class="cat-tabs" id="cat-tabs">
+  <button class="cat-tab active" data-cat="" onclick="selectCat(this, '')">すべて</button>
+  {% for cat in cats %}
+  <button class="cat-tab" data-cat="{{ cat }}" onclick="selectCat(this, '{{ cat }}')">{{ cat }}</button>
+  {% endfor %}
+</div>
+
 <!-- フィルタ -->
 <div class="filter-bar">
   <label class="filter-check">
@@ -57,7 +73,7 @@
 </div>
 
 {% for cat, prods in grouped.items() %}
-<div class="card">
+<div class="card cat-card" data-cat="{{ cat }}">
   <div class="card-head">
     <span>{{ cat if cat else '（未分類）' }}</span>
     <span id="cat-count-{{ loop.index }}" style="font-size:13px; color:var(--fg2); font-weight:400"></span>
@@ -190,6 +206,18 @@ async function saveOrder() {
     toast('保存に失敗しました');
     btn.disabled = false; btn.textContent = '📄 発注書を確定して印刷';
   }
+}
+
+// カテゴリタブ
+let currentCat = '';
+function selectCat(btn, cat) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.cat-card').forEach(card => {
+    card.style.display = (cat === '' || card.dataset.cat === cat) ? '' : 'none';
+  });
+  filterRows();
 }
 
 // 初期集計
