@@ -169,28 +169,38 @@ def send_line_message(to_user_id, text):
 
 STORES = ['イノ', 'リッチ']
 
-SUPPLIERS = [
-    {'name': 'ワールド美容', 'contacts': [
-        {'name': '大橋様', 'fax': '06-6696-0071', 'line_user_id': 'U949cf27934e18f3af9ad96a9c3fc9206'},
-    ]},
-    {'name': 'トピー商事', 'contacts': [
-        {'name': '', 'fax': '', 'line_user_id': ''},
-    ]},
-    {'name': 'アイテム', 'contacts': [
-        {'name': '', 'fax': '', 'line_user_id': ''},
-    ]},
-    {'name': '三井コーポレーション', 'contacts': [
-        {'name': '', 'fax': '', 'line_user_id': ''},
-    ]},
-]
+SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション']
+
+
+def get_suppliers_with_contacts():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT supplier_name, contact_name, fax, line_user_id, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id")
+    rows = cur.fetchall()
+    db.close()
+    result = {}
+    for name in SUPPLIER_NAMES:
+        result[name] = {'name': name, 'contacts': []}
+    for r in rows:
+        sn = r['supplier_name']
+        if sn not in result:
+            result[sn] = {'name': sn, 'contacts': []}
+        result[sn]['contacts'].append({
+            'id': r['id'],
+            'name': r['contact_name'],
+            'fax': r['fax'],
+            'line_user_id': r['line_user_id'],
+        })
+    return list(result.values())
 
 @app.route('/order')
 def order_top():
     store = request.args.get('store', '')
+    suppliers = get_suppliers_with_contacts()
     db = get_db()
     cur = db.cursor()
     supplier_list = []
-    for s in SUPPLIERS:
+    for s in suppliers:
         cur.execute("SELECT COUNT(*) FROM products WHERE is_active=true AND supplier=%s", (s['name'],))
         cnt = cur.fetchone()['count']
         supplier_list.append({**s, 'count': cnt})
@@ -217,7 +227,8 @@ def order_form():
     for r in rows:
         grouped.setdefault(r['category'], []).append(r)
 
-    sup_info = next((s for s in SUPPLIERS if s['name'] == supplier), SUPPLIERS[0])
+    suppliers = get_suppliers_with_contacts()
+    sup_info = next((s for s in suppliers if s['name'] == supplier), suppliers[0])
     return render_template('order.html', store=store, grouped=grouped,
                            cats=cats, rows=rows, now=datetime.now(),
                            supplier=supplier, sup_info=sup_info)
@@ -282,7 +293,8 @@ def order_print(order_id):
     for p in all_products:
         groups.setdefault(p['col_group'], []).append(p)
 
-    sup_info = next((s for s in SUPPLIERS if s['name'] == sup_name), SUPPLIERS[0])
+    suppliers = get_suppliers_with_contacts()
+    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
     db.close()
     return render_template('print.html',
         order=order, groups=groups, order_map=order_map, sup_info=sup_info)
@@ -311,7 +323,8 @@ def order_send_line(order_id):
     items = cur.fetchall()
     db.close()
 
-    sup_info = next((s for s in SUPPLIERS if s['name'] == order.get('supplier', '')), None)
+    suppliers = get_suppliers_with_contacts()
+    sup_info = next((s for s in suppliers if s['name'] == order.get('supplier', '')), None)
     if not sup_info:
         return jsonify(ok=False, error='この仕入先が見つかりません')
 
@@ -428,6 +441,55 @@ def product_supplier(pid):
     db.commit()
     db.close()
     return jsonify(ok=True)
+
+
+# ── 担当者管理 ────────────────────────────────────────────────────────────────
+
+@app.route('/settings/contacts')
+def contacts_settings():
+    suppliers = get_suppliers_with_contacts()
+    return render_template('contacts.html', suppliers=suppliers, supplier_names=SUPPLIER_NAMES)
+
+
+@app.route('/settings/contacts/add', methods=['POST'])
+def contact_add():
+    supplier_name = request.form['supplier_name']
+    contact_name  = request.form.get('contact_name', '')
+    fax           = request.form.get('fax', '')
+    line_user_id  = request.form.get('line_user_id', '')
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT COALESCE(MAX(sort_order),0) FROM supplier_contacts WHERE supplier_name=%s", (supplier_name,))
+    max_sort = cur.fetchone()['coalesce']
+    cur.execute("INSERT INTO supplier_contacts (supplier_name, contact_name, fax, line_user_id, sort_order) VALUES (%s,%s,%s,%s,%s)",
+                (supplier_name, contact_name, fax, line_user_id, max_sort + 1))
+    db.commit()
+    db.close()
+    return redirect(url_for('contacts_settings'))
+
+
+@app.route('/settings/contacts/<int:cid>/update', methods=['POST'])
+def contact_update(cid):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("UPDATE supplier_contacts SET contact_name=%s, fax=%s, line_user_id=%s WHERE id=%s",
+                (request.form.get('contact_name', ''),
+                 request.form.get('fax', ''),
+                 request.form.get('line_user_id', ''),
+                 cid))
+    db.commit()
+    db.close()
+    return redirect(url_for('contacts_settings'))
+
+
+@app.route('/settings/contacts/<int:cid>/delete', methods=['POST'])
+def contact_delete(cid):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("DELETE FROM supplier_contacts WHERE id=%s", (cid,))
+    db.commit()
+    db.close()
+    return redirect(url_for('contacts_settings'))
 
 
 if __name__ == '__main__':

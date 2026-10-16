@@ -175,6 +175,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注書作成</a>
   <a href="/order/history" class="nav-link {% if request.path == '/order/history' %}active{% endif %}">発注履歴</a>
   <a href="/products" class="nav-link {% if request.path == '/products' %}active{% endif %}">商品マスター</a>
+  <a href="/settings/contacts" class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">担当者設定</a>
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
 </nav>
