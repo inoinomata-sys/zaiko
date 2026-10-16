@@ -170,10 +170,18 @@ def send_line_message(to_user_id, text):
 STORES = ['イノ', 'リッチ']
 
 SUPPLIERS = [
-    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071', 'line_user_id': 'U949cf27934e18f3af9ad96a9c3fc9206'},
-    {'name': 'トピー商事',          'contact': '',                               'line_user_id': ''},
-    {'name': 'アイテム',            'contact': '',                               'line_user_id': ''},
-    {'name': '三井コーポレーション', 'contact': '',                               'line_user_id': ''},
+    {'name': 'ワールド美容', 'contacts': [
+        {'name': '大橋様', 'fax': '06-6696-0071', 'line_user_id': 'U949cf27934e18f3af9ad96a9c3fc9206'},
+    ]},
+    {'name': 'トピー商事', 'contacts': [
+        {'name': '', 'fax': '', 'line_user_id': ''},
+    ]},
+    {'name': 'アイテム', 'contacts': [
+        {'name': '', 'fax': '', 'line_user_id': ''},
+    ]},
+    {'name': '三井コーポレーション', 'contacts': [
+        {'name': '', 'fax': '', 'line_user_id': ''},
+    ]},
 ]
 
 @app.route('/order')
@@ -282,6 +290,9 @@ def order_print(order_id):
 
 @app.route('/order/<int:order_id>/send_line', methods=['POST'])
 def order_send_line(order_id):
+    req_data = request.get_json() or {}
+    contact_index = int(req_data.get('contact_index', 0))
+
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
@@ -301,11 +312,19 @@ def order_send_line(order_id):
     db.close()
 
     sup_info = next((s for s in SUPPLIERS if s['name'] == order.get('supplier', '')), None)
-    if not sup_info or not sup_info.get('line_user_id'):
-        return jsonify(ok=False, error='この仕入先のLINE IDが未設定です')
+    if not sup_info:
+        return jsonify(ok=False, error='この仕入先が見つかりません')
 
+    contacts = sup_info.get('contacts', [])
+    if contact_index >= len(contacts):
+        return jsonify(ok=False, error='担当者が見つかりません')
+    contact = contacts[contact_index]
+    if not contact.get('line_user_id'):
+        return jsonify(ok=False, error='この担当者のLINE IDが未設定です')
+
+    contact_label = contact['name'] if contact['name'] else ''
     lines = [f"【発注】{order['order_month']}月{order['order_day']}日 {order['store']}",
-             f"仕入先：{order['supplier']}", ""]
+             f"仕入先：{order['supplier']}" + (f"　{contact_label}" if contact_label else ""), ""]
     current_cat = ''
     for it in items:
         if it['category'] != current_cat:
@@ -315,7 +334,7 @@ def order_send_line(order_id):
     lines += ["", "(有)イノ　TEL: 072-999-6571"]
     text = '\n'.join(lines)
 
-    ok = send_line_message(sup_info['line_user_id'], text)
+    ok = send_line_message(contact['line_user_id'], text)
     return jsonify(ok=ok, error=None if ok else '送信に失敗しました')
 
 

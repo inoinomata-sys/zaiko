@@ -81,8 +81,18 @@ body {
 
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
-  {% if sup_info.line_user_id %}
-  <button class="btn btn-line" onclick="sendLine(this)" id="line-btn">LINEで送る</button>
+  {% set has_line = sup_info.contacts | selectattr('line_user_id') | list %}
+  {% if has_line %}
+  <div style="display:flex;align-items:center;gap:8px">
+    <select id="contact-sel" style="padding:7px 10px;border:1px solid #ccc;border-radius:7px;font-size:14px;font-family:inherit">
+      {% for c in sup_info.contacts %}
+      {% if c.line_user_id %}
+      <option value="{{ loop.index0 }}">{{ c.name if c.name else '担当者' + loop.index|string }}</option>
+      {% endif %}
+      {% endfor %}
+    </select>
+    <button class="btn btn-line" onclick="sendLine(this)" id="line-btn">LINEで送る</button>
+  </div>
   {% else %}
   <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
   {% endif %}
@@ -97,7 +107,7 @@ body {
 <div class="print-wrap">
 <table class="doc-header">
   <tr>
-    <td style="font-size:15px; font-weight:700; width:42%">{{ sup_info.name }}御中　{{ sup_info.contact }}</td>
+    <td style="font-size:15px; font-weight:700; width:42%">{{ sup_info.name }}御中{% if sup_info.contacts and sup_info.contacts[0].name %}　担当 {{ sup_info.contacts[0].name }}{% endif %}</td>
     <td style="text-align:center; width:20%; font-size:14px; font-weight:700">{{ order.order_month }}月 {{ order.order_day }}日</td>
     <td style="text-align:right; width:16%">(有)イノ　担当<br><span style="font-size:10px">TEL: 072-999-6571</span></td>
   </tr>
@@ -194,7 +204,13 @@ async function sendLine(btn) {
   btn.disabled = true;
   btn.textContent = '送信中…';
   try {
-    const res = await fetch('/order/{{ order.id }}/send_line', {method:'POST'});
+    const sel = document.getElementById('contact-sel');
+    const contactIndex = sel ? parseInt(sel.value) : 0;
+    const res = await fetch('/order/{{ order.id }}/send_line', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({contact_index: contactIndex})
+    });
     const data = await res.json();
     if (data.ok) {
       btn.textContent = '送信しました';

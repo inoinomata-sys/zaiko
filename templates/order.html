@@ -96,9 +96,9 @@
       <input type="number" id="order-day" min="1" max="31"
              style="width:64px; font-size:16px; padding:8px 6px; text-align:center">
       <span style="font-size:15px">日</span>
-      {% if sup_info.contact %}
+      {% if sup_info.contacts and sup_info.contacts[0].name %}
       <span class="hide-sp" style="color:var(--fg2); font-size:13px; margin-left:8px">
-        宛先: {{ supplier }}御中　{{ sup_info.contact }}
+        宛先: {{ supplier }}御中　担当 {{ sup_info.contacts[0].name }}
       </span>
       {% endif %}
     </div>
