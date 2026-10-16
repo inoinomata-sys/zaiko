@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory
 import os
 from datetime import datetime
 import psycopg2
@@ -6,7 +6,6 @@ import psycopg2.extras
 from dotenv import load_dotenv
 import urllib.request
 import json as json_lib
-from io import BytesIO
 
 load_dotenv()
 
@@ -300,52 +299,6 @@ def order_print(order_id):
     return render_template('print.html',
         order=order, groups=groups, order_map=order_map, sup_info=sup_info)
 
-
-@app.route('/order/<int:order_id>/pdf')
-def order_pdf(order_id):
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
-    order = cur.fetchone()
-    if not order:
-        abort(404)
-
-    cur.execute("""
-        SELECT oi.*, p.name, p.category, p.col_group, p.note, p.sort_order
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = %s
-        ORDER BY p.col_group, p.sort_order
-    """, (order_id,))
-    items = cur.fetchall()
-
-    sup_name = order.get('supplier', 'ワールド美容')
-    all_products = products_with_stock_supplier(order['store'], sup_name)
-    order_map = {r['product_id']: r for r in items}
-
-    groups = {}
-    for p in all_products:
-        groups.setdefault(p['col_group'], []).append(p)
-
-    suppliers = get_suppliers_with_contacts()
-    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
-    db.close()
-
-    html = render_template('print_pdf.html',
-        order=order, groups=groups, order_map=order_map, sup_info=sup_info)
-
-    try:
-        from xhtml2pdf import pisa
-        buf = BytesIO()
-        pisa.CreatePDF(html.encode('utf-8'), dest=buf, encoding='utf-8')
-        buf.seek(0)
-        fname = f"order_{order['order_month']}_{order['order_day']}_{sup_name}.pdf"
-        resp = make_response(buf.read())
-        resp.headers['Content-Type'] = 'application/pdf'
-        resp.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
-        return resp
-    except Exception as e:
-        return str(e), 500
 
 
 @app.route('/order/<int:order_id>/send_line', methods=['POST'])

@@ -97,22 +97,8 @@ body {
   {% else %}
   <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
   {% endif %}
-  <button class="btn btn-print" onclick="window.print()" id="print-btn">印刷（PDF保存）</button>
-  <a href="/order/{{ order.id }}/pdf" class="btn" style="background:#7c3aed;color:#fff" id="dl-btn">PDFダウンロード</a>
+  <button class="btn btn-print" onclick="downloadPDF(this)" id="dl-btn">PDFダウンロード</button>
 </div>
-<script>
-// PCでは印刷ボタンを前面に、スマホではダウンロードボタンを前面に
-(function(){
-  var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-  var isMobile = isIOS || /Android/.test(navigator.userAgent);
-  if (isMobile) {
-    document.getElementById('print-btn').style.display = 'none';
-    document.getElementById('dl-btn').style.fontWeight = '700';
-  } else {
-    document.getElementById('dl-btn').style.display = 'none';
-  }
-})();
-</script>
 
 <div class="order-summary">
   発注品目 <strong>{{ order_map|length }}</strong> 品　／
@@ -214,7 +200,30 @@ body {
 </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+async function downloadPDF(btn) {
+  btn.disabled = true;
+  btn.textContent = '生成中…';
+  try {
+    const { jsPDF } = window.jspdf;
+    const el = document.querySelector('.print-wrap');
+    const canvas = await html2canvas(el, {scale: 2, useCORS: true, backgroundColor: '#fff'});
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4'});
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = (canvas.height * pdfW) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    const fname = '発注書_{{ order.order_month }}月{{ order.order_day }}日_{{ order.store }}.pdf';
+    pdf.save(fname);
+  } catch(e) {
+    alert('PDF生成に失敗しました: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = 'PDFダウンロード';
+}
+
 async function sendLine(btn) {
   btn.disabled = true;
   btn.textContent = '送信中…';
