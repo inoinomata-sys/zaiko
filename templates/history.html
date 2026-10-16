@@ -20,7 +20,8 @@
   <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
   <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">🧴 ワールド美容</button>
   <button class="sup-tab" onclick="filterSup(this,'トピー商事')">📦 トピー商事</button>
-  <button class="sup-tab" onclick="filterSup(this,'アイテム美容')">✂️ アイテム美容</button>
+  <button class="sup-tab" onclick="filterSup(this,'アイテム')">✂️ アイテム</button>
+  <button class="sup-tab" onclick="filterSup(this,'三井コーポレーション')">🏢 三井コーポレーション</button>
 </div>
 
 <div class="card">
@@ -44,7 +45,8 @@
       <td>
         {% if o.supplier == 'ワールド美容' %}🧴
         {% elif o.supplier == 'トピー商事' %}📦
-        {% elif o.supplier == 'アイテム美容' %}✂️
+        {% elif o.supplier == 'アイテム' %}✂️
+        {% elif o.supplier == '三井コーポレーション' %}🏢
         {% endif %}
         {{ o.supplier or '—' }}
       </td>

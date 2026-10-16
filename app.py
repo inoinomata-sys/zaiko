@@ -132,9 +132,10 @@ def api_bulk_stock():
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
 SUPPLIERS = [
-    {'name': 'ワールド美容',  'icon': '🧴', 'contact': '担当 大橋様　FAX: 06-6696-0071'},
-    {'name': 'トピー商事',    'icon': '📦', 'contact': ''},
-    {'name': 'アイテム美容',  'icon': '✂️',  'contact': ''},
+    {'name': 'ワールド美容',      'icon': '🧴', 'contact': '担当 大橋様　FAX: 06-6696-0071'},
+    {'name': 'トピー商事',        'icon': '📦', 'contact': ''},
+    {'name': 'アイテム',          'icon': '✂️',  'contact': ''},
+    {'name': '三井コーポレーション', 'icon': '🏢', 'contact': ''},
 ]
 
 @app.route('/order')
