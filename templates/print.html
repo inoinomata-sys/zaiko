@@ -97,7 +97,8 @@ body {
   {% else %}
   <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
   {% endif %}
-  <button class="btn btn-print" onclick="downloadPDF(this)" id="dl-btn">PDFダウンロード</button>
+  <button class="btn btn-print" onclick="window.print()">印刷・PDF保存</button>
+  <button class="btn" style="background:#7c3aed;color:#fff" onclick="downloadPDF(this)">PDFダウンロード</button>
 </div>
 
 <div class="order-summary">
@@ -209,7 +210,7 @@ async function downloadPDF(btn) {
   try {
     const { jsPDF } = window.jspdf;
     const el = document.querySelector('.print-wrap');
-    const canvas = await html2canvas(el, {scale: 2, useCORS: true, backgroundColor: '#fff'});
+    const canvas = await html2canvas(el, {scale: 1.5, useCORS: true, backgroundColor: '#fff'});
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4'});
     const pdfW = pdf.internal.pageSize.getWidth();
