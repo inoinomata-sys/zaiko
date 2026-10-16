@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
 from datetime import datetime
 import psycopg2
@@ -6,6 +6,7 @@ import psycopg2.extras
 from dotenv import load_dotenv
 import urllib.request
 import json as json_lib
+from io import BytesIO
 
 load_dotenv()
 
@@ -300,6 +301,53 @@ def order_print(order_id):
         order=order, groups=groups, order_map=order_map, sup_info=sup_info)
 
 
+@app.route('/order/<int:order_id>/pdf')
+def order_pdf(order_id):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
+    order = cur.fetchone()
+    if not order:
+        abort(404)
+
+    cur.execute("""
+        SELECT oi.*, p.name, p.category, p.col_group, p.note, p.sort_order
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = %s
+        ORDER BY p.col_group, p.sort_order
+    """, (order_id,))
+    items = cur.fetchall()
+
+    sup_name = order.get('supplier', 'ワールド美容')
+    all_products = products_with_stock_supplier(order['store'], sup_name)
+    order_map = {r['product_id']: r for r in items}
+
+    groups = {}
+    for p in all_products:
+        groups.setdefault(p['col_group'], []).append(p)
+
+    suppliers = get_suppliers_with_contacts()
+    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
+    db.close()
+
+    html = render_template('print_pdf.html',
+        order=order, groups=groups, order_map=order_map, sup_info=sup_info)
+
+    try:
+        from xhtml2pdf import pisa
+        buf = BytesIO()
+        pisa.CreatePDF(html.encode('utf-8'), dest=buf, encoding='utf-8')
+        buf.seek(0)
+        fname = f"order_{order['order_month']}_{order['order_day']}_{sup_name}.pdf"
+        resp = make_response(buf.read())
+        resp.headers['Content-Type'] = 'application/pdf'
+        resp.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+        return resp
+    except Exception as e:
+        return str(e), 500
+
+
 @app.route('/order/<int:order_id>/send_line', methods=['POST'])
 def order_send_line(order_id):
     req_data = request.get_json() or {}
@@ -441,6 +489,48 @@ def product_supplier(pid):
     db.commit()
     db.close()
     return jsonify(ok=True)
+
+
+# ── LINE フォロワー取得 ────────────────────────────────────────────────────────
+
+def get_line_followers():
+    """公式LINEを友達追加したユーザーIDとプロフィール名を取得"""
+    if not LINE_TOKEN:
+        return []
+    results = []
+    next_token = None
+    while True:
+        url = 'https://api.line.me/v2/bot/followers/ids?limit=1000'
+        if next_token:
+            url += f'&start={next_token}'
+        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {LINE_TOKEN}'})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json_lib.loads(r.read())
+            for uid in data.get('userIds', []):
+                # プロフィール取得
+                preq = urllib.request.Request(
+                    f'https://api.line.me/v2/bot/profile/{uid}',
+                    headers={'Authorization': f'Bearer {LINE_TOKEN}'}
+                )
+                try:
+                    with urllib.request.urlopen(preq, timeout=5) as pr:
+                        profile = json_lib.loads(pr.read())
+                    results.append({'user_id': uid, 'display_name': profile.get('displayName', uid)})
+                except Exception:
+                    results.append({'user_id': uid, 'display_name': uid})
+            next_token = data.get('next')
+            if not next_token:
+                break
+        except Exception:
+            break
+    return results
+
+
+@app.route('/api/line/followers')
+def api_line_followers():
+    followers = get_line_followers()
+    return jsonify(followers=followers)
 
 
 # ── 担当者管理 ────────────────────────────────────────────────────────────────

@@ -28,11 +28,24 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
 </style>
 {% endblock %}
 
+<!-- LINEフォロワー選択モーダル -->
+<div id="line-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">LINEの友達から選択</h3>
+    <div id="follower-list" style="font-size:14px"></div>
+    <button onclick="document.getElementById('line-modal').style.display='none'"
+            class="btn btn-ghost" style="margin-top:12px;width:100%">閉じる</button>
+  </div>
+</div>
+
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
   <h2 style="font-size:18px; font-weight:700">仕入先 担当者設定</h2>
-  <p style="font-size:12px; color:var(--fg2)">LINEで送るときに選べる担当者を登録します</p>
+  <button class="btn btn-primary" onclick="loadFollowers()">LINEの友達一覧を取得</button>
 </div>
+<p style="font-size:12px; color:var(--fg2); margin-bottom:16px">
+  公式LINE（@705hispn）を友達追加した人の一覧を取得して、担当者のLINE IDを設定できます
+</p>
 
 {% for sup in suppliers %}
 <div class="sup-section card">
@@ -95,8 +108,48 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
 {% endfor %}
 
 <div class="card" style="padding:16px; font-size:13px; color:var(--fg2)">
-  <strong>LINE User IDの確認方法</strong><br>
-  担当者に公式LINE <strong>@705hispn</strong> を友達追加してもらった後、
-  LINE Developers Console の「Messaging API」→「チャット」→ 友達一覧 または Webhook で確認できます。
+  担当者に公式LINE <strong>@705hispn</strong> を友達追加してもらったら、上の「LINEの友達一覧を取得」ボタンでUser IDを確認できます。
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadFollowers() {
+  document.getElementById('follower-list').innerHTML = '取得中…';
+  document.getElementById('line-modal').style.display = 'flex';
+  fetch('/api/line/followers')
+    .then(r => r.json())
+    .then(data => {
+      const list = data.followers;
+      if (!list.length) {
+        document.getElementById('follower-list').innerHTML = 'まだ誰も友達追加していません';
+        return;
+      }
+      let html = '<p style="font-size:12px;color:#888;margin-bottom:8px">「コピー」を押してLINE IDフィールドに貼り付けてください</p>';
+      html += '<table style="width:100%;border-collapse:collapse">';
+      list.forEach(f => {
+        html += `<tr style="border-bottom:1px solid #eee">
+          <td style="padding:8px 4px;font-weight:600">${f.display_name}</td>
+          <td style="padding:8px 4px;font-size:10px;color:#888;word-break:break-all">${f.user_id}</td>
+          <td style="padding:8px 4px">
+            <button onclick="copyId('${f.user_id}')" class="btn btn-ghost btn-sm">コピー</button>
+          </td>
+        </tr>`;
+      });
+      html += '</table>';
+      document.getElementById('follower-list').innerHTML = html;
+    })
+    .catch(() => {
+      document.getElementById('follower-list').innerHTML = 'エラーが発生しました';
+    });
+}
+
+function copyId(uid) {
+  navigator.clipboard.writeText(uid).then(() => {
+    alert('コピーしました！\nLINE IDフィールドに貼り付けてください');
+  }).catch(() => {
+    prompt('LINE User IDをコピーしてください:', uid);
+  });
+}
+</script>
 {% endblock %}
