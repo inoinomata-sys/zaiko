@@ -256,12 +256,13 @@ def order_save():
     for item in items:
         if float(item.get('order_qty', 0)) <= 0:
             continue
+        pid = int(item['product_id']) if item.get('product_id') else None
         cur.execute("""
-            INSERT INTO order_items (order_id, product_id, base_qty, stock_qty, order_qty)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (order_id, int(item['product_id']),
-              item.get('base_qty'), item.get('stock_qty'),
-              float(item['order_qty'])))
+            INSERT INTO order_items (order_id, product_id, base_qty, stock_qty, order_qty, custom_name)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (order_id, pid,
+              item.get('base_qty', 0), item.get('stock_qty', 0),
+              float(item['order_qty']), item.get('custom_name')))
     db.commit()
     db.close()
     return jsonify(ok=True, order_id=order_id)
@@ -280,10 +281,16 @@ def order_print(order_id):
         SELECT oi.*, p.name, p.category, p.col_group, p.note, p.sort_order
         FROM order_items oi
         JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = %s
+        WHERE oi.order_id = %s AND oi.product_id IS NOT NULL
         ORDER BY p.col_group, p.sort_order
     """, (order_id,))
     items = cur.fetchall()
+
+    cur.execute("""
+        SELECT order_qty, custom_name FROM order_items
+        WHERE order_id=%s AND product_id IS NULL AND custom_name IS NOT NULL
+    """, (order_id,))
+    custom_items = cur.fetchall()
 
     sup_name = order.get('supplier', 'ワールド美容')
     all_products = products_with_stock_supplier(order['store'], sup_name)
@@ -297,7 +304,8 @@ def order_print(order_id):
     sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
     db.close()
     return render_template('print.html',
-        order=order, groups=groups, order_map=order_map, sup_info=sup_info)
+        order=order, groups=groups, order_map=order_map, sup_info=sup_info,
+        custom_items=custom_items)
 
 
 

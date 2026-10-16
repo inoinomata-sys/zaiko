@@ -160,6 +160,17 @@
 </div>
 {% endfor %}
 
+<!-- その他（手入力） -->
+<div class="card" style="margin-bottom:80px">
+  <div class="card-head" style="justify-content:space-between">
+    <span>その他（手入力）</span>
+    <button class="btn btn-ghost btn-sm" onclick="addCustomRow()" type="button">＋ 追加</button>
+  </div>
+  <div id="custom-rows" style="padding:8px 12px">
+    <p id="custom-empty" style="color:var(--fg2);font-size:13px;padding:6px 0">「＋ 追加」で商品リストにない品を入力できます</p>
+  </div>
+</div>
+
 <!-- フッター -->
 <div class="order-footer">
   <div class="footer-info">
@@ -238,16 +249,53 @@ function clearAll() {
   onOrderChange();
 }
 
+let customRowCount = 0;
+function addCustomRow() {
+  document.getElementById('custom-empty').style.display = 'none';
+  const idx = ++customRowCount;
+  const div = document.createElement('div');
+  div.className = 'order-row';
+  div.style.cssText = 'gap:8px;padding:8px 0';
+  div.innerHTML = `
+    <div class="row-info" style="flex:1">
+      <input type="text" class="custom-name" placeholder="商品名を入力"
+             style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:15px;font-family:inherit">
+    </div>
+    <div class="stepper" style="display:flex;align-items:center;gap:4px">
+      <button class="stepper-btn" onclick="stepCustom(this,-1)" type="button">－</button>
+      <input type="number" class="order-qty custom-qty" value="1" min="0" style="width:52px;text-align:center;font-size:16px;padding:6px 4px;border:1px solid var(--border);border-radius:7px">
+      <button class="stepper-btn" onclick="stepCustom(this,1)" type="button">＋</button>
+    </div>
+    <button onclick="this.closest('.order-row').remove();updateCustomEmpty()" type="button"
+            style="background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:0 4px">✕</button>`;
+  document.getElementById('custom-rows').appendChild(div);
+}
+function stepCustom(btn, d) {
+  const inp = btn.parentElement.querySelector('.custom-qty');
+  inp.value = Math.max(0, (parseInt(inp.value)||0) + d);
+}
+function updateCustomEmpty() {
+  const rows = document.querySelectorAll('#custom-rows .order-row');
+  document.getElementById('custom-empty').style.display = rows.length ? 'none' : '';
+}
+
 async function saveOrder() {
   const items = [];
   document.querySelectorAll('.order-row').forEach(row => {
     const oq = parseInt(row.querySelector('.order-qty').value) || 0;
     if (oq > 0) items.push({
-      product_id: row.dataset.id,
-      base_qty:   parseFloat(row.dataset.base),
-      stock_qty:  parseFloat(row.dataset.stock),
-      order_qty:  oq
+      product_id: row.dataset.id || null,
+      base_qty:   parseFloat(row.dataset.base) || 0,
+      stock_qty:  parseFloat(row.dataset.stock) || 0,
+      order_qty:  oq,
+      custom_name: null
     });
+  });
+  // その他（手入力）
+  document.querySelectorAll('#custom-rows .order-row').forEach(row => {
+    const name = row.querySelector('.custom-name').value.trim();
+    const oq   = parseInt(row.querySelector('.custom-qty').value) || 0;
+    if (name && oq > 0) items.push({product_id: null, base_qty: 0, stock_qty: 0, order_qty: oq, custom_name: name});
   });
   if (items.length === 0) { toast('発注数が 0 です'); return; }
 

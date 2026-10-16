@@ -241,6 +241,17 @@ function printPDF() {
   <div>{{ render_col(col3) }}</div>
   <div>{{ render_col(col4) }}</div>
 </div>
+{% if custom_items %}
+<div style="margin-top:8px;border-top:1.5px solid #555;padding-top:4px">
+  <div class="cat-head">その他（手入力）</div>
+  {% for c in custom_items %}
+  <div class="item-row">
+    <span class="iname">{{ c.custom_name }}</span>
+    <span class="iqty">{{ c.order_qty|int }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 </div>
 
 <script>
