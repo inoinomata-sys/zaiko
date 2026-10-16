@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
 from datetime import datetime
 import psycopg2
@@ -6,7 +6,9 @@ import psycopg2.extras
 import psycopg2.pool
 from dotenv import load_dotenv
 import urllib.request
+import urllib.parse
 import json as json_lib
+from fpdf import FPDF
 
 load_dotenv()
 
@@ -366,6 +368,137 @@ def order_print(order_id):
         order=order, groups=groups, order_map=order_map, sup_info=sup_info,
         custom_items=custom_items)
 
+
+
+@app.route('/order/<int:order_id>/pdf')
+def order_pdf(order_id):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
+    order = cur.fetchone()
+    if not order:
+        abort(404)
+
+    cur.execute("""
+        SELECT oi.order_qty, p.name, p.category, p.col_group, p.sort_order, p.note
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = %s AND oi.product_id IS NOT NULL
+        ORDER BY p.col_group, p.sort_order
+    """, (order_id,))
+    items = cur.fetchall()
+
+    cur.execute("""
+        SELECT order_qty, custom_name FROM order_items
+        WHERE order_id=%s AND product_id IS NULL AND custom_name IS NOT NULL
+    """, (order_id,))
+    custom_items = cur.fetchall()
+
+    sup_name = order.get('supplier', 'ワールド美容')
+    suppliers = get_suppliers_with_contacts()
+    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
+    release_db(db)
+
+    # カテゴリ別にまとめる
+    cat_groups = {}
+    for it in items:
+        cat = it['category'] or 'その他'
+        cat_groups.setdefault(cat, []).append(it)
+
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.add_page()
+
+    # 日本語フォント（Renderでは標準フォントのみ使用、日本語はUTF-8エンコード不要な文字のみ）
+    # fpdf2はUnicodeをサポートするが日本語フォントが必要
+    # → 日本語対応: NotoSansJP を静的ファイルから読む
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
+    if os.path.exists(font_path):
+        pdf.add_font('NotoSans', '', font_path)
+        pdf.add_font('NotoSans', 'B', font_path)
+        font_name = 'NotoSans'
+    else:
+        font_name = 'Helvetica'
+
+    pdf.set_margins(8, 8, 8)
+    pdf.set_auto_page_break(auto=True, margin=8)
+
+    # ヘッダー
+    pdf.set_font(font_name, 'B', 14)
+    contact_name = sup_info['contacts'][0]['name'] if sup_info.get('contacts') else ''
+    header_left = f"{sup_name}御中" + (f"  担当 {contact_name}" if contact_name else '')
+    pdf.cell(0, 8, header_left)
+    pdf.set_font(font_name, '', 11)
+    date_str = f"{order['order_month']}月{order['order_day']}日"
+    pdf.cell(0, 8, date_str, align='R', new_x='LMARGIN', new_y='NEXT')
+
+    pdf.set_font(font_name, '', 9)
+    pdf.cell(0, 5, "(有)イノ  担当    TEL: 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
+
+    # 区切り線
+    pdf.set_draw_color(80, 80, 80)
+    pdf.set_line_width(0.5)
+    pdf.line(8, pdf.get_y(), 202, pdf.get_y())
+    pdf.ln(2)
+
+    # 4列レイアウト
+    col_w = 47
+    col_x = [8, 57, 106, 155]
+    start_y = pdf.get_y()
+    col_y = [start_y] * 4
+    col_idx = 0
+
+    # 総行数でカラム割り
+    total_rows = sum(len(v) + 1 for v in cat_groups.items())
+    rows_per_col = max(1, -(-total_rows // 4))  # ceil
+
+    row_count = 0
+    for cat, cat_items in cat_groups.items():
+        block_size = len(cat_items) + 1
+        if row_count > 0 and row_count + block_size > rows_per_col * (col_idx + 1) and col_idx < 3:
+            col_idx += 1
+
+        x = col_x[col_idx]
+        # カテゴリ見出し
+        pdf.set_xy(x, col_y[col_idx])
+        pdf.set_fill_color(200, 200, 200)
+        pdf.set_font(font_name, 'B', 7)
+        pdf.cell(col_w, 4, cat, fill=True)
+        col_y[col_idx] = pdf.get_y() + 4
+
+        for it in cat_items:
+            pdf.set_xy(x, col_y[col_idx])
+            pdf.set_font(font_name, '', 7)
+            name = it['name'] + (f" ({it['note']})" if it.get('note') else '')
+            pdf.cell(col_w - 10, 3.5, name)
+            pdf.set_font(font_name, 'B', 8)
+            pdf.cell(10, 3.5, str(int(it['order_qty'])), align='R')
+            col_y[col_idx] += 3.5
+
+        row_count += block_size
+
+    # その他（手入力）
+    if custom_items:
+        max_y = max(col_y)
+        pdf.set_y(max_y + 3)
+        pdf.set_draw_color(80, 80, 80)
+        pdf.line(8, pdf.get_y(), 202, pdf.get_y())
+        pdf.ln(1)
+        pdf.set_font(font_name, 'B', 7)
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(0, 4, 'その他（手入力）', fill=True, new_x='LMARGIN', new_y='NEXT')
+        for ci in custom_items:
+            pdf.set_font(font_name, '', 7)
+            pdf.cell(col_w * 3, 3.5, ci['custom_name'])
+            pdf.set_font(font_name, 'B', 8)
+            pdf.cell(10, 3.5, str(int(ci['order_qty'])), align='R', new_x='LMARGIN', new_y='NEXT')
+
+    filename = f"発注書_{order['order_month']}月{order['order_day']}日_{sup_name}.pdf"
+    pdf_bytes = pdf.output()
+    response = make_response(bytes(pdf_bytes))
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{urllib.parse.quote(filename)}'
+    return response
 
 
 @app.route('/order/<int:order_id>/send_line', methods=['POST'])
