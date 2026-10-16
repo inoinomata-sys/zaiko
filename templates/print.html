@@ -35,11 +35,11 @@ body {
 }
 .doc-header td { padding: 5px 8px; }
 
-/* 3カラムレイアウト */
+/* 4カラムレイアウト */
 .order-cols {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0 8px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0 6px;
 }
 .order-col-list {
   break-inside: avoid-column;
@@ -127,17 +127,18 @@ body {
   {% endfor %}
 {% endfor %}
 
-{# 全アイテム数を計算して3列に分割 #}
+{# 全アイテム数を計算して4列に分割 #}
 {% set total_lines = namespace(v=0) %}
 {% for cat, items in cat_groups.items() %}
   {% set total_lines.v = total_lines.v + items|length + 1 %}
 {% endfor %}
-{% set third = (total_lines.v / 3)|round(0, 'ceil')|int %}
+{% set quarter = (total_lines.v / 4)|round(0, 'ceil')|int %}
 
-{# 3列に振り分け #}
+{# 4列に振り分け #}
 {% set col1 = [] %}
 {% set col2 = [] %}
 {% set col3 = [] %}
+{% set col4 = [] %}
 {% set filled = namespace(v=0, col=1) %}
 {% for cat, items in cat_groups.items() %}
   {% set block = [{'type':'cat','name':cat}] %}
@@ -147,13 +148,17 @@ body {
   {% if filled.col == 1 %}
     {% for row in block %}{% set _ = col1.append(row) %}{% endfor %}
     {% set filled.v = filled.v + block|length %}
-    {% if filled.v >= third %}{% set filled.col = 2 %}{% endif %}
+    {% if filled.v >= quarter %}{% set filled.col = 2 %}{% endif %}
   {% elif filled.col == 2 %}
     {% for row in block %}{% set _ = col2.append(row) %}{% endfor %}
     {% set filled.v = filled.v + block|length %}
-    {% if filled.v >= third * 2 %}{% set filled.col = 3 %}{% endif %}
-  {% else %}
+    {% if filled.v >= quarter * 2 %}{% set filled.col = 3 %}{% endif %}
+  {% elif filled.col == 3 %}
     {% for row in block %}{% set _ = col3.append(row) %}{% endfor %}
+    {% set filled.v = filled.v + block|length %}
+    {% if filled.v >= quarter * 3 %}{% set filled.col = 4 %}{% endif %}
+  {% else %}
+    {% for row in block %}{% set _ = col4.append(row) %}{% endfor %}
   {% endif %}
 {% endfor %}
 
@@ -174,6 +179,7 @@ body {
   <div>{{ render_col(col1) }}</div>
   <div>{{ render_col(col2) }}</div>
   <div>{{ render_col(col3) }}</div>
+  <div>{{ render_col(col4) }}</div>
 </div>
 </div>
 
