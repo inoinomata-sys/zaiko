@@ -97,18 +97,53 @@ body {
   {% else %}
   <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
   {% endif %}
-  <button class="btn btn-print" id="print-btn" onclick="window.print()">PDF保存・印刷</button>
+  <button class="btn btn-print" onclick="printPDF()">PDF保存・印刷</button>
 </div>
-<div id="ios-hint" style="display:none;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px 16px;margin:8px 0;font-size:14px;color:#1b5e20;line-height:1.8">
-  <strong>iPhoneでのPDF保存方法</strong><br>
-  Safariの下の <strong>共有ボタン（↑）</strong> をタップ<br>
-  →「<strong>PDFを作成</strong>」を選択 → 「完了」→「ファイルに保存」
+
+<!-- PDF操作案内モーダル -->
+<div id="pdf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:360px;width:100%">
+    <p style="font-weight:700;font-size:15px;margin-bottom:14px">PDF保存の手順</p>
+    <div id="pdf-guide" style="font-size:14px;line-height:2;color:#333"></div>
+    <button onclick="document.getElementById('pdf-modal').style.display='none'"
+            style="margin-top:16px;width:100%;padding:10px;background:#c2547a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">閉じる</button>
+  </div>
 </div>
+
 <script>
-if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-  document.getElementById('ios-hint').style.display = 'block';
-  // iOSではwindow.printは使わず共有ボタンを案内
-  document.getElementById('print-btn').style.display = 'none';
+function printPDF() {
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua);
+  const isMac = /Macintosh/.test(ua) && !isIOS;
+  const isAndroid = /Android/.test(ua);
+  const isChrome = /Chrome/.test(ua);
+  const isSafari = /Safari/.test(ua) && !isChrome;
+
+  let guide = '';
+  if (isIOS) {
+    guide = '① このまま画面下の <strong>共有ボタン（↑）</strong> をタップ<br>'
+          + '② 「<strong>PDFを作成</strong>」を選択<br>'
+          + '③「完了」→「ファイルに保存」';
+  } else if (isAndroid && isChrome) {
+    guide = '① 右上メニュー（⋮）→「<strong>印刷</strong>」をタップ<br>'
+          + '② 送信先を「<strong>PDFとして保存</strong>」に変更<br>'
+          + '③「保存」をタップ';
+  } else if (isMac && isSafari) {
+    guide = '① メニュー「ファイル」→「<strong>PDFとして書き出す…</strong>」<br>'
+          + '② 保存先を選んで「保存」';
+  } else {
+    guide = '① 印刷ダイアログが開きます<br>'
+          + '② 送信先／プリンターを「<strong>PDFとして保存</strong>」に変更<br>'
+          + '③「保存」をクリック';
+  }
+
+  document.getElementById('pdf-guide').innerHTML = guide;
+  document.getElementById('pdf-modal').style.display = 'flex';
+
+  // 案内表示後に印刷ダイアログを開く（iOSは除く）
+  if (!isIOS) {
+    setTimeout(() => window.print(), 300);
+  }
 }
 </script>
 
