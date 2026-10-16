@@ -33,7 +33,7 @@
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px">
   <h1 style="font-size:20px; font-weight:700">在庫管理</h1>
-  <a href="/order" class="btn btn-primary">🛒 発注書を作成</a>
+  <a href="/order" class="btn btn-primary">発注書を作成</a>
 </div>
 
 <!-- カテゴリフィルタ -->
@@ -69,7 +69,7 @@
         {{ p.name }}
         {% if p.note %}<span class="badge badge-muted" style="font-size:10px">{{ p.note }}</span>{% endif %}
       </td>
-      <td class="r">{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
+      <td class="r">{{ p.base_qty|n }}</td>
       <td class="r">
         <input class="qty-input" type="number" min="0" step="0.5"
                value="{{ p.current_qty }}"
@@ -78,7 +78,7 @@
       </td>
       <td class="r">
         {% if shortage > 0 %}
-          <span class="shortage">{{ shortage|int if shortage == shortage|int else shortage }}</span>
+          <span class="shortage">{{ shortage|n }}</span>
         {% else %}
           <span class="ok">—</span>
         {% endif %}

@@ -142,9 +142,9 @@
         {% if p.note %}<span class="badge badge-muted" style="font-size:11px; margin-left:4px">{{ p.note }}</span>{% endif %}
       </div>
       <div class="row-meta">
-        基準 {{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }} ／
-        在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty }}</span>
-        {% if shortage > 0 %} ／ 不足 {{ shortage|int if shortage == shortage|int else shortage }}{% endif %}
+        基準 {{ p.base_qty|n }} ／
+        在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty|n }}</span>
+        {% if shortage > 0 %} ／ 不足 {{ shortage|n }}{% endif %}
       </div>
     </div>
     <div class="stepper">

@@ -11,6 +11,15 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 
+@app.template_filter('n')
+def num_fmt(v):
+    """整数なら小数点なし、小数なら必要な桁だけ表示"""
+    if v is None:
+        return '0'
+    f = float(v)
+    return str(int(f)) if f == int(f) else f'{f:g}'
+
+
 @app.route('/sw.js')
 def service_worker():
     resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
