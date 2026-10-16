@@ -2,27 +2,68 @@
 {% block title %}発注履歴{% endblock %}
 {% block head %}
 <style>
-.sup-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.sup-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .sup-tab {
-  padding: 7px 18px; border-radius: 20px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--fg2); font-size: 14px; font-weight: 500;
+  padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg2); font-size: 13px; font-weight: 500;
   cursor: pointer; font-family: inherit; transition: all .15s;
 }
 .sup-tab.active { background: var(--acc); color: #fff; border-color: var(--acc); }
-.hist-row { display: none; }
-.hist-row.show { display: table-row; }
+
+.date-group { margin-bottom: 20px; }
+.date-head {
+  font-size: 16px; font-weight: 700;
+  padding: 10px 0 8px;
+  border-bottom: 2px solid var(--acc);
+  margin-bottom: 8px;
+  color: var(--fg);
+}
+
+.order-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.order-card.hidden { display: none; }
+.order-store {
+  background: var(--acc);
+  color: #fff;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.order-supplier {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 120px;
+}
+.order-meta {
+  font-size: 13px;
+  color: var(--fg2);
+  white-space: nowrap;
+}
+.order-actions { margin-left: auto; }
 </style>
 {% endblock %}
+
 {% block content %}
 <h1 style="font-size:20px;font-weight:700;margin-bottom:14px">発注履歴</h1>
 
-<div class="sup-tabs" style="margin-bottom:8px">
+<div class="sup-tabs">
   <button class="sup-tab active" onclick="filterStore(this,'')">全店舗</button>
   <button class="sup-tab" onclick="filterStore(this,'イノ')">イノ</button>
   <button class="sup-tab" onclick="filterStore(this,'リッチ')">リッチ</button>
 </div>
-
-<div class="sup-tabs">
+<div class="sup-tabs" style="margin-bottom:16px">
   <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
   <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">ワールド美容</button>
   <button class="sup-tab" onclick="filterSup(this,'トピー商事')">トピー商事</button>
@@ -30,40 +71,27 @@
   <button class="sup-tab" onclick="filterSup(this,'三井コーポレーション')">三井コーポレーション</button>
 </div>
 
-<div class="card">
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>発注日</th>
-        <th>店舗</th>
-        <th>仕入先</th>
-        <th>品目数</th>
-        <th>合計数</th>
-        <th>作成日時</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="hist-body">
+{% if grouped %}
+  {% for (month, day), orders in grouped.items() %}
+  <div class="date-group" data-month="{{ month }}" data-day="{{ day }}">
+    <div class="date-head">{{ month }}月{{ day }}日</div>
     {% for o in orders %}
-    <tr class="hist-row show" data-supplier="{{ o.supplier or '' }}" data-store="{{ o.store or '' }}">
-      <td style="color:var(--fg2);font-size:12px">{{ o.id }}</td>
-      <td style="font-weight:600">{{ o.order_month }}月{{ o.order_day }}日</td>
-      <td>{{ o.store or '—' }}</td>
-      <td>{{ o.supplier or '—' }}</td>
-      <td class="r">{{ o.item_count }} 品</td>
-      <td class="r">{{ o.total_qty|int }} 点</td>
-      <td style="font-size:12px;color:var(--fg2)">{{ o.created_at }}</td>
-      <td><a href="/order/{{ o.id }}/print" class="btn btn-ghost btn-sm">表示</a></td>
-    </tr>
+    <div class="order-card" data-store="{{ o.store or '' }}" data-supplier="{{ o.supplier or '' }}">
+      <span class="order-store">{{ o.store or '—' }}</span>
+      <span class="order-supplier">{{ o.supplier or '—' }}</span>
+      <span class="order-meta">{{ o.item_count }} 品 &nbsp;/&nbsp; {{ o.total_qty|int }} 点</span>
+      <div class="order-actions">
+        <a href="/order/{{ o.id }}/print" class="btn btn-ghost btn-sm">表示</a>
+      </div>
+    </div>
     {% endfor %}
-    {% if not orders %}
-    <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--fg2)">発注履歴はありません</td></tr>
-    {% endif %}
-    </tbody>
-  </table>
-</div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="text-align:center;padding:60px;color:var(--fg2)">発注履歴はありません</div>
+{% endif %}
 {% endblock %}
+
 {% block scripts %}
 <script>
 let currentStore = '', currentSup = '';
@@ -74,19 +102,23 @@ function filterStore(btn, store) {
   currentStore = store;
   applyFilter();
 }
-
 function filterSup(btn, sup) {
   document.querySelectorAll('.sup-tabs:last-of-type .sup-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentSup = sup;
   applyFilter();
 }
-
 function applyFilter() {
-  document.querySelectorAll('.hist-row').forEach(tr => {
-    const storeMatch = currentStore === '' || tr.dataset.store === currentStore;
-    const supMatch   = currentSup   === '' || tr.dataset.supplier === currentSup;
-    tr.classList.toggle('show', storeMatch && supMatch);
+  document.querySelectorAll('.date-group').forEach(group => {
+    let anyVisible = false;
+    group.querySelectorAll('.order-card').forEach(card => {
+      const sm = currentStore === '' || card.dataset.store === currentStore;
+      const sp = currentSup   === '' || card.dataset.supplier === currentSup;
+      const show = sm && sp;
+      card.classList.toggle('hidden', !show);
+      if (show) anyVisible = true;
+    });
+    group.style.display = anyVisible ? '' : 'none';
   });
 }
 </script>

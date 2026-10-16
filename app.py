@@ -255,12 +255,20 @@ def order_history():
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
         GROUP BY o.id
-        ORDER BY o.created_at DESC
-        LIMIT 100
+        ORDER BY o.order_month DESC, o.order_day DESC, o.created_at DESC
+        LIMIT 200
     """)
     orders = cur.fetchall()
     db.close()
-    return render_template('history.html', orders=orders)
+
+    # 日付ごとにグループ化
+    from collections import OrderedDict
+    grouped = OrderedDict()
+    for o in orders:
+        key = (o['order_month'], o['order_day'])
+        grouped.setdefault(key, []).append(o)
+
+    return render_template('history.html', grouped=grouped)
 
 
 # ── 商品マスター管理 ──────────────────────────────────────────────────────────
