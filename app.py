@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from dotenv import load_dotenv
 import urllib.request
 import json as json_lib
@@ -12,10 +13,12 @@ load_dotenv()
 app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+# 接続プール（最小1・最大5）
+_pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
+
 
 @app.template_filter('n')
 def num_fmt(v):
-    """整数なら小数点なし、小数なら必要な桁だけ表示"""
     if v is None:
         return '0'
     f = float(v)
@@ -29,11 +32,37 @@ def service_worker():
     return resp
 
 
+@app.route('/ping')
+def ping():
+    return 'ok', 200
+
+
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    return conn
+    global _pool
+    try:
+        conn = _pool.getconn()
+        # 切断されていたら再接続
+        if conn.closed:
+            _pool.putconn(conn)
+            raise psycopg2.InterfaceError
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
+        return conn
+    except Exception:
+        # プールを作り直して再試行
+        _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
+        conn = _pool.getconn()
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
+        return conn
+
+
+def release_db(conn):
+    try:
+        if not conn.closed:
+            _pool.putconn(conn)
+    except Exception:
+        pass
 
 
 def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
@@ -48,7 +77,7 @@ def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
         ORDER BY p.col_group, p.sort_order
     """, (store, supplier))
     rows = cur.fetchall()
-    db.close()
+    release_db(db)
     return rows
 
 
@@ -70,7 +99,7 @@ def products_with_stock(store='イノ', cat=None):
         ORDER BY p.col_group, p.sort_order
     """, params)
     rows = cur.fetchall()
-    db.close()
+    release_db(db)
     return rows
 
 
@@ -87,7 +116,7 @@ def inventory():
         "SELECT category FROM products WHERE is_active=true AND category!='' GROUP BY category ORDER BY MIN(sort_order)"
     )
     cats = [r['category'] for r in cur.fetchall()]
-    db.close()
+    release_db(db)
 
     rows = products_with_stock(store, cat or None)
 
@@ -116,7 +145,7 @@ def api_update_stock():
         DO UPDATE SET current_qty=EXCLUDED.current_qty, updated_at=EXCLUDED.updated_at
     """, (product_id, store, qty, datetime.now().strftime('%Y-%m-%d %H:%M')))
     db.commit()
-    db.close()
+    release_db(db)
     return jsonify(ok=True)
 
 
@@ -136,7 +165,7 @@ def api_bulk_stock():
             DO UPDATE SET current_qty=EXCLUDED.current_qty, updated_at=EXCLUDED.updated_at
         """, (int(item['product_id']), store, float(item['qty']), now))
     db.commit()
-    db.close()
+    release_db(db)
     return jsonify(ok=True)
 
 
@@ -177,7 +206,7 @@ def get_suppliers_with_contacts():
     cur = db.cursor()
     cur.execute("SELECT supplier_name, contact_name, fax, line_user_id, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id")
     rows = cur.fetchall()
-    db.close()
+    release_db(db)
     result = {}
     for name in SUPPLIER_NAMES:
         result[name] = {'name': name, 'contacts': []}
@@ -204,7 +233,7 @@ def order_top():
         cur.execute("SELECT COUNT(*) FROM products WHERE is_active=true AND supplier=%s", (s['name'],))
         cnt = cur.fetchone()['count']
         supplier_list.append({**s, 'count': cnt})
-    db.close()
+    release_db(db)
     return render_template('order_top.html', suppliers=supplier_list, stores=STORES, store=store)
 
 
@@ -220,7 +249,7 @@ def order_form():
         (supplier,)
     )
     cats = [r['category'] for r in cur.fetchall()]
-    db.close()
+    release_db(db)
 
     rows = products_with_stock_supplier(store, supplier)
     grouped = {}
@@ -264,7 +293,7 @@ def order_save():
               item.get('base_qty', 0), item.get('stock_qty', 0),
               float(item['order_qty']), item.get('custom_name')))
     db.commit()
-    db.close()
+    release_db(db)
     return jsonify(ok=True, order_id=order_id)
 
 
@@ -302,7 +331,7 @@ def order_print(order_id):
 
     suppliers = get_suppliers_with_contacts()
     sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
-    db.close()
+    release_db(db)
     return render_template('print.html',
         order=order, groups=groups, order_map=order_map, sup_info=sup_info,
         custom_items=custom_items)
@@ -319,7 +348,7 @@ def order_send_line(order_id):
     cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
     order = cur.fetchone()
     if not order:
-        db.close()
+        release_db(db)
         return jsonify(ok=False, error='注文が見つかりません')
 
     cur.execute("""
@@ -330,7 +359,7 @@ def order_send_line(order_id):
         ORDER BY p.col_group, p.sort_order
     """, (order_id,))
     items = cur.fetchall()
-    db.close()
+    release_db(db)
 
     suppliers = get_suppliers_with_contacts()
     sup_info = next((s for s in suppliers if s['name'] == order.get('supplier', '')), None)
@@ -375,7 +404,7 @@ def order_history():
         LIMIT 200
     """)
     orders = cur.fetchall()
-    db.close()
+    release_db(db)
 
     # 日付ごとにグループ化
     from collections import OrderedDict
@@ -395,7 +424,7 @@ def products():
     cur = db.cursor()
     cur.execute("SELECT * FROM products ORDER BY col_group, sort_order")
     rows = cur.fetchall()
-    db.close()
+    release_db(db)
     return render_template('products.html', rows=rows)
 
 
@@ -416,7 +445,7 @@ def product_add():
           float(d.get('base_qty', 0)), d.get('note') or None,
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
-    db.close()
+    release_db(db)
     return redirect(url_for('products'))
 
 
@@ -426,7 +455,7 @@ def product_toggle(pid):
     cur = db.cursor()
     cur.execute("UPDATE products SET is_active = NOT is_active WHERE id=%s", (pid,))
     db.commit()
-    db.close()
+    release_db(db)
     return redirect(url_for('products'))
 
 
@@ -437,7 +466,7 @@ def product_base(pid):
     cur.execute("UPDATE products SET base_qty=%s WHERE id=%s",
                (float(request.form['base_qty']), pid))
     db.commit()
-    db.close()
+    release_db(db)
     return jsonify(ok=True)
 
 
@@ -448,7 +477,7 @@ def product_supplier(pid):
     cur.execute("UPDATE products SET supplier=%s WHERE id=%s",
                (request.form['supplier'], pid))
     db.commit()
-    db.close()
+    release_db(db)
     return jsonify(ok=True)
 
 
@@ -515,7 +544,7 @@ def contact_add():
     cur.execute("INSERT INTO supplier_contacts (supplier_name, contact_name, fax, line_user_id, sort_order) VALUES (%s,%s,%s,%s,%s)",
                 (supplier_name, contact_name, fax, line_user_id, max_sort + 1))
     db.commit()
-    db.close()
+    release_db(db)
     return redirect(url_for('contacts_settings'))
 
 
@@ -529,7 +558,7 @@ def contact_update(cid):
                  request.form.get('line_user_id', ''),
                  cid))
     db.commit()
-    db.close()
+    release_db(db)
     return redirect(url_for('contacts_settings'))
 
 
@@ -539,7 +568,7 @@ def contact_delete(cid):
     cur = db.cursor()
     cur.execute("DELETE FROM supplier_contacts WHERE id=%s", (cid,))
     db.commit()
-    db.close()
+    release_db(db)
     return redirect(url_for('contacts_settings'))
 
 
