@@ -72,8 +72,8 @@
       <td class="r">{{ p.base_qty|n }}</td>
       <td class="r">
         <input class="qty-input" type="number" min="0" step="0.5"
-               value="{{ p.current_qty }}"
-               data-id="{{ p.id }}" data-orig="{{ p.current_qty }}"
+               value="{{ p.current_qty|n }}"
+               data-id="{{ p.id }}" data-orig="{{ p.current_qty|n }}"
                onchange="updateStock(this)">
       </td>
       <td class="r">
