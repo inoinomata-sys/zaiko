@@ -26,6 +26,7 @@ body {
 .btn { padding: 8px 18px; border-radius: 7px; border: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-print { background: #c2547a; color: #fff; }
 .btn-back  { background: transparent; color: #c2547a; border: 1px solid #c2547a; }
+.btn-line  { background: #06c755; color: #fff; }
 .order-summary { margin-bottom: 12px; font-size: 13px; color: #555; }
 
 /* 発注書ヘッダー */
@@ -80,6 +81,11 @@ body {
 
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
+  {% if sup_info.line_user_id %}
+  <button class="btn btn-line" onclick="sendLine(this)" id="line-btn">LINEで送る</button>
+  {% else %}
+  <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
+  {% endif %}
   <button class="btn btn-print" onclick="window.print()">印刷（PDF保存）</button>
 </div>
 
@@ -183,5 +189,27 @@ body {
 </div>
 </div>
 
+<script>
+async function sendLine(btn) {
+  btn.disabled = true;
+  btn.textContent = '送信中…';
+  try {
+    const res = await fetch('/order/{{ order.id }}/send_line', {method:'POST'});
+    const data = await res.json();
+    if (data.ok) {
+      btn.textContent = '送信しました';
+      btn.style.background = '#059142';
+    } else {
+      alert(data.error || '送信に失敗しました');
+      btn.disabled = false;
+      btn.textContent = 'LINEで送る';
+    }
+  } catch(e) {
+    alert('通信エラーが発生しました');
+    btn.disabled = false;
+    btn.textContent = 'LINEで送る';
+  }
+}
+</script>
 </body>
 </html>

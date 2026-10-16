@@ -4,6 +4,8 @@ from datetime import datetime
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+import urllib.request
+import json as json_lib
 
 load_dotenv()
 
@@ -140,13 +142,38 @@ def api_bulk_stock():
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
+LINE_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '')
+
+def send_line_message(to_user_id, text):
+    if not LINE_TOKEN or not to_user_id:
+        return False
+    data = json_lib.dumps({
+        'to': to_user_id,
+        'messages': [{'type': 'text', 'text': text}]
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'https://api.line.me/v2/bot/message/push',
+        data=data,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {LINE_TOKEN}'
+        },
+        method='POST'
+    )
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except Exception:
+        return False
+
+
 STORES = ['イノ', 'リッチ']
 
 SUPPLIERS = [
-    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071'},
-    {'name': 'トピー商事',          'contact': ''},
-    {'name': 'アイテム',            'contact': ''},
-    {'name': '三井コーポレーション', 'contact': ''},
+    {'name': 'ワールド美容',        'contact': '担当 大橋様　FAX: 06-6696-0071', 'line_user_id': ''},
+    {'name': 'トピー商事',          'contact': '',                               'line_user_id': ''},
+    {'name': 'アイテム',            'contact': '',                               'line_user_id': ''},
+    {'name': '三井コーポレーション', 'contact': '',                               'line_user_id': ''},
 ]
 
 @app.route('/order')
@@ -251,6 +278,45 @@ def order_print(order_id):
     db.close()
     return render_template('print.html',
         order=order, groups=groups, order_map=order_map, sup_info=sup_info)
+
+
+@app.route('/order/<int:order_id>/send_line', methods=['POST'])
+def order_send_line(order_id):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
+    order = cur.fetchone()
+    if not order:
+        db.close()
+        return jsonify(ok=False, error='注文が見つかりません')
+
+    cur.execute("""
+        SELECT oi.order_qty, p.name, p.category
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = %s
+        ORDER BY p.col_group, p.sort_order
+    """, (order_id,))
+    items = cur.fetchall()
+    db.close()
+
+    sup_info = next((s for s in SUPPLIERS if s['name'] == order.get('supplier', '')), None)
+    if not sup_info or not sup_info.get('line_user_id'):
+        return jsonify(ok=False, error='この仕入先のLINE IDが未設定です')
+
+    lines = [f"【発注】{order['order_month']}月{order['order_day']}日 {order['store']}",
+             f"仕入先：{order['supplier']}", ""]
+    current_cat = ''
+    for it in items:
+        if it['category'] != current_cat:
+            current_cat = it['category']
+            lines.append(f"▼ {current_cat}")
+        lines.append(f"  {it['name']}  ×{int(it['order_qty'])}")
+    lines += ["", "(有)イノ　TEL: 072-999-6571"]
+    text = '\n'.join(lines)
+
+    ok = send_line_message(sup_info['line_user_id'], text)
+    return jsonify(ok=ok, error=None if ok else '送信に失敗しました')
 
 
 @app.route('/order/history')
