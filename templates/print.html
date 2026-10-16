@@ -97,9 +97,16 @@ body {
   {% else %}
   <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
   {% endif %}
-  <button class="btn btn-print" onclick="window.print()">印刷・PDF保存</button>
-  <button class="btn" style="background:#7c3aed;color:#fff" onclick="downloadPDF(this)">PDFダウンロード</button>
+  <button class="btn btn-print" onclick="window.print()">PDF保存・印刷</button>
 </div>
+<div id="ios-hint" style="display:none;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:13px;color:#5d4037">
+  iPhoneでPDF保存する方法：「PDF保存・印刷」をタップ → 左下のプレビューを <strong>2本指で広げる</strong> → 右上の「共有」→「ファイルに保存」
+</div>
+<script>
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  document.getElementById('ios-hint').style.display = 'block';
+}
+</script>
 
 <div class="order-summary">
   発注品目 <strong>{{ order_map|length }}</strong> 品　／
@@ -201,30 +208,7 @@ body {
 </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-async function downloadPDF(btn) {
-  btn.disabled = true;
-  btn.textContent = '生成中…';
-  try {
-    const { jsPDF } = window.jspdf;
-    const el = document.querySelector('.print-wrap');
-    const canvas = await html2canvas(el, {scale: 1.5, useCORS: true, backgroundColor: '#fff'});
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF({orientation: 'portrait', unit: 'mm', format: 'a4'});
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = (canvas.height * pdfW) / canvas.width;
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
-    const fname = '発注書_{{ order.order_month }}月{{ order.order_day }}日_{{ order.store }}.pdf';
-    pdf.save(fname);
-  } catch(e) {
-    alert('PDF生成に失敗しました: ' + e.message);
-  }
-  btn.disabled = false;
-  btn.textContent = 'PDFダウンロード';
-}
-
 async function sendLine(btn) {
   btn.disabled = true;
   btn.textContent = '送信中…';
