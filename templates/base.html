@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}在庫・発注管理{% endblock %} — イノ</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1a6fbf">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="在庫管理">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <style>
 :root {
   --bg: #f4f6f9;
@@ -162,6 +168,11 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
 </nav>
+<div id="pwa-banner" style="display:none;background:#1a6fbf;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;">
+  <span>📱 ホーム画面に追加してアプリとして使えます</span>
+  <button onclick="installPWA()" style="background:#fff;color:#1a6fbf;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">追加する</button>
+  <button onclick="this.parentElement.style.display='none'" style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:18px;margin-left:auto;">✕</button>
+</div>
 <main>
 {% block content %}{% endblock %}
 </main>
@@ -174,5 +185,29 @@ function toast(msg, dur=2200) {
 }
 </script>
 {% block scripts %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+
+// ホーム画面追加バナー
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('pwa-banner').style.display = 'flex';
+});
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('pwa-banner').style.display = 'none';
+  });
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-banner').style.display = 'none';
+});
+</script>
 </body>
 </html>

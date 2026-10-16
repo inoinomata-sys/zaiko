@@ -1,0 +1,37 @@
+{
+  "name": "イノ 在庫・発注管理",
+  "short_name": "在庫管理",
+  "description": "美容室の在庫・発注管理システム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1a6fbf",
+  "orientation": "portrait-primary",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "在庫確認",
+      "url": "/",
+      "description": "在庫一覧を開く"
+    },
+    {
+      "name": "発注書作成",
+      "url": "/order",
+      "description": "発注書を作成する"
+    }
+  ]
+}
