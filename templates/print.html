@@ -57,29 +57,31 @@ body {
 }
 
 /* 発注リスト */
-.order-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.order-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .order-table th {
-  padding: 4px 8px; border: 1px solid #999; background: #e8f0fb;
-  font-size: 11px; font-weight: 700; text-align: center;
+  padding: 5px 8px; border: 1px solid #999; background: #e8f0fb;
+  font-size: 12px; font-weight: 700; text-align: center;
 }
 .order-table td {
-  padding: 3px 8px; border: 1px solid #ccc;
+  padding: 4px 8px; border: 1px solid #ccc;
   font-variant-numeric: tabular-nums;
 }
 .order-table td.name-col { text-align: left; }
 .order-table td.num-col  { text-align: right; }
 .order-table td.qty-col  { text-align: right; font-weight: 700; color: #c0392b; font-size: 13px; }
-.cat-header td { background: #d8e8f8; font-weight: 700; font-size: 11px; padding: 2px 8px; }
+.cat-header td { background: #d8e8f8; font-weight: 700; font-size: 12px; padding: 3px 8px; }
 .zero-stock { color: #c0392b; }
 
 /* ── 印刷用スタイル ── */
 @media print {
-  body { background: #fff; padding: 4mm; }
+  body { background: #fff; padding: 4mm; color: #000; }
   .screen-header, .btn-row, .order-summary { display: none !important; }
   .print-wrap { border: none; padding: 0; box-shadow: none; border-radius: 0; }
-  .fax-form { font-size: 9pt; }
-  .col-group table td, .col-group table th { padding: 0px 2px; font-size: 8.5pt; }
-  .cat-label { font-size: 9pt; }
+  .order-table th { background: #ddd !important; color: #000 !important; border-color: #666; }
+  .order-table td { border-color: #666; color: #000 !important; }
+  .order-table td.qty-col { color: #000 !important; font-size: 12pt; }
+  .cat-header td { background: #bbb !important; color: #000 !important; }
+  .zero-stock { color: #000 !important; }
   @page { size: A4 portrait; margin: 8mm 6mm; }
 }
 </style>
