@@ -193,11 +193,18 @@ async function saveOrder() {
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = '保存中…';
 
-  const res = await fetch('/order/save', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({store: STORE, items, month, day})
-  });
+  let res;
+  try {
+    res = await fetch('/order/save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({store: STORE, items, month, day})
+    });
+  } catch(e) {
+    toast('通信エラーが発生しました。再度お試しください。');
+    btn.disabled = false; btn.textContent = '📄 発注書を確定して印刷';
+    return;
+  }
 
   if (res.ok) {
     const data = await res.json();

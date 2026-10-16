@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort
+from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory
 import os
 from datetime import datetime
 import psycopg2
@@ -9,6 +9,13 @@ load_dotenv()
 
 app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
+
+@app.route('/sw.js')
+def service_worker():
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
 
 
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────

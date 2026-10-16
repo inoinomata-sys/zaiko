@@ -187,7 +187,7 @@ function toast(msg, dur=2200) {
 {% block scripts %}{% endblock %}
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js');
+  navigator.serviceWorker.register('/sw.js', {scope: '/'});
 }
 
 // ホーム画面追加バナー
