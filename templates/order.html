@@ -3,27 +3,75 @@
 
 {% block head %}
 <style>
-.order-qty {
-  width: 68px; text-align: right; padding: 6px 8px;
-  border: 2px solid var(--acc); border-radius: 6px;
-  font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
-  background: #fff;
-}
-.order-qty:focus { outline: 2px solid var(--acc); }
-.order-qty[value="0"], .order-qty:placeholder-shown { opacity: .4; }
-.has-order { background: #eff8ff; }
-.no-order  { opacity: .65; }
-.date-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-.filter-check { display: flex; align-items: center; gap: 5px; font-size: 15px; cursor: pointer; }
-.cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+/* カテゴリタブ */
+.cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .cat-tab {
-  padding: 8px 18px; border-radius: 20px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--fg2); font-size: 15px; font-weight: 500;
-  cursor: pointer; transition: all .15s; font-family: inherit;
+  padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg2); font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit; white-space: nowrap;
 }
-.cat-tab:hover { border-color: var(--acc); color: var(--acc); }
 .cat-tab.active { background: var(--acc); color: #fff; border-color: var(--acc); }
+
+/* フィルタバー */
+.filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.filter-check { display: flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer; }
+
+/* 商品行（カード形式） */
+.order-row {
+  display: flex; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid var(--border); gap: 10px;
+}
+.order-row:last-child { border-bottom: none; }
+.order-row.has-order { background: #eff8ff; }
+.order-row.no-order  { opacity: .7; }
+
+.row-info { flex: 1; min-width: 0; }
+.row-name { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
+.row-meta .low  { color: var(--warn); font-weight: 600; }
+.row-meta .out  { color: var(--danger); font-weight: 700; }
+
+/* ±ステッパー */
+.stepper { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+.stepper-btn {
+  width: 44px; height: 44px; border: 2px solid var(--acc); background: #fff;
+  color: var(--acc); font-size: 22px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit; user-select: none; transition: all .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:first-child { border-radius: 8px 0 0 8px; }
+.stepper-btn:last-child  { border-radius: 0 8px 8px 0; }
+.stepper-btn:active { background: var(--acc); color: #fff; }
+.order-qty {
+  width: 56px; height: 44px; text-align: center;
+  border-top: 2px solid var(--acc); border-bottom: 2px solid var(--acc); border-left: none; border-right: none;
+  font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: #fff; font-family: inherit;
+  -moz-appearance: textfield;
+}
+.order-qty::-webkit-outer-spin-button,
+.order-qty::-webkit-inner-spin-button { -webkit-appearance: none; }
+.order-qty:focus { outline: none; background: #f0f7ff; }
+.order-qty[value="0"] { color: #bbb; }
+
+/* フッター */
+.order-footer {
+  position: sticky; bottom: 0; background: var(--surface);
+  border-top: 2px solid var(--border); padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; z-index: 50; box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+}
+.footer-info { font-size: 14px; }
+.footer-info strong { font-size: 18px; }
+.footer-btns { display: flex; gap: 8px; }
+
+@media (max-width: 500px) {
+  .order-footer { flex-direction: column; align-items: stretch; }
+  .footer-btns { flex-direction: column; }
+  .footer-btns .btn { text-align: center; justify-content: center; }
+  .hide-sp { display: none; }
+}
 </style>
 {% endblock %}
 
@@ -33,17 +81,17 @@
 </div>
 
 <!-- 発注日 -->
-<div class="card" style="margin-bottom:16px">
-  <div style="padding:14px 16px">
-    <div class="date-row">
-      <span style="font-weight:600">発注日</span>
-      <input type="number" id="order-month" min="1" max="12" placeholder="月"
-             style="width:64px">
-      <span>月</span>
-      <input type="number" id="order-day" min="1" max="31" placeholder="日"
-             style="width:64px">
-      <span>日</span>
-      <span style="margin-left:12px; color:var(--fg2); font-size:13px">
+<div class="card" style="margin-bottom:14px">
+  <div style="padding:12px 16px">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+      <span style="font-weight:600; font-size:15px">発注日</span>
+      <input type="number" id="order-month" min="1" max="12"
+             style="width:64px; font-size:16px; padding:8px 6px; text-align:center">
+      <span style="font-size:15px">月</span>
+      <input type="number" id="order-day" min="1" max="31"
+             style="width:64px; font-size:16px; padding:8px 6px; text-align:center">
+      <span style="font-size:15px">日</span>
+      <span class="hide-sp" style="color:var(--fg2); font-size:13px; margin-left:8px">
         宛先: ワールド美容御中　担当 大橋様　FAX: 06-6696-0071
       </span>
     </div>
@@ -62,68 +110,56 @@
 <div class="filter-bar">
   <label class="filter-check">
     <input type="checkbox" id="only-shortage" onchange="filterRows()">
-    不足品のみ表示
+    不足品のみ
   </label>
   <label class="filter-check">
     <input type="checkbox" id="only-order" onchange="filterRows()">
-    発注数 &gt; 0 のみ
+    発注あり
   </label>
   <button class="btn btn-ghost btn-sm" onclick="autoFill()">▶ 不足数を自動入力</button>
-  <button class="btn btn-ghost btn-sm" onclick="clearAll()">✕ すべてクリア</button>
+  <button class="btn btn-ghost btn-sm" onclick="clearAll()">✕ クリア</button>
 </div>
 
+<!-- 商品リスト -->
 {% for cat, prods in grouped.items() %}
-<div class="card cat-card" data-cat="{{ cat }}">
-  <div class="card-head">
+<div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
+  <div class="card-head" style="font-size:15px">
     <span>{{ cat if cat else '（未分類）' }}</span>
-    <span id="cat-count-{{ loop.index }}" style="font-size:13px; color:var(--fg2); font-weight:400"></span>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width:220px; font-size:15px">商品名</th>
-        <th class="r" style="width:80px; font-size:15px">基準</th>
-        <th class="r" style="width:90px; font-size:15px">現在庫</th>
-        <th class="r" style="width:80px; font-size:15px">不足数</th>
-        <th class="r" style="width:100px; font-size:15px">発注数</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for p in prods %}
-    {% set shortage = [p.base_qty - p.current_qty, 0]|max %}
-    <tr class="order-row {% if shortage > 0 %}has-order{% else %}no-order{% endif %}"
-        data-shortage="{{ shortage }}"
-        data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-stock="{{ p.current_qty }}">
-      <td class="name" style="font-size:16px; padding:10px 10px">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</td>
-      <td class="r" style="font-size:16px; padding:10px 10px">{{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }}</td>
-      <td class="r {% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}" style="font-size:16px; padding:10px 10px">
-        {{ p.current_qty }}
-      </td>
-      <td class="r {% if shortage > 0 %}shortage{% endif %}" style="font-size:16px; padding:10px 10px">
-        {% if shortage > 0 %}{{ shortage|int if shortage == shortage|int else shortage }}{% else %}—{% endif %}
-      </td>
-      <td class="r">
-        <input class="order-qty" type="number" min="0" step="1"
-               value="0"
-               data-id="{{ p.id }}" onchange="onOrderChange()">
-      </td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  {% for p in prods %}
+  {% set shortage = [p.base_qty - p.current_qty, 0]|max %}
+  <div class="order-row {% if shortage > 0 %}has-order{% else %}no-order{% endif %}"
+       data-shortage="{{ shortage }}"
+       data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-stock="{{ p.current_qty }}">
+    <div class="row-info">
+      <div class="row-name">
+        {{ p.name }}
+        {% if p.note %}<span class="badge badge-muted" style="font-size:11px; margin-left:4px">{{ p.note }}</span>{% endif %}
+      </div>
+      <div class="row-meta">
+        基準 {{ p.base_qty|int if p.base_qty == p.base_qty|int else p.base_qty }} ／
+        在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty }}</span>
+        {% if shortage > 0 %} ／ 不足 {{ shortage|int if shortage == shortage|int else shortage }}{% endif %}
+      </div>
+    </div>
+    <div class="stepper">
+      <button class="stepper-btn" onclick="step(this,-1)" type="button">－</button>
+      <input class="order-qty" type="number" min="0" step="1" value="0"
+             data-id="{{ p.id }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
+      <button class="stepper-btn" onclick="step(this,1)" type="button">＋</button>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 {% endfor %}
 
 <!-- フッター -->
-<div style="position:sticky; bottom:0; background:var(--surface); border-top:2px solid var(--border);
-            padding:14px 16px; display:flex; align-items:center; justify-content:space-between;
-            gap:12px; z-index:50; border-radius:0 0 10px 10px; box-shadow:0 -4px 16px rgba(0,0,0,.08)">
-  <div>
-    発注品目: <strong id="order-count">0</strong> 品
-    合計数: <strong id="order-total">0</strong>
+<div class="order-footer">
+  <div class="footer-info">
+    発注 <strong id="order-count">0</strong> 品 &nbsp;
+    計 <strong id="order-total">0</strong> 点
   </div>
-  <div style="display:flex; gap:10px">
-    <button class="btn btn-ghost" onclick="window.print()">🖨 一覧を印刷</button>
+  <div class="footer-btns">
     <button class="btn btn-primary" onclick="saveOrder()" id="save-btn">📄 発注書を確定して印刷</button>
   </div>
 </div>
@@ -132,6 +168,29 @@
 {% block scripts %}
 <script>
 const STORE = '{{ store }}';
+
+function step(btn, delta) {
+  const inp = btn.parentElement.querySelector('.order-qty');
+  const v = Math.max(0, (parseInt(inp.value) || 0) + delta);
+  inp.value = v;
+  onQtyInput(inp);
+  onOrderChange();
+}
+
+function onQtyInput(inp) {
+  const row = inp.closest('.order-row');
+  const v = parseInt(inp.value) || 0;
+  // value属性を同期（CSS用）
+  inp.setAttribute('value', v);
+  if (v > 0) {
+    row.classList.add('has-order');
+    row.classList.remove('no-order');
+  } else {
+    const sh = parseFloat(row.dataset.shortage) || 0;
+    row.classList.toggle('has-order', sh > 0);
+    row.classList.toggle('no-order', sh <= 0);
+  }
+}
 
 function onOrderChange() {
   let count = 0, total = 0;
@@ -146,45 +205,42 @@ function onOrderChange() {
 function filterRows() {
   const onlyShortage = document.getElementById('only-shortage').checked;
   const onlyOrder    = document.getElementById('only-order').checked;
-  document.querySelectorAll('.order-row').forEach(tr => {
-    const sh  = parseFloat(tr.dataset.shortage) || 0;
-    const oq  = parseInt(tr.querySelector('.order-qty').value) || 0;
-    let show  = true;
+  document.querySelectorAll('.order-row').forEach(row => {
+    const sh = parseFloat(row.dataset.shortage) || 0;
+    const oq = parseInt(row.querySelector('.order-qty').value) || 0;
+    let show = true;
     if (onlyShortage && sh <= 0) show = false;
     if (onlyOrder    && oq <= 0) show = false;
-    tr.style.display = show ? '' : 'none';
+    row.style.display = show ? '' : 'none';
   });
 }
 
 function autoFill() {
-  document.querySelectorAll('.order-row').forEach(tr => {
-    const sh  = parseFloat(tr.dataset.shortage) || 0;
-    const inp = tr.querySelector('.order-qty');
-    if (sh > 0) inp.value = Math.ceil(sh);
+  document.querySelectorAll('.order-row').forEach(row => {
+    const sh  = parseFloat(row.dataset.shortage) || 0;
+    const inp = row.querySelector('.order-qty');
+    if (sh > 0) { inp.value = Math.ceil(sh); onQtyInput(inp); }
   });
   onOrderChange();
   toast('不足数を自動入力しました');
 }
 
 function clearAll() {
-  document.querySelectorAll('.order-qty').forEach(inp => inp.value = 0);
+  document.querySelectorAll('.order-qty').forEach(inp => { inp.value = 0; onQtyInput(inp); });
   onOrderChange();
 }
 
 async function saveOrder() {
   const items = [];
-  document.querySelectorAll('.order-row').forEach(tr => {
-    const oq = parseInt(tr.querySelector('.order-qty').value) || 0;
-    if (oq > 0) {
-      items.push({
-        product_id: tr.dataset.id,
-        base_qty:   parseFloat(tr.dataset.base),
-        stock_qty:  parseFloat(tr.dataset.stock),
-        order_qty:  oq
-      });
-    }
+  document.querySelectorAll('.order-row').forEach(row => {
+    const oq = parseInt(row.querySelector('.order-qty').value) || 0;
+    if (oq > 0) items.push({
+      product_id: row.dataset.id,
+      base_qty:   parseFloat(row.dataset.base),
+      stock_qty:  parseFloat(row.dataset.stock),
+      order_qty:  oq
+    });
   });
-
   if (items.length === 0) { toast('発注数が 0 です'); return; }
 
   const month = parseInt(document.getElementById('order-month').value) || null;
@@ -215,10 +271,7 @@ async function saveOrder() {
   }
 }
 
-// カテゴリタブ
-let currentCat = '';
 function selectCat(btn, cat) {
-  currentCat = cat;
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.cat-card').forEach(card => {
@@ -234,7 +287,6 @@ function selectCat(btn, cat) {
   document.getElementById('order-day').value   = jst.getDate();
 })();
 
-// 初期集計
 onOrderChange();
 </script>
 {% endblock %}

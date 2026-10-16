@@ -46,12 +46,20 @@ nav {
 }
 nav .brand { font-size: 16px; font-weight: 700; margin-right: 16px; color: #fff; white-space: nowrap; }
 nav a.nav-link {
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 6px;
   color: rgba(255,255,255,.85);
   font-size: 14px;
   font-weight: 500;
   transition: background .15s;
+  white-space: nowrap;
+}
+@media (max-width: 500px) {
+  nav { padding: 0 10px; gap: 2px; overflow-x: auto; }
+  nav .brand { font-size: 14px; margin-right: 8px; }
+  nav a.nav-link { padding: 6px 8px; font-size: 13px; }
+  nav .store-badge { font-size: 12px; padding: 3px 8px; }
+  main { padding: 12px; }
 }
 nav a.nav-link:hover { background: rgba(255,255,255,.15); text-decoration: none; color: #fff; }
 nav a.nav-link.active { background: rgba(255,255,255,.22); color: #fff; }
