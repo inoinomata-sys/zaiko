@@ -50,7 +50,8 @@
 </div>
 
 <div class="card">
-  <table>
+  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+  <table style="min-width:700px">
     <thead>
       <tr>
         <th>ID</th>
@@ -102,6 +103,7 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
