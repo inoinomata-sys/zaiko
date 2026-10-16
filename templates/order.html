@@ -257,25 +257,39 @@ async function saveOrder() {
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = '保存中…';
 
+  // 5秒後にまだ待っていたらメッセージを変える
+  const slowTimer = setTimeout(() => {
+    if (btn.disabled) btn.textContent = 'サーバー起動中…少々お待ちください';
+  }, 5000);
+
   let res;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60秒タイムアウト
     res = await fetch('/order/save', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({store: STORE, supplier: SUPPLIER, items, month, day})
+      body: JSON.stringify({store: STORE, supplier: SUPPLIER, items, month, day}),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
   } catch(e) {
-    toast('通信エラーが発生しました。再度お試しください。');
-    btn.disabled = false; btn.textContent = '📄 発注書を確定して印刷';
+    clearTimeout(slowTimer);
+    const msg = e.name === 'AbortError'
+      ? 'タイムアウトしました。再度お試しください。'
+      : '通信エラーが発生しました。再度お試しください。';
+    toast(msg);
+    btn.disabled = false; btn.textContent = '発注書を確定して印刷';
     return;
   }
+  clearTimeout(slowTimer);
 
   if (res.ok) {
     const data = await res.json();
     window.location.href = `/order/${data.order_id}/print`;
   } else {
     toast('保存に失敗しました');
-    btn.disabled = false; btn.textContent = '📄 発注書を確定して印刷';
+    btn.disabled = false; btn.textContent = '発注書を確定して印刷';
   }
 }
 
