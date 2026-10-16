@@ -139,11 +139,7 @@ function printPDF() {
 
   document.getElementById('pdf-guide').innerHTML = guide;
   document.getElementById('pdf-modal').style.display = 'flex';
-
-  // 案内表示後に印刷ダイアログを開く（iOSは除く）
-  if (!isIOS) {
-    setTimeout(() => window.print(), 300);
-  }
+  window.print();
 }
 </script>
 
