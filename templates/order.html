@@ -254,8 +254,8 @@ function addCustomRow() {
   document.getElementById('custom-empty').style.display = 'none';
   const idx = ++customRowCount;
   const div = document.createElement('div');
-  div.className = 'order-row';
-  div.style.cssText = 'gap:8px;padding:8px 0';
+  div.className = 'custom-row';
+  div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)';
   div.innerHTML = `
     <div class="row-info" style="flex:1">
       <input type="text" class="custom-name" placeholder="商品名を入力"
@@ -266,7 +266,7 @@ function addCustomRow() {
       <input type="number" class="order-qty custom-qty" value="1" min="0" style="width:52px;text-align:center;font-size:16px;padding:6px 4px;border:1px solid var(--border);border-radius:7px">
       <button class="stepper-btn" onclick="stepCustom(this,1)" type="button">＋</button>
     </div>
-    <button onclick="this.closest('.order-row').remove();updateCustomEmpty()" type="button"
+    <button onclick="this.closest('.custom-row').remove();updateCustomEmpty()" type="button"
             style="background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:0 4px">✕</button>`;
   document.getElementById('custom-rows').appendChild(div);
 }
@@ -275,7 +275,7 @@ function stepCustom(btn, d) {
   inp.value = Math.max(0, (parseInt(inp.value)||0) + d);
 }
 function updateCustomEmpty() {
-  const rows = document.querySelectorAll('#custom-rows .order-row');
+  const rows = document.querySelectorAll('#custom-rows .custom-row');
   document.getElementById('custom-empty').style.display = rows.length ? 'none' : '';
 }
 
@@ -292,7 +292,7 @@ async function saveOrder() {
     });
   });
   // その他（手入力）
-  document.querySelectorAll('#custom-rows .order-row').forEach(row => {
+  document.querySelectorAll('#custom-rows .custom-row').forEach(row => {
     const name = row.querySelector('.custom-name').value.trim();
     const oq   = parseInt(row.querySelector('.custom-qty').value) || 0;
     if (name && oq > 0) items.push({product_id: null, base_qty: 0, stock_qty: 0, order_qty: oq, custom_name: name});
