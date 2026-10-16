@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}発注先を選択{% endblock %}
+
+{% block head %}
+<style>
+.supplier-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.supplier-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--fg);
+  transition: all .18s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.supplier-card:hover {
+  border-color: var(--acc);
+  box-shadow: 0 6px 24px rgba(26,111,191,.18);
+  transform: translateY(-2px);
+  text-decoration: none;
+  color: var(--fg);
+}
+.supplier-card:active { transform: translateY(0); }
+.supplier-icon { font-size: 48px; line-height: 1; }
+.supplier-name { font-size: 22px; font-weight: 700; }
+.supplier-sub  { font-size: 13px; color: var(--fg2); }
+.supplier-count {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 13px;
+  color: var(--fg2);
+}
+
+/* 今日の日付バッジ */
+.today-badge {
+  background: var(--acc);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:6px">
+  <h1 style="font-size:22px; font-weight:700; margin-bottom:12px">発注する仕入先を選んでください</h1>
+  <div id="today-badge" class="today-badge">📅 —月—日</div>
+</div>
+
+<div class="supplier-grid">
+  {% for s in suppliers %}
+  <a href="/order/form?supplier={{ s.name|urlencode }}" class="supplier-card">
+    <div class="supplier-icon">{{ s.icon }}</div>
+    <div class="supplier-name">{{ s.name }}</div>
+    <div class="supplier-sub">{{ s.contact }}</div>
+    <div class="supplier-count">商品 {{ s.count }} 品目</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const jst = new Date(new Date().toLocaleString('en-US', {timeZone: 'Asia/Tokyo'}));
+  const m = jst.getMonth() + 1, d = jst.getDate();
+  document.getElementById('today-badge').textContent = `📅 ${m}月${d}日`;
+})();
+</script>
+{% endblock %}

@@ -77,7 +77,10 @@
 
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px">
-  <h1 style="font-size:20px; font-weight:700">発注書作成</h1>
+  <div>
+    <a href="/order" style="font-size:13px; color:var(--fg2)">← 仕入先選択に戻る</a>
+    <h1 style="font-size:20px; font-weight:700; margin-top:4px">{{ supplier }} 発注書</h1>
+  </div>
 </div>
 
 <!-- 発注日 -->
@@ -167,7 +170,8 @@
 
 {% block scripts %}
 <script>
-const STORE = '{{ store }}';
+const STORE    = '{{ store }}';
+const SUPPLIER = '{{ supplier }}';
 
 function step(btn, delta) {
   const inp = btn.parentElement.querySelector('.order-qty');
@@ -254,7 +258,7 @@ async function saveOrder() {
     res = await fetch('/order/save', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({store: STORE, items, month, day})
+      body: JSON.stringify({store: STORE, supplier: SUPPLIER, items, month, day})
     });
   } catch(e) {
     toast('通信エラーが発生しました。再度お試しください。');

@@ -25,6 +25,22 @@ def get_db():
     return conn
 
 
+def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("""
+        SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
+               COALESCE(s.current_qty, 0) AS current_qty, s.updated_at
+        FROM products p
+        LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
+        WHERE p.is_active=true AND p.supplier=%s
+        ORDER BY p.col_group, p.sort_order
+    """, (store, supplier))
+    rows = cur.fetchall()
+    db.close()
+    return rows
+
+
 def products_with_stock(store='イノ', cat=None):
     db = get_db()
     cur = db.cursor()
@@ -115,39 +131,67 @@ def api_bulk_stock():
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
+SUPPLIERS = [
+    {'name': 'ワールド美容',  'icon': '🧴', 'contact': '担当 大橋様　FAX: 06-6696-0071'},
+    {'name': 'トピー商事',    'icon': '📦', 'contact': ''},
+    {'name': 'アイテム美容',  'icon': '✂️',  'contact': ''},
+]
+
 @app.route('/order')
+def order_top():
+    db = get_db()
+    cur = db.cursor()
+    supplier_list = []
+    for s in SUPPLIERS:
+        cur.execute("SELECT COUNT(*) FROM products WHERE is_active=true AND supplier=%s", (s['name'],))
+        cnt = cur.fetchone()['count']
+        supplier_list.append({**s, 'count': cnt})
+    db.close()
+    return render_template('order_top.html', suppliers=supplier_list)
+
+
+@app.route('/order/form')
 def order_form():
-    store = request.args.get('store', 'イノ')
-    rows  = products_with_stock(store)
+    store    = request.args.get('store', 'イノ')
+    supplier = request.args.get('supplier', 'ワールド美容')
 
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(
+        "SELECT category FROM products WHERE is_active=true AND supplier=%s AND category!='' GROUP BY category ORDER BY MIN(sort_order)",
+        (supplier,)
+    )
+    cats = [r['category'] for r in cur.fetchall()]
+    db.close()
+
+    rows = products_with_stock_supplier(store, supplier)
     grouped = {}
-    cats = []
     for r in rows:
-        c = r['category']
-        grouped.setdefault(c, []).append(r)
-        if c and c not in cats:
-            cats.append(c)
+        grouped.setdefault(r['category'], []).append(r)
 
+    sup_info = next((s for s in SUPPLIERS if s['name'] == supplier), SUPPLIERS[0])
     return render_template('order.html', store=store, grouped=grouped,
-                           cats=cats, rows=rows, now=datetime.now())
+                           cats=cats, rows=rows, now=datetime.now(),
+                           supplier=supplier, sup_info=sup_info)
 
 
 @app.route('/order/save', methods=['POST'])
 def order_save():
-    data  = request.get_json()
-    store = data.get('store', 'イノ')
-    items = data.get('items', [])
-    month = data.get('month')
-    day   = data.get('day')
+    data     = request.get_json()
+    store    = data.get('store', 'イノ')
+    supplier = data.get('supplier', 'ワールド美容')
+    items    = data.get('items', [])
+    month    = data.get('month')
+    day      = data.get('day')
 
     db = get_db()
     cur = db.cursor()
     now = datetime.now().strftime('%Y-%m-%d %H:%M')
     cur.execute("""
         INSERT INTO orders (store, supplier, order_month, order_day, status, created_at)
-        VALUES (%s, 'ワールド美容', %s, %s, 'confirmed', %s)
+        VALUES (%s, %s, %s, %s, 'confirmed', %s)
         RETURNING id
-    """, (store, month, day, now))
+    """, (store, supplier, month, day, now))
     order_id = cur.fetchone()['id']
 
     for item in items:
@@ -182,16 +226,18 @@ def order_print(order_id):
     """, (order_id,))
     items = cur.fetchall()
 
-    all_products = products_with_stock(order['store'])
+    sup_name = order.get('supplier', 'ワールド美容')
+    all_products = products_with_stock_supplier(order['store'], sup_name)
     order_map = {r['product_id']: r for r in items}
 
     groups = {}
     for p in all_products:
         groups.setdefault(p['col_group'], []).append(p)
 
+    sup_info = next((s for s in SUPPLIERS if s['name'] == sup_name), SUPPLIERS[0])
     db.close()
     return render_template('print.html',
-        order=order, groups=groups, order_map=order_map)
+        order=order, groups=groups, order_map=order_map, sup_info=sup_info)
 
 
 @app.route('/order/history')
@@ -227,10 +273,11 @@ def product_add():
     )
     max_sort = cur.fetchone()['coalesce']
     cur.execute("""
-        INSERT INTO products (col_group, category, name, base_qty, note, sort_order)
-        VALUES (%s,%s,%s,%s,%s,%s)
+        INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
+        VALUES (%s,%s,%s,%s,%s,%s,%s)
     """, (int(d['col_group']), d['category'], d['name'],
-          float(d.get('base_qty', 0)), d.get('note') or None, max_sort + 1))
+          float(d.get('base_qty', 0)), d.get('note') or None,
+          d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
     db.close()
     return redirect(url_for('products'))
@@ -252,6 +299,17 @@ def product_base(pid):
     cur = db.cursor()
     cur.execute("UPDATE products SET base_qty=%s WHERE id=%s",
                (float(request.form['base_qty']), pid))
+    db.commit()
+    db.close()
+    return jsonify(ok=True)
+
+
+@app.route('/products/<int:pid>/supplier', methods=['POST'])
+def product_supplier(pid):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("UPDATE products SET supplier=%s WHERE id=%s",
+               (request.form['supplier'], pid))
     db.commit()
     db.close()
     return jsonify(ok=True)

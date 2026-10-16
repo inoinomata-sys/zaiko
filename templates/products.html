@@ -30,6 +30,14 @@
         <input type="number" name="base_qty" value="1" min="0" step="0.5" style="width:80px">
       </div>
       <div class="form-group">
+        <label>仕入先</label>
+        <select name="supplier" style="width:130px">
+          <option>ワールド美容</option>
+          <option>トピー商事</option>
+          <option>アイテム美容</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>備考</label>
         <input type="text" name="note" placeholder="ネット" style="width:100px">
       </div>
@@ -49,6 +57,7 @@
         <th>カテゴリ</th>
         <th>商品名</th>
         <th class="r">基準</th>
+        <th>仕入先</th>
         <th>備考</th>
         <th>状態</th>
         <th></th>
@@ -64,6 +73,14 @@
       <td class="r">
         <input type="number" value="{{ p.base_qty }}" min="0" step="0.5" style="width:60px;text-align:right"
                onchange="updateBase({{ p.id }}, this.value)">
+      </td>
+      <td>
+        <select style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px"
+                onchange="updateSupplier({{ p.id }}, this.value)">
+          {% for s in ['ワールド美容','トピー商事','アイテム美容'] %}
+          <option {% if p.supplier == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
       </td>
       <td style="font-size:12px;color:var(--fg2)">{{ p.note or '' }}</td>
       <td>
@@ -93,6 +110,12 @@ async function updateBase(id, val) {
   fd.append('base_qty', val);
   const res = await fetch(`/products/${id}/base`, {method:'POST', body:fd});
   if (res.ok) toast('基準数を更新しました');
+}
+async function updateSupplier(id, val) {
+  const fd = new FormData();
+  fd.append('supplier', val);
+  const res = await fetch(`/products/${id}/supplier`, {method:'POST', body:fd});
+  if (res.ok) toast('仕入先を更新しました');
 }
 </script>
 {% endblock %}
