@@ -70,13 +70,21 @@
   <input class="search" type="search" id="search" placeholder="商品名で探す（例: 7NB）" autocomplete="off">
 </div>
 
+<div class="cat-scroll" id="cat-tabs">
+  <button type="button" class="on" data-cat="">すべて</button>
+  {% set seen = [] %}
+  {% for (sup, cat) in grouped.keys() %}{% if cat not in seen %}{% set _ = seen.append(cat) %}
+  <button type="button" data-cat="{{ cat }}">{{ cat if cat else '（未分類）' }}</button>
+  {% endif %}{% endfor %}
+</div>
+
 <div class="summary">
   ラベルの数だけ <b>＋</b> を押してください。押すたびに保存されます。間違えたら <b>－</b>。<br>
   今日の入力 <b id="today-total">{{ today_total|n }}</b> 個　／　数字は前回の発注確定からの合計（次の発注数になります）
 </div>
 
 {% for (sup, cat), prods in grouped.items() %}
-<div class="card cat-card" style="margin-bottom:12px">
+<div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
   <div class="card-head">
     <span>{{ cat if cat else '（未分類）' }} <span style="font-size:12px; color:var(--fg2); font-weight:400">{{ sup }}</span></span>
   </div>
@@ -180,18 +188,29 @@ document.querySelectorAll('.u-row').forEach(row => {
   }));
 });
 
-document.getElementById('search').addEventListener('input', e => {
-  const q = e.target.value.normalize('NFKC').trim().toLowerCase();
+let currentCat = '';
+function applyFilter() {
+  const q = document.getElementById('search').value.normalize('NFKC').trim().toLowerCase();
   document.querySelectorAll('.cat-card').forEach(card => {
     let any = false;
-    card.querySelectorAll('.u-row').forEach(row => {
-      const show = !q || row.dataset.name.includes(q);
-      row.style.display = show ? '' : 'none';
-      any = any || show;
-    });
+    if (!currentCat || card.dataset.cat === currentCat) {
+      card.querySelectorAll('.u-row').forEach(row => {
+        const show = !q || row.dataset.name.includes(q);
+        row.style.display = show ? '' : 'none';
+        any = any || show;
+      });
+    }
     card.style.display = any ? '' : 'none';
   });
-});
+}
+document.getElementById('search').addEventListener('input', applyFilter);
+document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  currentCat = b.dataset.cat;
+  applyFilter();
+  window.scrollTo({top: 0});
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
+}));
 
 window.addEventListener('beforeunload', e => {
   for (const s of state.values()) if (s.pending !== 0 || s.busy) { e.preventDefault(); e.returnValue = ''; }

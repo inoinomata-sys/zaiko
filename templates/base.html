@@ -164,6 +164,16 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   opacity: 0; transition: all .2s; pointer-events: none;
   white-space: nowrap; z-index: 999;
 }
+.cat-scroll {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.cat-scroll button {
+  flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--fg2); font: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; touch-action: manipulation;
+}
+.cat-scroll button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 {% block head %}{% endblock %}

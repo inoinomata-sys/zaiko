@@ -266,7 +266,7 @@ def inventory():
         if r['category'] and r['sort_order'] < first_sort.get(r['category'], float('inf')):
             first_sort[r['category']] = r['sort_order']
     cats = sorted(first_sort, key=first_sort.get)
-    rows = [r for r in all_rows if r['category'] == cat] if cat else all_rows
+    rows = all_rows
     stale_before = now_jst() - timedelta(days=STALE_DAYS)
     grouped = OrderedDict()
     counts = {'unchecked': 0, 'stale': 0, 'shortage': 0}

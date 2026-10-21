@@ -12,10 +12,6 @@
 .chip.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
 .chip .num { font-weight: 700; margin-left: 4px; }
 .store-chip { font-size: 16px; padding: 8px 22px; font-weight: 700; }
-.shelf-select {
-  font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--border);
-  border-radius: 10px; background: var(--surface); min-width: 220px; max-width: 100%;
-}
 .notice summary { cursor: pointer; }
 .notice {
   background: #fff8e6; border: 1px solid #f1d38a; color: #7a5a00;
@@ -79,12 +75,9 @@
   {% endfor %}
 </div>
 
-<div class="bar">
-  <select class="shelf-select" aria-label="棚を選ぶ"
-          onchange="location.href='/?store={{ store|urlencode }}' + (this.value ? '&cat=' + encodeURIComponent(this.value) : '')">
-    <option value="">すべての棚</option>
-    {% for c in cats %}<option value="{{ c }}" {% if current_cat == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
-  </select>
+<div class="cat-scroll" id="cat-tabs">
+  <button type="button" class="{% if not current_cat %}on{% endif %}" data-cat="">すべての棚</button>
+  {% for c in cats %}<button type="button" class="{% if current_cat == c %}on{% endif %}" data-cat="{{ c }}">{{ c }}</button>{% endfor %}
 </div>
 
 <div class="bar" id="filters">
@@ -104,7 +97,7 @@
 </details>
 
 {% for cat, prods in grouped.items() %}
-<div class="card cat-card" style="margin-bottom:12px">
+<div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
   <div class="card-head" style="flex-wrap:wrap; gap:8px">
     <span>{{ cat if cat else '（未分類）' }} <span style="font-size:13px; color:var(--fg2); font-weight:400">{{ prods|length }} 品</span></span>
     <button class="btn btn-ghost btn-sm" type="button" onclick="checkCategory(this, {{ cat|tojson|forceescape }})">この棚を確認済みにする</button>
@@ -306,21 +299,36 @@ async function checkCategory(btn, cat) {
   }
 }
 
-document.querySelectorAll('#filters .chip').forEach(chip => chip.addEventListener('click', () => {
-  document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('on', c === chip));
-  const f = chip.dataset.f;
+let currentCat = {{ current_cat|tojson }}, currentF = 'all';
+function applyFilter() {
   document.querySelectorAll('.cat-card').forEach(card => {
     let any = false;
-    card.querySelectorAll('.inv-row').forEach(row => {
-      const short = !!row.querySelector('.short');
-      const show = f === 'all' || (f === 'unchecked' && row.dataset.unchecked === '1')
-        || (f === 'stale' && row.dataset.stale === '1') || (f === 'shortage' && short);
-      row.style.display = show ? '' : 'none';
-      any = any || show;
-    });
+    if (!currentCat || card.dataset.cat === currentCat) {
+      card.querySelectorAll('.inv-row').forEach(row => {
+        const f = currentF, short = !!row.querySelector('.short');
+        const show = f === 'all' || (f === 'unchecked' && row.dataset.unchecked === '1')
+          || (f === 'stale' && row.dataset.stale === '1') || (f === 'shortage' && short);
+        row.style.display = show ? '' : 'none';
+        any = any || show;
+      });
+    }
     card.style.display = any ? '' : 'none';
   });
+}
+document.querySelectorAll('#filters .chip').forEach(chip => chip.addEventListener('click', () => {
+  document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('on', c === chip));
+  currentF = chip.dataset.f;
+  applyFilter();
 }));
+document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  currentCat = b.dataset.cat;
+  applyFilter();
+  window.scrollTo({top: 0});
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
+}));
+applyFilter();
+document.querySelector('#cat-tabs .on')?.scrollIntoView({inline: 'center', block: 'nearest'});
 
 window.addEventListener('beforeunload', e => {
   for (const s of state.values()) if (s.pending !== 0 || s.busy || s.queue.length) { e.preventDefault(); e.returnValue = ''; }
