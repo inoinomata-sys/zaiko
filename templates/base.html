@@ -172,6 +172,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
 <nav>
   <span class="brand">在庫管理</span>
   <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">在庫</a>
+  <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}">使用入力</a>
   <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注書作成</a>
   <a href="/order/history" class="nav-link {% if request.path == '/order/history' %}active{% endif %}">発注履歴</a>
   <a href="/products" class="nav-link {% if request.path == '/products' %}active{% endif %}">商品マスター</a>

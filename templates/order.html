@@ -30,6 +30,7 @@
 .row-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
 .row-meta .low  { color: var(--warn); font-weight: 600; }
 .row-meta .out  { color: var(--danger); font-weight: 700; }
+.row-meta .use  { color: #1d4f80; font-weight: 700; }
 
 /* ±ステッパー */
 .stepper { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
@@ -130,6 +131,18 @@
   </div>
 </div>
 
+{% if ordered_today %}
+<div class="check-warn" style="background:#fde8e8;border-color:#f3b4b4;color:#8a1c1c">
+  今日はすでに {{ store }}・{{ supplier }} の発注を <b>{{ ordered_today }}</b> 件確定しています。二重発注にご注意ください（<a href="/order/history">発注履歴</a>）。
+</div>
+{% endif %}
+
+{% if counts.usage %}
+<div class="check-warn" style="background:#eef6ff;border-color:#b9d6f5;color:#1d4f80">
+  前回の発注確定から「使用入力」された <b>{{ counts.usage }}</b> 品の使用数を、発注数に入れています。必要に応じて＋／－で直してください。
+</div>
+{% endif %}
+
 {% if counts.unchecked or counts.stale %}
 <div class="check-warn">
   {% if counts.unchecked %}在庫を数えた記録がない商品（<b>未確認</b>）が <b>{{ counts.unchecked }}</b> 品あります。未確認の商品は在庫数が分からないため、不足数の計算と「不足数を自動入力」の対象外です。{% endif %}
@@ -182,6 +195,7 @@
         {% if p.note %}<span class="badge badge-muted" style="font-size:11px; margin-left:4px">{{ p.note }}</span>{% endif %}
       </div>
       <div class="row-meta">
+        {% if p.usage > 0 %}<span class="use">使用 {{ p.usage|n }}</span> ／ {% endif %}
         基準 {{ p.base_qty|n }} ／
         {% if p.unchecked %}
           在庫 <span class="chk chk-none">未確認</span>
@@ -194,7 +208,7 @@
     </div>
     <div class="stepper">
       <button class="stepper-btn" onclick="step(this,-1)" type="button">－</button>
-      <input class="order-qty" type="number" min="0" step="1" value="0"
+      <input class="order-qty" type="number" min="0" step="1" value="{{ (p.usage|round(0, 'ceil'))|int }}"
              data-id="{{ p.id }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
       <button class="stepper-btn" onclick="step(this,1)" type="button">＋</button>
     </div>
@@ -236,6 +250,8 @@
 {% block scripts %}
 <script>
 const STORE    = {{ store|tojson }};
+const REQUEST_KEY = {{ request_key|tojson }};
+const USAGE_UPTO  = {{ usage_upto|tojson }};
 const SUPPLIER = {{ supplier|tojson }};
 
 function step(btn, delta) {
@@ -293,7 +309,7 @@ function autoFill() {
   document.querySelectorAll('.order-row').forEach(row => {
     const sh  = parseFloat(row.dataset.shortage) || 0;
     const inp = row.querySelector('.order-qty');
-    if (sh > 0) { inp.value = Math.ceil(sh); onQtyInput(inp); }
+    if (sh > 0) { inp.value = Math.max(parseInt(inp.value) || 0, Math.ceil(sh)); onQtyInput(inp); }
   });
   onOrderChange();
   const skipped = document.querySelectorAll('.order-row[data-check="unchecked"]').length;
@@ -348,7 +364,7 @@ function customItems() {
   return out;
 }
 
-async function saveOrder() {
+async function saveOrder(allowDuplicate) {
   const items = [];
   document.querySelectorAll('.order-row').forEach(row => {
     const oq = parseInt(row.querySelector('.order-qty').value) || 0;
@@ -384,7 +400,9 @@ async function saveOrder() {
     res = await fetch('/order/save', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({store: STORE, supplier: SUPPLIER, items, month, day}),
+      body: JSON.stringify({store: STORE, supplier: SUPPLIER, items, month, day,
+                            request_key: REQUEST_KEY, usage_upto: USAGE_UPTO,
+                            allow_duplicate: !!allowDuplicate}),
       signal: controller.signal
     });
     clearTimeout(timeout);
@@ -402,6 +420,10 @@ async function saveOrder() {
   if (res.ok) {
     const data = await res.json();
     window.location.href = `/order/${data.order_id}/print`;
+  } else if (res.status === 409) {
+    const data = await res.json();
+    btn.disabled = false; btn.textContent = '発注書を確定して印刷';
+    if (data.duplicate && confirm(data.error + '\nもう一度発注しますか？（二重発注になります）')) saveOrder(true);
   } else {
     toast('保存に失敗しました');
     btn.disabled = false; btn.textContent = '発注書を確定して印刷';
@@ -428,6 +450,7 @@ function selectCat(btn, cat) {
   document.getElementById('order-day').value   = jst.getDate();
 })();
 
+document.querySelectorAll('.order-row .order-qty').forEach(onQtyInput);
 onOrderChange();
 </script>
 {% endblock %}

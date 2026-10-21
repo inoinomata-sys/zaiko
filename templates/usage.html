@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% block title %}使用入力{% endblock %}
+
+{% block head %}
+<style>
+.bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+.chip {
+  padding: 8px 22px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--fg2); font-size: 16px; font-weight: 700; text-decoration: none;
+}
+.chip.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.sel, .search {
+  font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); max-width: 100%;
+}
+.search { flex: 1 1 180px; min-width: 0; }
+.summary { font-size: 14px; color: var(--fg2); margin-bottom: 12px; }
+.summary b { color: var(--fg); font-size: 16px; }
+
+.u-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.u-row:last-child { border-bottom: none; }
+.u-row.has { background: #fdf3f7; }
+.u-info { flex: 1; min-width: 0; }
+.u-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
+.u-meta { font-size: 12px; color: var(--fg2); margin-top: 3px; }
+.u-meta .today { color: var(--acc); font-weight: 700; }
+
+.stepper { display: flex; align-items: center; flex-shrink: 0; }
+.stepper-btn {
+  width: 52px; height: 52px; border: 2px solid var(--acc); background: #fff;
+  color: var(--acc); font-size: 26px; font-weight: 700; cursor: pointer;
+  font-family: inherit; user-select: none; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:first-child { border-radius: 8px 0 0 8px; }
+.stepper-btn:last-child  { border-radius: 0 8px 8px 0; }
+.stepper-btn:active { background: var(--acc); color: #fff; }
+.stepper-btn:disabled { opacity: .35; cursor: default; }
+.count {
+  width: 56px; height: 52px; display: flex; align-items: center; justify-content: center;
+  border-top: 2px solid var(--acc); border-bottom: 2px solid var(--acc);
+  font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; background: #fff;
+}
+.status { font-size: 11px; min-height: 14px; text-align: right; width: 56px; flex-shrink: 0; }
+.status.saved { color: #1d6b3f; }
+.status.error { color: var(--danger); font-weight: 700; }
+@media (max-width: 480px) {
+  .u-row { flex-wrap: wrap; }
+  .u-info { flex-basis: 100%; }
+  .stepper { margin-left: auto; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="font-size:20px; font-weight:700; margin-bottom:12px">使用入力（ラベル）</h1>
+
+<div class="bar">
+  {% for st in stores %}
+  <a href="/usage?store={{ st|urlencode }}{% if supplier %}&supplier={{ supplier|urlencode }}{% endif %}" class="chip {% if st == store %}on{% endif %}">{{ st }}</a>
+  {% endfor %}
+</div>
+
+<div class="bar">
+  <select class="sel" aria-label="仕入先"
+          onchange="location.href='/usage?store={{ store|urlencode }}' + (this.value ? '&supplier=' + encodeURIComponent(this.value) : '')">
+    <option value="">すべての仕入先</option>
+    {% for s in supplier_names %}<option value="{{ s }}" {% if s == supplier %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <input class="search" type="search" id="search" placeholder="商品名で探す（例: 7NB）" autocomplete="off">
+</div>
+
+<div class="summary">
+  ラベルの数だけ <b>＋</b> を押してください。押すたびに保存されます。間違えたら <b>－</b>。<br>
+  今日の入力 <b id="today-total">{{ today_total|n }}</b> 個　／　数字は前回の発注確定からの合計（次の発注数になります）
+</div>
+
+{% for (sup, cat), prods in grouped.items() %}
+<div class="card cat-card" style="margin-bottom:12px">
+  <div class="card-head">
+    <span>{{ cat if cat else '（未分類）' }} <span style="font-size:12px; color:var(--fg2); font-weight:400">{{ sup }}</span></span>
+  </div>
+  {% for p in prods %}
+  <div class="u-row {% if p.pending > 0 %}has{% endif %}" data-id="{{ p.id }}" data-name="{{ p.name|lower }}"
+       data-pending="{{ p.pending }}" data-today="{{ p.today }}">
+    <div class="u-info">
+      <div class="u-name">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</div>
+      <div class="u-meta"><span class="today-cell">{% if p.today %}<span class="today">今日 +{{ p.today|n }}</span>{% endif %}</span></div>
+    </div>
+    <div class="stepper">
+      <button class="stepper-btn" type="button" data-d="-1" aria-label="1減らす" {% if p.pending <= 0 %}disabled{% endif %}>－</button>
+      <div class="count">{{ p.pending|n }}</div>
+      <button class="stepper-btn" type="button" data-d="1" aria-label="1増やす">＋</button>
+    </div>
+    <div class="status"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% if not grouped %}
+<div style="text-align:center; padding:60px; color:var(--fg2)">この仕入先の商品はまだありません。</div>
+{% endif %}
+<div style="height:40px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORE = {{ store|tojson }};
+const fmt = n => Number.isInteger(n) ? String(n) : String(+n.toFixed(2));
+let todayTotal = {{ today_total }};
+
+// 商品ごとに、連打は少しためて1回で送り、送信は1件ずつ順番に行う（数がずれないように）
+const state = new Map();
+function st(row) {
+  if (!state.has(row)) state.set(row, {pending: 0, timer: null, busy: false});
+  return state.get(row);
+}
+
+function render(row) {
+  const s = st(row);
+  const shown = parseFloat(row.dataset.pending) + s.pending;
+  row.querySelector('.count').textContent = fmt(shown);
+  row.querySelector('[data-d="-1"]').disabled = shown <= 0;
+  row.classList.toggle('has', shown > 0);
+  const today = parseFloat(row.dataset.today) + s.pending;
+  row.querySelector('.today-cell').innerHTML = today ? `<span class="today">今日 ${today > 0 ? '+' : ''}${fmt(today)}</span>` : '';
+}
+
+function setStatus(row, cls, text) {
+  const el = row.querySelector('.status');
+  el.className = 'status ' + cls;
+  el.textContent = text;
+}
+
+async function flush(row) {
+  const s = st(row);
+  clearTimeout(s.timer);
+  if (s.busy || s.pending === 0) return;
+  const delta = s.pending;
+  s.busy = true;
+  setStatus(row, '', '保存中…');
+  let data;
+  try {
+    const res = await fetch('/api/usage', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({product_id: row.dataset.id, store: STORE, delta})
+    });
+    data = await res.json();
+  } catch (e) {
+    data = {ok: false, error: '通信エラー'};
+  }
+  s.busy = false;
+  if (data.ok) {
+    s.pending -= delta;
+    todayTotal += data.today - parseFloat(row.dataset.today);
+    row.dataset.pending = data.pending;
+    row.dataset.today = data.today;
+    document.getElementById('today-total').textContent = fmt(todayTotal);
+    setStatus(row, 'saved', '保存済み');
+    render(row);
+    if (s.pending !== 0) flush(row);
+  } else {
+    if (data.pending !== undefined) { row.dataset.pending = data.pending; row.dataset.today = data.today; s.pending = 0; render(row); }
+    setStatus(row, 'error', '未保存');
+    toast((data.error || '保存に失敗しました') + '。もう一度押してください', 3500);
+  }
+}
+
+document.querySelectorAll('.u-row').forEach(row => {
+  row.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => {
+    const s = st(row);
+    const d = +b.dataset.d;
+    if (parseFloat(row.dataset.pending) + s.pending + d < 0) return;
+    s.pending += d;
+    render(row);
+    setStatus(row, '', '入力中…');
+    clearTimeout(s.timer);
+    s.timer = setTimeout(() => flush(row), 500);
+  }));
+});
+
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.normalize('NFKC').trim().toLowerCase();
+  document.querySelectorAll('.cat-card').forEach(card => {
+    let any = false;
+    card.querySelectorAll('.u-row').forEach(row => {
+      const show = !q || row.dataset.name.includes(q);
+      row.style.display = show ? '' : 'none';
+      any = any || show;
+    });
+    card.style.display = any ? '' : 'none';
+  });
+});
+
+window.addEventListener('beforeunload', e => {
+  for (const s of state.values()) if (s.pending !== 0 || s.busy) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

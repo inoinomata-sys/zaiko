@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
 import urllib.parse
 import unicodedata
+import uuid
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
@@ -188,6 +189,16 @@ def migrate():
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ")
     cur.execute("ALTER TABLE order_items ALTER COLUMN product_id DROP NOT NULL")
+    # 使用数（ラベル）の記録。1回の入力ごとに1行。取り消しはマイナスの行として残す
+    cur.execute("""CREATE TABLE IF NOT EXISTS usage_log (
+        id SERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), store TEXT NOT NULL,
+        product_id INTEGER NOT NULL REFERENCES products(id), qty DOUBLE PRECISION NOT NULL)""")
+    cur.execute("CREATE INDEX IF NOT EXISTS usage_log_store_product ON usage_log (store, product_id)")
+    # usage_upto: この発注に含めた使用記録の最後のid（これより後の使用が次回の仮発注になる）
+    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS usage_upto INTEGER")
+    # request_key: 同じ確定操作の二重送信で発注が2件できないようにする
+    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL")
     cur.execute("""CREATE TABLE IF NOT EXISTS error_log (
         id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""")
     db.commit()
@@ -354,6 +365,88 @@ def api_check_category():
     return jsonify(ok=True, count=n, skipped=skipped, checked_at=jst_fmt(now))
 
 
+# ── 使用入力（ラベル） ────────────────────────────────────────────────────────
+
+PENDING_USAGE_SQL = """
+    SELECT u.product_id,
+           SUM(u.qty) AS pending,
+           SUM(CASE WHEN u.at >= %s THEN u.qty ELSE 0 END) AS today
+    FROM usage_log u
+    JOIN products p ON p.id = u.product_id
+    WHERE u.store = %s {where}
+      AND u.id > COALESCE((SELECT MAX(o.usage_upto) FROM orders o
+                           WHERE o.store = u.store AND o.supplier = p.supplier), 0)
+    GROUP BY u.product_id
+"""
+
+
+def today_start():
+    return now_jst().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def pending_usage(cur, store, supplier=None, product_id=None):
+    """前回その仕入先に発注確定した後の使用数（＝仮発注数）と、今日入力した数を商品ごとに返す"""
+    where, params = '', [today_start(), store]
+    if supplier:
+        where += ' AND p.supplier = %s'
+        params.append(supplier)
+    if product_id:
+        where += ' AND u.product_id = %s'
+        params.append(product_id)
+    cur.execute(PENDING_USAGE_SQL.format(where=where), params)
+    return {r['product_id']: {'pending': float(r['pending']), 'today': float(r['today'])}
+            for r in cur.fetchall()}
+
+
+@app.route('/usage')
+def usage():
+    store = request.args.get('store', 'イノ')
+    if store not in STORES:
+        store = 'イノ'
+    supplier = request.args.get('supplier', '')
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("""
+        SELECT id, supplier, category, name, note FROM products
+        WHERE is_active=true {where} ORDER BY col_group, sort_order, id
+    """.format(where="AND supplier=%s" if supplier else ''), (supplier,) if supplier else ())
+    rows = cur.fetchall()
+    usage_map = pending_usage(cur, store, supplier or None)
+    grouped = OrderedDict()
+    for r in rows:
+        u = usage_map.get(r['id'], {'pending': 0, 'today': 0})
+        grouped.setdefault((r['supplier'], r['category']), []).append({**r, **u})
+    today_total = sum(u['today'] for u in usage_map.values())
+    return render_template('usage.html', store=store, supplier=supplier, grouped=grouped,
+                           today_total=today_total)
+
+
+@app.route('/api/usage', methods=['POST'])
+def api_usage():
+    data = request.get_json() or {}
+    try:
+        product_id = int(data['product_id'])
+        delta = float(data['delta'])
+    except (KeyError, TypeError, ValueError):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    store = data.get('store', 'イノ')
+    if store not in STORES or delta == 0:
+        return jsonify(ok=False, error='入力が不正です'), 400
+    db = get_db()
+    with transaction(db) as cur:
+        # 同じ商品への同時入力で数がずれないよう、商品の行をロックしてから計算する
+        cur.execute("SELECT id FROM products WHERE id=%s FOR UPDATE", (product_id,))
+        if not cur.fetchone():
+            return jsonify(ok=False, error='商品が見つかりません'), 404
+        cur_u = pending_usage(cur, store, product_id=product_id).get(product_id, {'pending': 0, 'today': 0})
+        if cur_u['pending'] + delta < 0:
+            return jsonify(ok=False, error='0より少なくはできません', **cur_u), 400
+        cur.execute("INSERT INTO usage_log (store, product_id, qty) VALUES (%s,%s,%s)",
+                    (store, product_id, delta))
+        cur_u = pending_usage(cur, store, product_id=product_id).get(product_id, {'pending': 0, 'today': 0})
+    return jsonify(ok=True, **cur_u)
+
+
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
 def get_suppliers_with_contacts():
@@ -394,10 +487,21 @@ def order_form():
     supplier = request.args.get('supplier', 'ワールド美容')
 
     now = now_jst()
+    db = get_db()
+    cur = db.cursor()
+    # この画面に出した使用数の範囲（これより後に入力された使用は次回の発注に回す）
+    cur.execute("SELECT COALESCE(MAX(id), 0) AS m FROM usage_log")
+    usage_upto = cur.fetchone()['m']
+    usage_map = pending_usage(cur, store, supplier)
+    cur.execute("""SELECT COUNT(*) AS c FROM orders WHERE store=%s AND supplier=%s
+                   AND order_month=%s AND order_day=%s""", (store, supplier, now.month, now.day))
+    ordered_today = cur.fetchone()['c']
     grouped = OrderedDict()
-    counts = {'unchecked': 0, 'stale': 0}
+    counts = {'unchecked': 0, 'stale': 0, 'usage': 0}
     for r in products_with_stock(store, supplier=supplier):
         r = dict(r)
+        r['usage'] = usage_map.get(r['id'], {}).get('pending', 0)
+        counts['usage'] += r['usage'] > 0
         r['unchecked'] = r['checked_at'] is None
         r['days'] = None if r['unchecked'] else (now - r['checked_at']).days
         r['stale'] = not r['unchecked'] and r['days'] >= STALE_DAYS
@@ -409,7 +513,9 @@ def order_form():
 
     return render_template('order.html', store=store, grouped=grouped,
                            cats=list(grouped.keys()), supplier=supplier,
-                           sup_info=supplier_info(supplier), counts=counts, stale_days=STALE_DAYS)
+                           sup_info=supplier_info(supplier), counts=counts, stale_days=STALE_DAYS,
+                           usage_upto=usage_upto, ordered_today=ordered_today,
+                           request_key=uuid.uuid4().hex)
 
 
 @app.route('/order/save', methods=['POST'])
@@ -420,19 +526,35 @@ def order_save():
     items    = data.get('items', [])
     month    = data.get('month')
     day      = data.get('day')
+    request_key = data.get('request_key') or None
+    usage_upto  = data.get('usage_upto')
 
     db = get_db()
     with transaction(db) as cur:
-        order_id = _insert_order(cur, store, supplier, month, day, items)
+        # 同じ画面からの二重送信（連打・通信のやり直し）は、最初の1件をそのまま返す
+        if request_key:
+            cur.execute("SELECT id FROM orders WHERE request_key=%s", (request_key,))
+            done = cur.fetchone()
+            if done:
+                return jsonify(ok=True, order_id=done['id'], repeated=True)
+        # 同じ店舗・仕入先・発注日の発注が既にあれば、確認なしでは確定しない
+        if not data.get('allow_duplicate'):
+            cur.execute("""SELECT COUNT(*) AS c FROM orders WHERE store=%s AND supplier=%s
+                           AND order_month=%s AND order_day=%s""", (store, supplier, month, day))
+            if cur.fetchone()['c']:
+                return jsonify(ok=False, duplicate=True,
+                               error=f'{month}月{day}日の {store}・{supplier} の発注はすでに確定済みです。'), 409
+        order_id = _insert_order(cur, store, supplier, month, day, items, request_key, usage_upto)
     return jsonify(ok=True, order_id=order_id)
 
 
-def _insert_order(cur, store, supplier, month, day, items):
+def _insert_order(cur, store, supplier, month, day, items, request_key=None, usage_upto=None):
     cur.execute("""
-        INSERT INTO orders (store, supplier, order_month, order_day, status, created_at)
-        VALUES (%s, %s, %s, %s, 'confirmed', %s)
+        INSERT INTO orders (store, supplier, order_month, order_day, status, created_at, request_key, usage_upto)
+        VALUES (%s, %s, %s, %s, 'confirmed', %s, %s, %s)
         RETURNING id
-    """, (store, supplier, month, day, now_jst().strftime('%Y-%m-%d %H:%M')))
+    """, (store, supplier, month, day, now_jst().strftime('%Y-%m-%d %H:%M'), request_key,
+          int(usage_upto) if usage_upto is not None else None))
     order_id = cur.fetchone()['id']
 
     rows = [(order_id, int(item['product_id']) if item.get('product_id') else None,
