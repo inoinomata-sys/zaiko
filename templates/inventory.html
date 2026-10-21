@@ -99,7 +99,7 @@
   <div style="margin-top:6px">
     <b>＋／－</b>は使った・補充した時の数量変更です（「最終更新」が変わります）。<br>
     実際に数えた時は、数を入れて<b>「確認」</b>を押すと確認日時が記録されます。<br>
-    「未確認」は数えた記録がない商品です。在庫がなかった時は 0 を入れて「確認」を押してください。
+    「未確認」は数えた記録がない商品です。在庫がなかった時は「?」のまま「確認」を押すと 0 で記録されます。
   </div>
 </details>
 
@@ -265,8 +265,10 @@ document.querySelectorAll('.inv-row').forEach(row => {
   inp.addEventListener('change', () => setDirect(row));
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
   row.querySelector('.check-btn').addEventListener('click', () => {
+    // 空欄（?）のまま「確認」＝数えたら在庫がなかった、として0で確認する
+    if (inp.value === '') inp.value = '0';
     const v = parseFloat(inp.value);
-    if (inp.value === '' || isNaN(v) || v < 0) { toast('数えた数を入力してから「確認」を押してください（在庫なしは 0）'); return; }
+    if (isNaN(v) || v < 0) { toast('0以上の数を入力してください'); return; }
     const s = st(row);
     clearTimeout(s.timer); s.pending = 0;
     s.queue.push({op: 'check', value: v, version: +row.dataset.version});
