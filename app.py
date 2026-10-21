@@ -559,7 +559,15 @@ def products():
 @app.route('/products/add', methods=['POST'])
 def product_add():
     d = request.form
-    category = nfkc(d.get('category', ''))
+    category = nfkc(d.get('category', '')) or ''
+    name = nfkc(d.get('name', ''))
+    supplier = d.get('supplier') or SUPPLIER_NAMES[0]
+    try:
+        base_qty = max(float(d.get('base_qty') or 0), 0)
+    except ValueError:
+        base_qty = 0
+    if not name:
+        return redirect(url_for('products', supplier=supplier))
     db = get_db()
     cur = db.cursor()
     # 並び順用の列番号は、同じカテゴリの既存商品から引き継ぐ（新しいカテゴリは最後の列）
@@ -573,12 +581,11 @@ def product_add():
     cur.execute("""
         INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (col_group, category, nfkc(d['name']),
-          float(d.get('base_qty', 0)), nfkc(d.get('note')) or None,
-          d.get('supplier', 'ワールド美容'), max_sort + 1))
+    """, (col_group, category, name, base_qty, nfkc(d.get('note')) or None,
+          supplier, max_sort + 1))
     db.commit()
     release_db(db)
-    return redirect(url_for('products', supplier=d.get('supplier', 'ワールド美容')))
+    return redirect(url_for('products', supplier=supplier, added=name))
 
 
 @app.route('/products/<int:pid>/toggle', methods=['POST'])
