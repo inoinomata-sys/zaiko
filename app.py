@@ -229,7 +229,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -252,6 +252,9 @@ SCHEMA_SQL = [
     "ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_ver TEXT",
     """CREATE TABLE IF NOT EXISTS error_log (
         id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""",
+    # 商品追加の自動やり直しで、同じ商品が2件できないようにする
+    "ALTER TABLE products ADD COLUMN IF NOT EXISTS request_key TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS products_request_key ON products (request_key) WHERE request_key IS NOT NULL",
 ]
 
 
@@ -995,17 +998,34 @@ def products():
 @app.route('/products/add', methods=['POST'])
 def product_add():
     d = request.form
+    wants_json = 'application/json' in request.headers.get('Accept', '')
     category = nfkc(d.get('category', '')) or ''
     name = nfkc(d.get('name', ''))
+    note = nfkc(d.get('note')) or None
     supplier = d.get('supplier') or SUPPLIER_NAMES[0]
+    request_key = d.get('request_key') or None
     try:
         base_qty = max(float(d.get('base_qty') or 0), 0)
     except ValueError:
         base_qty = 0
+
+    def fail(msg):
+        return (jsonify(ok=False, error=msg), 400) if wants_json else redirect(url_for('products', supplier=supplier))
+    if supplier not in SUPPLIER_NAMES:
+        return fail('仕入先が不正です')
     if not name:
-        return redirect(url_for('products', supplier=supplier))
+        return fail('商品名を入力してください')
+    if len(name) > 200 or len(category) > 60 or (note and len(note) > 100):
+        return fail('文字数が多すぎます（商品名200・カテゴリ60・備考100文字まで）')
     db = get_db()
     with transaction(db) as cur:
+        if request_key:
+            # 通信が切れて自動でやり直した時に、同じ商品が2件できないようにする
+            cur.execute("SELECT id FROM products WHERE request_key=%s", (request_key,))
+            done = cur.fetchone()
+            if done:
+                url = url_for('products', supplier=supplier, added=name) + f"#p{done['id']}"
+                return jsonify(ok=True, url=url, repeated=True) if wants_json else redirect(url)
         # 同じ仕入先・同じカテゴリの最後の商品のすぐ後ろに入れる（一覧でそのカテゴリの中に並ぶように）
         cur.execute("""SELECT col_group, sort_order FROM products WHERE supplier=%s AND category=%s
                        ORDER BY col_group DESC, sort_order DESC, id DESC LIMIT 1""", (supplier, category))
@@ -1021,11 +1041,12 @@ def product_add():
             cur.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 AS s FROM products WHERE col_group=%s", (col_group,))
             pos = cur.fetchone()['s']
         cur.execute("""
-            INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
-            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
-        """, (col_group, category, name, base_qty, nfkc(d.get('note')) or None, supplier, pos))
+            INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order, request_key)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        """, (col_group, category, name, base_qty, note, supplier, pos, request_key))
         new_id = cur.fetchone()['id']
-    return redirect(url_for('products', supplier=supplier, added=name) + f'#p{new_id}')
+    url = url_for('products', supplier=supplier, added=name) + f'#p{new_id}'
+    return jsonify(ok=True, url=url) if wants_json else redirect(url)
 
 
 @app.route('/products/<int:pid>/move', methods=['POST'])
