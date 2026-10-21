@@ -214,6 +214,9 @@ def migrate():
     cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS usage_upto INTEGER")
     # request_key: 同じ確定操作の二重送信で発注が2件できないようにする
     cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT")
+    # 作ったPDFを保存しておき、2回目からはすぐ返す（発注確定後に内容は変わらないため）
+    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf BYTEA")
+    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_ver TEXT")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL")
     cur.execute("""CREATE TABLE IF NOT EXISTS error_log (
         id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""")
@@ -560,6 +563,7 @@ def order_save():
                 return jsonify(ok=False, duplicate=True,
                                error=f'{month}月{day}日の {store}・{supplier} の発注はすでに確定済みです。'), 409
         order_id = _insert_order(cur, store, supplier, month, day, items, request_key, usage_upto)
+    threading.Thread(target=warm_pdf, args=(order_id,), daemon=True).start()
     return jsonify(ok=True, order_id=order_id)
 
 
@@ -587,14 +591,20 @@ def _insert_order(cur, store, supplier, month, day, items, request_key=None, usa
 CUSTOM_CAT = 'リスト外の品（手入力）'
 
 
-def load_order(order_id):
+def load_order(order_id, conn=None):
     """発注書1件分を、カテゴリ順のブロック [(カテゴリ名, [{name, note, qty}])] として返す"""
-    db = get_db()
+    db = conn or get_db()
     cur = db.cursor()
-    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
+    cur.execute("""
+        SELECT o.id, o.store, o.supplier, o.order_month, o.order_day, o.created_at,
+               (SELECT c.contact_name FROM supplier_contacts c WHERE c.supplier_name = o.supplier
+                ORDER BY c.sort_order, c.id LIMIT 1) AS contact_name
+        FROM orders o WHERE o.id=%s
+    """, (order_id,))
     order = cur.fetchone()
     if not order:
-        release_db(db)
+        if conn is None:
+            release_db(db)
         abort(404)
     cur.execute("""
         SELECT oi.order_qty, oi.custom_name, p.name, p.category, p.note
@@ -604,7 +614,8 @@ def load_order(order_id):
         ORDER BY p.col_group NULLS LAST, p.sort_order NULLS LAST, oi.id
     """, (order_id,))
     rows = cur.fetchall()
-    release_db(db)
+    if conn is None:
+        release_db(db)
 
     blocks = OrderedDict()
     for r in rows:
@@ -623,8 +634,14 @@ def order_print(order_id):
     item_count = sum(len(items) for _, items in blocks)
     total_qty = sum(float(it['qty']) for _, items in blocks for it in items)
     return render_template('print.html', order=order, blocks=blocks,
-                           sup_info=supplier_info(order.get('supplier') or 'ワールド美容'),
+                           sup_info=order_sup_info(order),
                            item_count=item_count, total_qty=total_qty)
+
+
+def order_sup_info(order):
+    name = order.get('supplier') or 'ワールド美容'
+    contact = order.get('contact_name')
+    return {'name': name, 'contacts': [{'name': contact}] if contact else []}
 
 
 class OrderPDF(FPDF):
@@ -646,12 +663,51 @@ class OrderPDF(FPDF):
 PDF_COLS = 3
 
 
+PDF_VER = '3'  # PDFのレイアウトを変えたら上げる（保存済みのPDFを作り直させるため）
+
+
+def pdf_filename(order):
+    return f"発注書_{order['order_month']}月{order['order_day']}日_{order.get('supplier') or 'ワールド美容'}.pdf"
+
+
 @app.route('/order/<int:order_id>/pdf')
 def order_pdf(order_id):
-    order, blocks = load_order(order_id)
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT order_month, order_day, supplier, pdf, pdf_ver FROM orders WHERE id=%s", (order_id,))
+    row = cur.fetchone()
+    if not row:
+        abort(404)
+    if row['pdf'] is not None and row['pdf_ver'] == PDF_VER:
+        data = bytes(row['pdf'])
+    else:
+        data = build_pdf(order_id)
+        cur.execute("UPDATE orders SET pdf=%s, pdf_ver=%s WHERE id=%s", (psycopg2.Binary(data), PDF_VER, order_id))
+    response = make_response(data)
+    response.headers['Content-Type'] = 'application/pdf'
+    disposition = 'inline' if request.args.get('inline') else 'attachment'
+    response.headers['Content-Disposition'] = f"{disposition}; filename*=UTF-8''{urllib.parse.quote(pdf_filename(row))}"
+    return response
+
+
+def warm_pdf(order_id):
+    """発注確定の直後に裏でPDFを作って保存しておく（印刷画面を開く頃には用意できているように）"""
+    with app.app_context():
+        conn = _checkout()
+        try:
+            data = build_pdf(order_id, conn)
+            conn.cursor().execute("UPDATE orders SET pdf=%s, pdf_ver=%s WHERE id=%s AND pdf IS NULL",
+                                  (psycopg2.Binary(data), PDF_VER, order_id))
+        except Exception:
+            app.logger.exception('PDFの事前作成に失敗')
+        finally:
+            _checkin(conn)
+
+
+def build_pdf(order_id, conn=None):
+    order, blocks = load_order(order_id, conn)
     sup_name = order.get('supplier') or 'ワールド美容'
-    sup = supplier_info(sup_name)
-    contact_name = sup['contacts'][0]['name'] if sup['contacts'] else ''
+    contact_name = order.get('contact_name') or ''
     date_str = f"{order['order_month']}月{order['order_day']}日"
 
     pdf = OrderPDF(orientation='P', unit='mm', format='A4')
@@ -742,12 +798,7 @@ def order_pdf(order_id):
         pdf.set_xy(pdf.l_margin, pos['y'] + 4)
         pdf.cell(0, 10, '発注品はありません')
 
-    filename = f"発注書_{date_str}_{sup_name}.pdf"
-    response = make_response(bytes(pdf.output()))
-    response.headers['Content-Type'] = 'application/pdf'
-    disposition = 'inline' if request.args.get('inline') else 'attachment'
-    response.headers['Content-Disposition'] = f"{disposition}; filename*=UTF-8''{urllib.parse.quote(filename)}"
-    return response
+    return bytes(pdf.output())
 
 
 @app.route('/order/history')
@@ -755,7 +806,7 @@ def order_history():
     db = get_db()
     cur = db.cursor()
     cur.execute("""
-        SELECT o.*,
+        SELECT o.id, o.store, o.supplier, o.order_month, o.order_day, o.status, o.created_at,
                COUNT(oi.id)          AS item_count,
                COALESCE(SUM(oi.order_qty), 0) AS total_qty
         FROM orders o
