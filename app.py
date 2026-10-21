@@ -3,6 +3,7 @@ from flask import Flask, g, has_request_context, render_template, request, jsoni
 import os
 import traceback
 import time
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
@@ -21,9 +22,21 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 JST = timezone(timedelta(hours=9))
 
-# 起動時には接続を作らない（サーバーが複数プロセスに分かれる時に接続を共有して壊れるのを防ぐ）
-_pool = psycopg2.pool.ThreadedConnectionPool(
-    0, 5, DATABASE_URL, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+# 接続プールは最初に使う時に作る（起動時に作ると、サーバーが複数プロセスに分かれる時に接続を共有して壊れるため）
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                # 最大数は gunicorn のスレッド数(4)に合わせる。2本は使い終わっても閉じずに残す
+                _pool = psycopg2.pool.ThreadedConnectionPool(
+                    2, 4, DATABASE_URL, keepalives=1, keepalives_idle=30,
+                    keepalives_interval=10, keepalives_count=3)
+    return _pool
 
 STORES = ['イノ', 'リッチ']
 SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
@@ -106,10 +119,10 @@ IDLE_CHECK_SEC = 60
 def _getconn():
     # 接続数の上限などで一時的に失敗することがあるので、少し待って1回だけやり直す
     try:
-        return _pool.getconn()
+        return _get_pool().getconn()
     except Exception:
         time.sleep(0.5)
-        return _pool.getconn()
+        return _get_pool().getconn()
 
 
 def _set_autocommit(conn):
@@ -128,7 +141,7 @@ def _checkout():
             _set_autocommit(conn)
             conn.cursor().execute('SELECT 1')
         except Exception:
-            _pool.putconn(conn, close=True)
+            _get_pool().putconn(conn, close=True)
             conn = _getconn()
     _set_autocommit(conn)
     conn.cursor_factory = psycopg2.extras.RealDictCursor
@@ -142,7 +155,7 @@ def _checkin(conn):
             conn.rollback()
     except Exception:
         pass
-    _pool.putconn(conn, close=bool(conn.closed))
+    _get_pool().putconn(conn, close=bool(conn.closed))
 
 
 def get_db():
