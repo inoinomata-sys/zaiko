@@ -71,6 +71,12 @@ def handle_error(e):
         conn.close()
     except Exception:
         pass
+    # DBとの接続が途中で切れていた場合（SSL error など）、GET は1回だけ自動でやり直す
+    if (isinstance(e, (psycopg2.OperationalError, psycopg2.InterfaceError))
+            and request.method == 'GET' and not request.args.get('_r')):
+        args = request.args.to_dict(flat=False)
+        args['_r'] = ['1']
+        return redirect(request.path + '?' + urllib.parse.urlencode(args, doseq=True))
     if request.path.startswith('/api/') or request.method != 'GET':
         return jsonify(ok=False, error='サーバーで一時的なエラーが起きました。もう一度お試しください。'), 500
     return render_template('error.html'), 500
@@ -91,7 +97,7 @@ def ping():
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────
 
 _last_used = {}
-IDLE_CHECK_SEC = 60
+IDLE_CHECK_SEC = 15
 
 
 def _getconn():
