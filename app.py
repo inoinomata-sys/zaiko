@@ -546,23 +546,28 @@ def products():
     cur.execute("SELECT * FROM products ORDER BY col_group, sort_order")
     rows = cur.fetchall()
     release_db(db)
-    return render_template('products.html', rows=rows)
+    categories = list(OrderedDict.fromkeys(r['category'] for r in rows if r['category']))
+    return render_template('products.html', rows=rows, categories=categories)
 
 
 @app.route('/products/add', methods=['POST'])
 def product_add():
     d = request.form
+    category = nfkc(d.get('category', ''))
     db = get_db()
     cur = db.cursor()
-    cur.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM products WHERE col_group=%s",
-        (d['col_group'],)
-    )
+    # 並び順用の列番号は、同じカテゴリの既存商品から引き継ぐ（新しいカテゴリは最後の列）
+    cur.execute("SELECT MIN(col_group) AS g FROM products WHERE category=%s", (category,))
+    col_group = cur.fetchone()['g']
+    if col_group is None:
+        cur.execute("SELECT COALESCE(MAX(col_group), 1) AS g FROM products")
+        col_group = cur.fetchone()['g']
+    cur.execute("SELECT COALESCE(MAX(sort_order),0) FROM products WHERE col_group=%s", (col_group,))
     max_sort = cur.fetchone()['coalesce']
     cur.execute("""
         INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (int(d['col_group']), nfkc(d['category']), nfkc(d['name']),
+    """, (col_group, category, nfkc(d['name']),
           float(d.get('base_qty', 0)), nfkc(d.get('note')) or None,
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
