@@ -541,13 +541,19 @@ def order_history():
 
 @app.route('/products')
 def products():
+    supplier = request.args.get('supplier', SUPPLIER_NAMES[0])
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT * FROM products ORDER BY col_group, sort_order")
-    rows = cur.fetchall()
+    all_rows = cur.fetchall()
     release_db(db)
+    counts = {}
+    for r in all_rows:
+        counts[r['supplier']] = counts.get(r['supplier'], 0) + 1
+    rows = all_rows if supplier == 'all' else [r for r in all_rows if r['supplier'] == supplier]
     categories = list(OrderedDict.fromkeys(r['category'] for r in rows if r['category']))
-    return render_template('products.html', rows=rows, categories=categories)
+    return render_template('products.html', rows=rows, categories=categories,
+                           current_supplier=supplier, counts=counts, total=len(all_rows))
 
 
 @app.route('/products/add', methods=['POST'])
@@ -572,7 +578,7 @@ def product_add():
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
     release_db(db)
-    return redirect(url_for('products'))
+    return redirect(url_for('products', supplier=d.get('supplier', 'ワールド美容')))
 
 
 @app.route('/products/<int:pid>/toggle', methods=['POST'])
@@ -582,7 +588,7 @@ def product_toggle(pid):
     cur.execute("UPDATE products SET is_active = NOT is_active WHERE id=%s", (pid,))
     db.commit()
     release_db(db)
-    return redirect(url_for('products'))
+    return redirect(request.referrer or url_for('products'))
 
 
 @app.route('/products/<int:pid>/base', methods=['POST'])
