@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
 import urllib.parse
@@ -16,7 +17,8 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 JST = timezone(timedelta(hours=9))
 
-_pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
+_pool = psycopg2.pool.ThreadedConnectionPool(
+    1, 5, DATABASE_URL, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
 
 STORES = ['イノ', 'リッチ']
 SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
@@ -67,29 +69,32 @@ def ping():
 
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────
 
+_last_used = {}
+IDLE_CHECK_SEC = 60
+
+
 def get_db():
-    global _pool
-    try:
-        conn = _pool.getconn()
-        if conn.closed:
-            _pool.putconn(conn)
-            raise psycopg2.InterfaceError
-        conn.cursor_factory = psycopg2.extras.RealDictCursor
-        return conn
-    except Exception:
-        _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
-        conn = _pool.getconn()
-        conn.cursor_factory = psycopg2.extras.RealDictCursor
-        return conn
+    conn = _pool.getconn()
+    # しばらく使っていない接続はDB側で切られていることがあるので、確かめてから使う
+    if conn.closed or time.time() - _last_used.get(id(conn), 0) > IDLE_CHECK_SEC:
+        try:
+            conn.cursor().execute('SELECT 1')
+            conn.rollback()
+        except Exception:
+            _pool.putconn(conn, close=True)
+            conn = _pool.getconn()
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
+    return conn
 
 
 def release_db(conn):
+    _last_used[id(conn)] = time.time()
     try:
         if not conn.closed:
             conn.rollback()  # 失敗したトランザクションを残したままプールに戻さない
-            _pool.putconn(conn)
     except Exception:
         pass
+    _pool.putconn(conn, close=conn.closed)
 
 
 def migrate():
@@ -329,16 +334,15 @@ def order_save():
     """, (store, supplier, month, day, now_jst().strftime('%Y-%m-%d %H:%M')))
     order_id = cur.fetchone()['id']
 
-    for item in items:
-        if float(item.get('order_qty', 0)) <= 0:
-            continue
-        pid = int(item['product_id']) if item.get('product_id') else None
-        cur.execute("""
+    rows = [(order_id, int(item['product_id']) if item.get('product_id') else None,
+             item.get('base_qty', 0), item.get('stock_qty', 0),
+             float(item['order_qty']), nfkc(item.get('custom_name')))
+            for item in items if float(item.get('order_qty', 0)) > 0]
+    if rows:
+        psycopg2.extras.execute_values(cur, """
             INSERT INTO order_items (order_id, product_id, base_qty, stock_qty, order_qty, custom_name)
-            VALUES (%s,%s,%s,%s,%s,%s)
-        """, (order_id, pid,
-              item.get('base_qty', 0), item.get('stock_qty', 0),
-              float(item['order_qty']), nfkc(item.get('custom_name'))))
+            VALUES %s
+        """, rows, page_size=1000)
     db.commit()
     release_db(db)
     return jsonify(ok=True, order_id=order_id)
