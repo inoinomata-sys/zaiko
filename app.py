@@ -44,6 +44,8 @@ SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム美容',
                   'ナプラ', 'コタ', 'リファ', '買い物忘れ・買い物しといて',
                   'コーナン・業務用スーパー・100均一']
 STALE_DAYS = 7
+# 発注履歴に出さず、同じ日の二重発注の警告もしない仕入先（買い物リスト）。記録は使用数・在庫の計算のため裏に残る
+NO_HISTORY_SUPPLIERS = ['買い物忘れ・買い物しといて']
 
 
 def nfkc(v):
@@ -635,7 +637,7 @@ def order_form():
     usage_map = pending_usage(cur, store, supplier)
     cur.execute("""SELECT COUNT(*) AS c FROM orders WHERE store=%s AND supplier=%s
                    AND order_month=%s AND order_day=%s""", (store, supplier, now.month, now.day))
-    ordered_today = cur.fetchone()['c']
+    ordered_today = 0 if supplier in NO_HISTORY_SUPPLIERS else cur.fetchone()['c']
     grouped = OrderedDict()
     counts = {'unchecked': 0, 'stale': 0, 'usage': 0}
     for r in products_with_stock(store, supplier=supplier):
@@ -702,7 +704,7 @@ def order_save():
             if done:
                 return jsonify(ok=True, order_id=done['id'], repeated=True)
         # 同じ店舗・仕入先・発注日の発注が既にあれば、確認なしでは確定しない
-        if not data.get('allow_duplicate'):
+        if not data.get('allow_duplicate') and supplier not in NO_HISTORY_SUPPLIERS:
             cur.execute("""SELECT COUNT(*) AS c FROM orders WHERE store=%s AND supplier=%s
                            AND order_month=%s AND order_day=%s""", (store, supplier, month, day))
             if cur.fetchone()['c']:
@@ -964,17 +966,19 @@ def order_history():
                COALESCE(SUM(oi.order_qty), 0) AS total_qty
         FROM orders o
         LEFT JOIN order_items oi ON o.id = oi.order_id
+        WHERE o.supplier <> ALL(%s)
         GROUP BY o.id
         ORDER BY o.order_month DESC, o.order_day DESC, o.created_at DESC
         LIMIT 200
-    """)
+    """, (NO_HISTORY_SUPPLIERS,))
     orders = cur.fetchall()
     release_db(db)
 
     grouped = OrderedDict()
     for o in orders:
         grouped.setdefault((o['order_month'], o['order_day']), []).append(o)
-    return render_template('history.html', grouped=grouped)
+    return render_template('history.html', grouped=grouped,
+                           history_suppliers=[s for s in SUPPLIER_NAMES if s not in NO_HISTORY_SUPPLIERS])
 
 
 # ── 商品マスター管理 ──────────────────────────────────────────────────────────

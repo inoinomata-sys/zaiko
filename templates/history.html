@@ -65,7 +65,7 @@
 </div>
 <div class="sup-tabs" style="margin-bottom:16px">
   <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
-  {% for s in supplier_names %}<button class="sup-tab" onclick="filterSup(this,'{{ s }}')">{{ s }}</button>{% endfor %}
+  {% for s in history_suppliers %}<button class="sup-tab" onclick="filterSup(this,'{{ s }}')">{{ s }}</button>{% endfor %}
 </div>
 
 {% if grouped %}
