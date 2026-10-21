@@ -1,6 +1,7 @@
 from werkzeug.exceptions import HTTPException
 from flask import Flask, g, has_request_context, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
+import sys
 import traceback
 import time
 import threading
@@ -106,6 +107,40 @@ def service_worker():
 @app.route('/ping')
 def ping():
     return 'ok', 200
+
+
+_BOOT_TIME = time.time()
+
+
+@app.route('/health')
+def health():
+    """サーバーの状態（プロセス数・メモリ・稼働時間）。不具合の調査用で、個人情報や設定値は返さない"""
+    info = {'pid': os.getpid(), 'uptime_s': int(time.time() - _BOOT_TIME), 'threads': threading.active_count()}
+    try:
+        with open('/proc/self/status') as f:
+            for line in f:
+                if line.startswith('VmRSS'):
+                    info['rss_mb'] = round(int(line.split()[1]) / 1024)
+        procs = []
+        for pid in os.listdir('/proc'):
+            if pid.isdigit():
+                try:
+                    cmd = open(f'/proc/{pid}/cmdline', 'rb').read().replace(b'\0', b' ').decode()
+                except OSError:
+                    continue
+                if 'gunicorn' in cmd:
+                    procs.append({'pid': int(pid), 'cmd': cmd.strip()[:120]})
+        info['gunicorn_processes'] = procs
+        info['cpu_count'] = os.cpu_count()
+        info['cwd_has_conf'] = os.path.exists('gunicorn.conf.py')
+        info['cwd'] = os.getcwd()
+        info['gunicorn_env'] = {k: v for k, v in os.environ.items() if k.startswith(('GUNICORN', 'WEB_CONCURRENCY'))}
+        info['python'] = sys.version.split()[0]
+        import gunicorn
+        info['gunicorn'] = gunicorn.__version__
+    except Exception as e:
+        info['diag_error'] = str(e)
+    return jsonify(info)
 
 
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────
