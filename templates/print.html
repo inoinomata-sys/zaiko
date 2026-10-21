@@ -99,25 +99,46 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 </div>
 
 <script>
-// iPhoneのホーム画面アプリではダウンロードしたPDFを保存できないため、共有メニュー（ファイルに保存など）を使う。
-// 共有はタップ直後に呼ぶ必要があるので、PDFは画面を開いた時点で先に取得しておく。
+// iPhoneのホーム画面アプリでPDFを直接開くと、戻る・共有ボタンのない画面になり保存できない。
+// 共有メニュー（ファイルに保存など）を使う。共有はタップ直後に呼ぶ必要があるため、PDFは先に取得しておき、
+// 取得が終わるまでボタンは押せないようにする。共有が使えない時はSafariの画面で開く（右上に共有ボタンがある）。
 (function () {
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-  if (!ios || !navigator.canShare) return;
+  if (!ios) return;
   const btn = document.getElementById('pdf-btn');
+  const url = btn.getAttribute('href');
   const name = {{ ("発注書_" ~ order.order_month ~ "月" ~ order.order_day ~ "日_" ~ sup_info.name ~ ".pdf")|tojson }};
   let file = null;
-  fetch(btn.href).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+
+  function openInSafari() {
+    btn.removeAttribute('download');
+    btn.href = url + '?inline=1';
+    btn.target = '_blank';
+    btn.style.pointerEvents = '';
+    btn.style.opacity = '';
+    btn.textContent = 'PDFを開く（右上の共有から保存）';
+  }
+
+  btn.removeAttribute('download');
+  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '.6';
+  btn.textContent = 'PDFを準備中…';
+
+  if (!navigator.canShare) { openInSafari(); return; }
+  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
     const f = new File([b], name, {type: 'application/pdf'});
-    if (!navigator.canShare({files: [f]})) return;
+    if (!navigator.canShare({files: [f]})) return openInSafari();
     file = f;
+    btn.style.pointerEvents = '';
+    btn.style.opacity = '';
     btn.textContent = 'PDFを保存・共有';
-  }).catch(() => {});
+  }).catch(openInSafari);
+
   btn.addEventListener('click', e => {
     if (!file) return;
     e.preventDefault();
     navigator.share({files: [file]}).catch(err => {
-      if (err.name !== 'AbortError') location.href = btn.href;
+      if (err.name !== 'AbortError') { openInSafari(); alert('共有できませんでした。もう一度ボタンを押すとPDFを開きます。'); }
     });
   });
 })();

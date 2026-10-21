@@ -509,7 +509,8 @@ def order_pdf(order_id):
     filename = f"発注書_{date_str}_{sup_name}.pdf"
     response = make_response(bytes(pdf.output()))
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
+    disposition = 'inline' if request.args.get('inline') else 'attachment'
+    response.headers['Content-Disposition'] = f"{disposition}; filename*=UTF-8''{urllib.parse.quote(filename)}"
     return response
 
 
