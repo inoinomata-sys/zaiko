@@ -67,7 +67,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
   <button class="btn btn-back" onclick="window.print()">この画面を印刷</button>
-  <a class="btn btn-print" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
+  <a class="btn btn-print" id="pdf-btn" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
 </div>
 
 <div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
@@ -99,5 +99,29 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
   {% endif %}
 </div>
 
+<script>
+// iPhoneのホーム画面アプリではダウンロードしたPDFを保存できないため、共有メニュー（ファイルに保存など）を使う。
+// 共有はタップ直後に呼ぶ必要があるので、PDFは画面を開いた時点で先に取得しておく。
+(function () {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (!ios || !navigator.canShare) return;
+  const btn = document.getElementById('pdf-btn');
+  const name = {{ ("発注書_" ~ order.order_month ~ "月" ~ order.order_day ~ "日_" ~ sup_info.name ~ ".pdf")|tojson }};
+  let file = null;
+  fetch(btn.href).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+    const f = new File([b], name, {type: 'application/pdf'});
+    if (!navigator.canShare({files: [f]})) return;
+    file = f;
+    btn.textContent = 'PDFを保存・共有';
+  }).catch(() => {});
+  btn.addEventListener('click', e => {
+    if (!file) return;
+    e.preventDefault();
+    navigator.share({files: [file]}).catch(err => {
+      if (err.name !== 'AbortError') location.href = btn.href;
+    });
+  });
+})();
+</script>
 </body>
 </html>
