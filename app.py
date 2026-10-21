@@ -1,5 +1,7 @@
+from werkzeug.exceptions import HTTPException
 from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
+import traceback
 import time
 from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
@@ -55,6 +57,25 @@ def inject_globals():
     return {'supplier_names': SUPPLIER_NAMES, 'stores': STORES}
 
 
+@app.errorhandler(Exception)
+def handle_error(e):
+    if isinstance(e, HTTPException):
+        return e
+    tb = traceback.format_exc()
+    app.logger.error(tb)
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+        conn.cursor().execute("INSERT INTO error_log (method, path, error) VALUES (%s,%s,%s)",
+                              (request.method, request.full_path, tb[-4000:]))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+    if request.path.startswith('/api/') or request.method != 'GET':
+        return jsonify(ok=False, error='サーバーで一時的なエラーが起きました。もう一度お試しください。'), 500
+    return render_template('error.html'), 500
+
+
 @app.route('/sw.js')
 def service_worker():
     resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
@@ -73,8 +94,17 @@ _last_used = {}
 IDLE_CHECK_SEC = 60
 
 
+def _getconn():
+    # 接続数の上限などで一時的に失敗することがあるので、少し待って1回だけやり直す
+    try:
+        return _pool.getconn()
+    except Exception:
+        time.sleep(0.5)
+        return _pool.getconn()
+
+
 def get_db():
-    conn = _pool.getconn()
+    conn = _getconn()
     # しばらく使っていない接続はDB側で切られていることがあるので、確かめてから使う
     if conn.closed or time.time() - _last_used.get(id(conn), 0) > IDLE_CHECK_SEC:
         try:
@@ -82,7 +112,7 @@ def get_db():
             conn.rollback()
         except Exception:
             _pool.putconn(conn, close=True)
-            conn = _pool.getconn()
+            conn = _getconn()
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
@@ -104,6 +134,8 @@ def migrate():
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ")
     cur.execute("ALTER TABLE order_items ALTER COLUMN product_id DROP NOT NULL")
+    cur.execute("""CREATE TABLE IF NOT EXISTS error_log (
+        id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""")
     db.commit()
     release_db(db)
 
