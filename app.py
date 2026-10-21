@@ -1,40 +1,30 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from collections import OrderedDict
+import urllib.parse
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
 from dotenv import load_dotenv
-import urllib.request
-import urllib.parse
-import json as json_lib
 from fpdf import FPDF
 
 load_dotenv()
 
 app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
+JST = timezone(timedelta(hours=9))
 
-# 接続プール（最小1・最大5）
 _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
 
-# ── メモリキャッシュ ─────────────────────────────────────────────────────────
-_cache = {}
+STORES = ['イノ', 'リッチ']
+SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
+                  'ナプラ', 'コタ', 'アルマダ', 'リファ']
+STALE_DAYS = 7
 
-def cache_get(key):
-    return _cache.get(key)
 
-def cache_set(key, val):
-    _cache[key] = val
-
-def cache_del(*keys):
-    for k in keys:
-        _cache.pop(k, None)
-    # プレフィックス一致で削除
-    for k in list(_cache.keys()):
-        for prefix in keys:
-            if k.startswith(str(prefix)):
-                _cache.pop(k, None)
+def now_jst():
+    return datetime.now(JST)
 
 
 @app.template_filter('n')
@@ -43,6 +33,18 @@ def num_fmt(v):
         return '0'
     f = float(v)
     return str(int(f)) if f == int(f) else f'{f:g}'
+
+
+@app.template_filter('jst')
+def jst_fmt(v):
+    if not v:
+        return ''
+    return v.astimezone(JST).strftime('%m/%d %H:%M')
+
+
+@app.context_processor
+def inject_globals():
+    return {'supplier_names': SUPPLIER_NAMES, 'stores': STORES}
 
 
 @app.route('/sw.js')
@@ -63,14 +65,12 @@ def get_db():
     global _pool
     try:
         conn = _pool.getconn()
-        # 切断されていたら再接続
         if conn.closed:
             _pool.putconn(conn)
             raise psycopg2.InterfaceError
         conn.cursor_factory = psycopg2.extras.RealDictCursor
         return conn
     except Exception:
-        # プールを作り直して再試行
         _pool = psycopg2.pool.SimpleConnectionPool(1, 5, DATABASE_URL)
         conn = _pool.getconn()
         conn.cursor_factory = psycopg2.extras.RealDictCursor
@@ -80,56 +80,50 @@ def get_db():
 def release_db(conn):
     try:
         if not conn.closed:
+            conn.rollback()  # 失敗したトランザクションを残したままプールに戻さない
             _pool.putconn(conn)
     except Exception:
         pass
 
 
-def products_with_stock_supplier(store='イノ', supplier='ワールド美容'):
-    key = f'pws:{store}:{supplier}'
-    hit = cache_get(key)
-    if hit is not None:
-        return hit
+def migrate():
     db = get_db()
     cur = db.cursor()
-    cur.execute("""
-        SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
-               COALESCE(s.current_qty, 0) AS current_qty, s.updated_at
-        FROM products p
-        LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
-        WHERE p.is_active=true AND p.supplier=%s
-        ORDER BY p.col_group, p.sort_order
-    """, (store, supplier))
-    rows = cur.fetchall()
+    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ")
+    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
+    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ")
+    cur.execute("ALTER TABLE order_items ALTER COLUMN product_id DROP NOT NULL")
+    db.commit()
     release_db(db)
-    cache_set(key, rows)
-    return rows
 
 
-def products_with_stock(store='イノ', cat=None):
-    key = f'pw:{store}:{cat}'
-    hit = cache_get(key)
-    if hit is not None:
-        return hit
-    db = get_db()
-    cur = db.cursor()
-    where = "WHERE p.is_active=true"
-    params = [store]
+migrate()
+
+
+PRODUCT_STOCK_SQL = """
+    SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
+           COALESCE(s.current_qty, 0) AS current_qty, s.changed_at, s.checked_at,
+           COALESCE(s.version, 0) AS version
+    FROM products p
+    LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
+    WHERE p.is_active=true {where}
+    ORDER BY p.col_group, p.sort_order
+"""
+
+
+def products_with_stock(store='イノ', cat=None, supplier=None):
+    where, params = '', [store]
     if cat:
         where += " AND p.category=%s"
         params.append(cat)
-    cur.execute(f"""
-        SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order,
-               COALESCE(s.current_qty, 0) AS current_qty,
-               s.updated_at
-        FROM products p
-        LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
-        {where}
-        ORDER BY p.col_group, p.sort_order
-    """, params)
+    if supplier:
+        where += " AND p.supplier=%s"
+        params.append(supplier)
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(PRODUCT_STOCK_SQL.format(where=where), params)
     rows = cur.fetchall()
     release_db(db)
-    cache_set(key, rows)
     return rows
 
 
@@ -138,7 +132,9 @@ def products_with_stock(store='イノ', cat=None):
 @app.route('/')
 def inventory():
     store = request.args.get('store', 'イノ')
-    cat   = request.args.get('cat', '')
+    if store not in STORES:
+        store = 'イノ'
+    cat = request.args.get('cat', '')
 
     db = get_db()
     cur = db.cursor()
@@ -149,110 +145,137 @@ def inventory():
     release_db(db)
 
     rows = products_with_stock(store, cat or None)
-
-    grouped = {}
+    stale_before = now_jst() - timedelta(days=STALE_DAYS)
+    grouped = OrderedDict()
+    counts = {'unchecked': 0, 'stale': 0, 'shortage': 0}
     for r in rows:
+        r = dict(r)
+        r['unchecked'] = r['checked_at'] is None
+        r['stale'] = (not r['unchecked']) and r['checked_at'] < stale_before
+        r['shortage'] = max(float(r['base_qty'] or 0) - float(r['current_qty'] or 0), 0)
+        counts['unchecked'] += r['unchecked']
+        counts['stale'] += r['stale']
+        counts['shortage'] += r['shortage'] > 0
         grouped.setdefault(r['category'], []).append(r)
 
     return render_template('inventory.html',
-        store=store, cats=cats, current_cat=cat,
-        grouped=grouped, now=datetime.now()
-    )
+        store=store, cats=cats, current_cat=cat, grouped=grouped,
+        counts=counts, stale_days=STALE_DAYS)
+
+
+def stock_payload(row):
+    return {
+        'qty': float(row['current_qty']),
+        'version': row['version'],
+        'changed_at': jst_fmt(row['changed_at']),
+        'checked_at': jst_fmt(row['checked_at']),
+    }
 
 
 @app.route('/api/stock', methods=['POST'])
 def api_update_stock():
-    data = request.get_json()
-    product_id = int(data['product_id'])
-    qty        = float(data['qty'])
-    store      = data.get('store', 'イノ')
+    """op=delta: 加減（同時操作でも合算）/ op=set: 直接入力（version不一致は409）/ op=check: 数量を変えず確認済みにする"""
+    data = request.get_json() or {}
+    try:
+        product_id = int(data['product_id'])
+        op = data.get('op', 'set')
+        value = float(data.get('value', 0))
+    except (KeyError, TypeError, ValueError):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    store = data.get('store', 'イノ')
+    if store not in STORES or op not in ('delta', 'set', 'check'):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    if op == 'set' and value < 0:
+        return jsonify(ok=False, error='0未満は保存できません'), 400
+
+    now = now_jst()
+    db = get_db()
+    try:
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO stock (product_id, store, current_qty, version)
+            VALUES (%s, %s, 0, 0) ON CONFLICT (product_id, store) DO NOTHING
+        """, (product_id, store))
+        cur.execute("SELECT current_qty, version FROM stock WHERE product_id=%s AND store=%s FOR UPDATE",
+                    (product_id, store))
+        row = cur.fetchone()
+
+        if op == 'set':
+            expected = data.get('version')
+            if expected is not None and int(expected) != row['version']:
+                cur.execute("SELECT current_qty, version, changed_at, checked_at FROM stock WHERE product_id=%s AND store=%s",
+                            (product_id, store))
+                latest = cur.fetchone()
+                db.rollback()
+                return jsonify(ok=False, conflict=True,
+                               error='他の端末で先に更新されました。最新の数量を表示します。',
+                               **stock_payload(latest)), 409
+            new_qty = value
+        elif op == 'delta':
+            new_qty = max(float(row['current_qty'] or 0) + value, 0)
+        else:
+            new_qty = float(row['current_qty'] or 0)
+
+        changed = new_qty != float(row['current_qty'] or 0)
+        cur.execute("""
+            UPDATE stock SET current_qty=%s, version=version+1, checked_at=%s,
+                   changed_at=CASE WHEN %s THEN %s ELSE changed_at END,
+                   updated_at=%s
+            WHERE product_id=%s AND store=%s
+            RETURNING current_qty, version, changed_at, checked_at
+        """, (new_qty, now, changed, now, now.strftime('%Y-%m-%d %H:%M'), product_id, store))
+        result = cur.fetchone()
+        db.commit()
+    except Exception:
+        db.rollback()
+        release_db(db)
+        return jsonify(ok=False, error='保存に失敗しました'), 500
+    release_db(db)
+    return jsonify(ok=True, **stock_payload(result))
+
+
+@app.route('/api/stock/check_category', methods=['POST'])
+def api_check_category():
+    data = request.get_json() or {}
+    store = data.get('store', 'イノ')
+    cat = data.get('category')
+    if store not in STORES or cat is None:
+        return jsonify(ok=False, error='入力が不正です'), 400
+    now = now_jst()
     db = get_db()
     cur = db.cursor()
     cur.execute("""
-        INSERT INTO stock (product_id, store, current_qty, updated_at)
-        VALUES (%s,%s,%s,%s)
-        ON CONFLICT(product_id, store)
-        DO UPDATE SET current_qty=EXCLUDED.current_qty, updated_at=EXCLUDED.updated_at
-    """, (product_id, store, qty, datetime.now().strftime('%Y-%m-%d %H:%M')))
+        INSERT INTO stock (product_id, store, current_qty, version, checked_at, updated_at)
+        SELECT id, %s, 0, 1, %s, %s FROM products WHERE is_active=true AND category=%s
+        ON CONFLICT (product_id, store)
+        DO UPDATE SET checked_at=EXCLUDED.checked_at, version=stock.version+1
+    """, (store, now, now.strftime('%Y-%m-%d %H:%M'), cat))
+    n = cur.rowcount
     db.commit()
     release_db(db)
-    cache_del(f'pw:{store}:', f'pws:{store}:')
-    return jsonify(ok=True)
-
-
-@app.route('/api/stock/bulk', methods=['POST'])
-def api_bulk_stock():
-    data  = request.get_json()
-    store = data.get('store', 'イノ')
-    items = data.get('items', [])
-    db = get_db()
-    cur = db.cursor()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M')
-    for item in items:
-        cur.execute("""
-            INSERT INTO stock (product_id, store, current_qty, updated_at)
-            VALUES (%s,%s,%s,%s)
-            ON CONFLICT(product_id, store)
-            DO UPDATE SET current_qty=EXCLUDED.current_qty, updated_at=EXCLUDED.updated_at
-        """, (int(item['product_id']), store, float(item['qty']), now))
-    db.commit()
-    release_db(db)
-    cache_del(f'pw:{store}:', f'pws:{store}:')
-    return jsonify(ok=True)
+    return jsonify(ok=True, count=n, checked_at=jst_fmt(now))
 
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
 
-LINE_TOKEN = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '')
-
-def send_line_message(to_user_id, text):
-    if not LINE_TOKEN or not to_user_id:
-        return False
-    data = json_lib.dumps({
-        'to': to_user_id,
-        'messages': [{'type': 'text', 'text': text}]
-    }).encode('utf-8')
-    req = urllib.request.Request(
-        'https://api.line.me/v2/bot/message/push',
-        data=data,
-        headers={
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {LINE_TOKEN}'
-        },
-        method='POST'
-    )
-    try:
-        urllib.request.urlopen(req, timeout=10)
-        return True
-    except Exception:
-        return False
-
-
-STORES = ['イノ', 'リッチ']
-
-SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション']
-
-
 def get_suppliers_with_contacts():
     db = get_db()
     cur = db.cursor()
-    cur.execute("SELECT supplier_name, contact_name, fax, line_user_id, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id")
+    cur.execute("SELECT supplier_name, contact_name, fax, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id")
     rows = cur.fetchall()
     release_db(db)
-    result = {}
-    for name in SUPPLIER_NAMES:
-        result[name] = {'name': name, 'contacts': []}
+    result = OrderedDict((name, {'name': name, 'contacts': []}) for name in SUPPLIER_NAMES)
     for r in rows:
         sn = r['supplier_name']
-        if sn not in result:
-            result[sn] = {'name': sn, 'contacts': []}
-        result[sn]['contacts'].append({
-            'id': r['id'],
-            'name': r['contact_name'],
-            'fax': r['fax'],
-            'line_user_id': r['line_user_id'],
-        })
+        result.setdefault(sn, {'name': sn, 'contacts': []})
+        result[sn]['contacts'].append({'id': r['id'], 'name': r['contact_name'], 'fax': r['fax']})
     return list(result.values())
+
+
+def supplier_info(name):
+    suppliers = get_suppliers_with_contacts()
+    return next((s for s in suppliers if s['name'] == name), {'name': name, 'contacts': []})
+
 
 @app.route('/order')
 def order_top():
@@ -260,13 +283,11 @@ def order_top():
     suppliers = get_suppliers_with_contacts()
     db = get_db()
     cur = db.cursor()
-    supplier_list = []
-    for s in suppliers:
-        cur.execute("SELECT COUNT(*) FROM products WHERE is_active=true AND supplier=%s", (s['name'],))
-        cnt = cur.fetchone()['count']
-        supplier_list.append({**s, 'count': cnt})
+    cur.execute("SELECT supplier, COUNT(*) AS c FROM products WHERE is_active=true GROUP BY supplier")
+    counts = {r['supplier']: r['c'] for r in cur.fetchall()}
     release_db(db)
-    return render_template('order_top.html', suppliers=supplier_list, stores=STORES, store=store)
+    supplier_list = [{**s, 'count': counts.get(s['name'], 0)} for s in suppliers]
+    return render_template('order_top.html', suppliers=supplier_list, store=store)
 
 
 @app.route('/order/form')
@@ -274,25 +295,14 @@ def order_form():
     store    = request.args.get('store', 'イノ')
     supplier = request.args.get('supplier', 'ワールド美容')
 
-    db = get_db()
-    cur = db.cursor()
-    cur.execute(
-        "SELECT category FROM products WHERE is_active=true AND supplier=%s AND category!='' GROUP BY category ORDER BY MIN(sort_order)",
-        (supplier,)
-    )
-    cats = [r['category'] for r in cur.fetchall()]
-    release_db(db)
-
-    rows = products_with_stock_supplier(store, supplier)
-    grouped = {}
+    rows = products_with_stock(store, supplier=supplier)
+    grouped = OrderedDict()
     for r in rows:
         grouped.setdefault(r['category'], []).append(r)
 
-    suppliers = get_suppliers_with_contacts()
-    sup_info = next((s for s in suppliers if s['name'] == supplier), suppliers[0])
     return render_template('order.html', store=store, grouped=grouped,
-                           cats=cats, rows=rows, now=datetime.now(),
-                           supplier=supplier, sup_info=sup_info)
+                           cats=list(grouped.keys()), supplier=supplier,
+                           sup_info=supplier_info(supplier))
 
 
 @app.route('/order/save', methods=['POST'])
@@ -306,12 +316,11 @@ def order_save():
 
     db = get_db()
     cur = db.cursor()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M')
     cur.execute("""
         INSERT INTO orders (store, supplier, order_month, order_day, status, created_at)
         VALUES (%s, %s, %s, %s, 'confirmed', %s)
         RETURNING id
-    """, (store, supplier, month, day, now))
+    """, (store, supplier, month, day, now_jst().strftime('%Y-%m-%d %H:%M')))
     order_id = cur.fetchone()['id']
 
     for item in items:
@@ -329,227 +338,148 @@ def order_save():
     return jsonify(ok=True, order_id=order_id)
 
 
-@app.route('/order/<int:order_id>/print')
-def order_print(order_id):
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
-    order = cur.fetchone()
-    if not order:
-        abort(404)
-
-    cur.execute("""
-        SELECT oi.*, p.name, p.category, p.col_group, p.note, p.sort_order
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = %s AND oi.product_id IS NOT NULL
-        ORDER BY p.col_group, p.sort_order
-    """, (order_id,))
-    items = cur.fetchall()
-
-    cur.execute("""
-        SELECT order_qty, custom_name FROM order_items
-        WHERE order_id=%s AND product_id IS NULL AND custom_name IS NOT NULL
-    """, (order_id,))
-    custom_items = cur.fetchall()
-
-    sup_name = order.get('supplier', 'ワールド美容')
-    all_products = products_with_stock_supplier(order['store'], sup_name)
-    order_map = {r['product_id']: r for r in items}
-
-    groups = {}
-    for p in all_products:
-        groups.setdefault(p['col_group'], []).append(p)
-
-    suppliers = get_suppliers_with_contacts()
-    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
-    release_db(db)
-    return render_template('print.html',
-        order=order, groups=groups, order_map=order_map, sup_info=sup_info,
-        custom_items=custom_items)
+CUSTOM_CAT = 'リスト外の品（手入力）'
 
 
-
-@app.route('/order/<int:order_id>/pdf')
-def order_pdf(order_id):
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
-    order = cur.fetchone()
-    if not order:
-        abort(404)
-
-    cur.execute("""
-        SELECT oi.order_qty, p.name, p.category, p.col_group, p.sort_order, p.note
-        FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = %s AND oi.product_id IS NOT NULL
-        ORDER BY p.col_group, p.sort_order
-    """, (order_id,))
-    items = cur.fetchall()
-
-    cur.execute("""
-        SELECT order_qty, custom_name FROM order_items
-        WHERE order_id=%s AND product_id IS NULL AND custom_name IS NOT NULL
-    """, (order_id,))
-    custom_items = cur.fetchall()
-
-    sup_name = order.get('supplier', 'ワールド美容')
-    suppliers = get_suppliers_with_contacts()
-    sup_info = next((s for s in suppliers if s['name'] == sup_name), suppliers[0])
-    release_db(db)
-
-    # カテゴリ別にまとめる
-    cat_groups = {}
-    for it in items:
-        cat = it['category'] or 'その他'
-        cat_groups.setdefault(cat, []).append(it)
-
-    pdf = FPDF(orientation='P', unit='mm', format='A4')
-    pdf.add_page()
-
-    # 日本語フォント（Renderでは標準フォントのみ使用、日本語はUTF-8エンコード不要な文字のみ）
-    # fpdf2はUnicodeをサポートするが日本語フォントが必要
-    # → 日本語対応: NotoSansJP を静的ファイルから読む
-    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
-    if os.path.exists(font_path):
-        pdf.add_font('NotoSans', '', font_path)
-        pdf.add_font('NotoSans', 'B', font_path)
-        font_name = 'NotoSans'
-    else:
-        font_name = 'Helvetica'
-
-    pdf.set_margins(8, 8, 8)
-    pdf.set_auto_page_break(auto=True, margin=8)
-
-    # ヘッダー
-    pdf.set_font(font_name, 'B', 14)
-    contact_name = sup_info['contacts'][0]['name'] if sup_info.get('contacts') else ''
-    header_left = f"{sup_name}御中" + (f"  担当 {contact_name}" if contact_name else '')
-    pdf.cell(0, 8, header_left)
-    pdf.set_font(font_name, '', 11)
-    date_str = f"{order['order_month']}月{order['order_day']}日"
-    pdf.cell(0, 8, date_str, align='R', new_x='LMARGIN', new_y='NEXT')
-
-    pdf.set_font(font_name, '', 9)
-    pdf.cell(0, 5, "(有)イノ  担当    TEL: 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(2)
-
-    # 区切り線
-    pdf.set_draw_color(80, 80, 80)
-    pdf.set_line_width(0.5)
-    pdf.line(8, pdf.get_y(), 202, pdf.get_y())
-    pdf.ln(2)
-
-    # 4列レイアウト
-    col_w = 47
-    col_x = [8, 57, 106, 155]
-    start_y = pdf.get_y()
-    col_y = [start_y] * 4
-    col_idx = 0
-
-    # 総行数でカラム割り
-    total_rows = sum(len(v) + 1 for v in cat_groups.items())
-    rows_per_col = max(1, -(-total_rows // 4))  # ceil
-
-    row_count = 0
-    for cat, cat_items in cat_groups.items():
-        block_size = len(cat_items) + 1
-        if row_count > 0 and row_count + block_size > rows_per_col * (col_idx + 1) and col_idx < 3:
-            col_idx += 1
-
-        x = col_x[col_idx]
-        # カテゴリ見出し
-        pdf.set_xy(x, col_y[col_idx])
-        pdf.set_fill_color(200, 200, 200)
-        pdf.set_font(font_name, 'B', 7)
-        pdf.cell(col_w, 4, cat, fill=True)
-        col_y[col_idx] = pdf.get_y() + 4
-
-        for it in cat_items:
-            pdf.set_xy(x, col_y[col_idx])
-            pdf.set_font(font_name, '', 7)
-            name = it['name'] + (f" ({it['note']})" if it.get('note') else '')
-            pdf.cell(col_w - 10, 3.5, name)
-            pdf.set_font(font_name, 'B', 8)
-            pdf.cell(10, 3.5, str(int(it['order_qty'])), align='R')
-            col_y[col_idx] += 3.5
-
-        row_count += block_size
-
-    # その他（手入力）
-    if custom_items:
-        max_y = max(col_y)
-        pdf.set_y(max_y + 3)
-        pdf.set_draw_color(80, 80, 80)
-        pdf.line(8, pdf.get_y(), 202, pdf.get_y())
-        pdf.ln(1)
-        pdf.set_font(font_name, 'B', 7)
-        pdf.set_fill_color(200, 200, 200)
-        pdf.cell(0, 4, 'その他（手入力）', fill=True, new_x='LMARGIN', new_y='NEXT')
-        for ci in custom_items:
-            pdf.set_font(font_name, '', 7)
-            pdf.cell(col_w * 3, 3.5, ci['custom_name'])
-            pdf.set_font(font_name, 'B', 8)
-            pdf.cell(10, 3.5, str(int(ci['order_qty'])), align='R', new_x='LMARGIN', new_y='NEXT')
-
-    filename = f"発注書_{order['order_month']}月{order['order_day']}日_{sup_name}.pdf"
-    pdf_bytes = pdf.output()
-    response = make_response(bytes(pdf_bytes))
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename*=UTF-8\'\'{urllib.parse.quote(filename)}'
-    return response
-
-
-@app.route('/order/<int:order_id>/send_line', methods=['POST'])
-def order_send_line(order_id):
-    req_data = request.get_json() or {}
-    contact_index = int(req_data.get('contact_index', 0))
-
+def load_order(order_id):
+    """発注書1件分を、カテゴリ順のブロック [(カテゴリ名, [{name, note, qty}])] として返す"""
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT * FROM orders WHERE id=%s", (order_id,))
     order = cur.fetchone()
     if not order:
         release_db(db)
-        return jsonify(ok=False, error='注文が見つかりません')
-
+        abort(404)
     cur.execute("""
-        SELECT oi.order_qty, p.name, p.category
+        SELECT oi.order_qty, oi.custom_name, p.name, p.category, p.note
         FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
+        LEFT JOIN products p ON oi.product_id = p.id
         WHERE oi.order_id = %s
-        ORDER BY p.col_group, p.sort_order
+        ORDER BY p.col_group NULLS LAST, p.sort_order NULLS LAST, oi.id
     """, (order_id,))
-    items = cur.fetchall()
+    rows = cur.fetchall()
     release_db(db)
 
-    suppliers = get_suppliers_with_contacts()
-    sup_info = next((s for s in suppliers if s['name'] == order.get('supplier', '')), None)
-    if not sup_info:
-        return jsonify(ok=False, error='この仕入先が見つかりません')
+    blocks = OrderedDict()
+    for r in rows:
+        if r['name'] is not None:
+            blocks.setdefault(r['category'] or 'その他', []).append(
+                {'name': r['name'], 'note': r['note'], 'qty': r['order_qty']})
+        elif r['custom_name']:
+            blocks.setdefault(CUSTOM_CAT, []).append(
+                {'name': r['custom_name'], 'note': None, 'qty': r['order_qty']})
+    return order, list(blocks.items())
 
-    contacts = sup_info.get('contacts', [])
-    if contact_index >= len(contacts):
-        return jsonify(ok=False, error='担当者が見つかりません')
-    contact = contacts[contact_index]
-    if not contact.get('line_user_id'):
-        return jsonify(ok=False, error='この担当者のLINE IDが未設定です')
 
-    contact_label = contact['name'] if contact['name'] else ''
-    lines = [f"【発注】{order['order_month']}月{order['order_day']}日 {order['store']}",
-             f"仕入先：{order['supplier']}" + (f"　{contact_label}" if contact_label else ""), ""]
-    current_cat = ''
-    for it in items:
-        if it['category'] != current_cat:
-            current_cat = it['category']
-            lines.append(f"▼ {current_cat}")
-        lines.append(f"  {it['name']}  ×{int(it['order_qty'])}")
-    lines += ["", "(有)イノ　TEL: 072-999-6571"]
-    text = '\n'.join(lines)
+@app.route('/order/<int:order_id>/print')
+def order_print(order_id):
+    order, blocks = load_order(order_id)
+    item_count = sum(len(items) for _, items in blocks)
+    total_qty = sum(float(it['qty']) for _, items in blocks for it in items)
+    return render_template('print.html', order=order, blocks=blocks,
+                           sup_info=supplier_info(order.get('supplier') or 'ワールド美容'),
+                           item_count=item_count, total_qty=total_qty)
 
-    ok = send_line_message(contact['line_user_id'], text)
-    return jsonify(ok=ok, error=None if ok else '送信に失敗しました')
+
+class OrderPDF(FPDF):
+    font_name = 'Helvetica'
+    title_text = ''
+
+    def header(self):
+        self.set_font(self.font_name, '', 9)
+        self.set_text_color(90, 90, 90)
+        self.cell(0, 5, self.title_text, new_x='LMARGIN', new_y='NEXT')
+        self.set_text_color(0, 0, 0)
+        self.ln(1)
+
+    def footer(self):
+        self.set_y(-12)
+        self.set_font(self.font_name, '', 9)
+        self.cell(0, 6, f'{self.page_no()} / {{nb}} ページ', align='C')
+
+
+@app.route('/order/<int:order_id>/pdf')
+def order_pdf(order_id):
+    order, blocks = load_order(order_id)
+    sup_name = order.get('supplier') or 'ワールド美容'
+    sup = supplier_info(sup_name)
+    contact_name = sup['contacts'][0]['name'] if sup['contacts'] else ''
+    date_str = f"{order['order_month']}月{order['order_day']}日"
+
+    pdf = OrderPDF(orientation='P', unit='mm', format='A4')
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
+    if os.path.exists(font_path):
+        pdf.add_font('NotoSans', '', font_path)
+        pdf.font_name = 'NotoSans'
+    f = pdf.font_name
+    pdf.title_text = f"発注書  {sup_name}御中  {date_str}  {order['store']}"
+    pdf.set_margins(15, 12, 15)
+    pdf.set_auto_page_break(auto=False)
+    pdf.alias_nb_pages()
+    pdf.add_page()
+
+    bottom = pdf.h - 18
+    qty_w = 28
+    name_w = pdf.w - pdf.l_margin - pdf.r_margin - qty_w
+    line_h = 7
+
+    pdf.set_font(f, '', 18)
+    pdf.cell(0, 10, f"{sup_name} 御中" + (f"　担当 {contact_name}" if contact_name else ''), new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 13)
+    pdf.cell(0, 8, f"発注日 {date_str}　店舗 {order['store']}", new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 11)
+    pdf.cell(0, 6, "(有)イノ　TEL 072-999-6571", new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(3)
+
+    def table_head():
+        pdf.set_font(f, '', 11)
+        pdf.set_fill_color(60, 60, 60)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(name_w, 8, '  商品名', fill=True)
+        pdf.cell(qty_w, 8, '数量  ', fill=True, align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_text_color(0, 0, 0)
+
+    def ensure_space(h, cat=None):
+        if pdf.get_y() + h > bottom:
+            pdf.add_page()
+            table_head()
+            if cat:
+                cat_row(cat + '（続き）')
+
+    def cat_row(text):
+        pdf.set_font(f, '', 12)
+        pdf.set_fill_color(225, 225, 225)
+        pdf.cell(0, 8, '  ' + text, fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    table_head()
+    for cat, items in blocks:
+        ensure_space(8 + line_h)
+        cat_row(cat)
+        for it in items:
+            name = it['name'] + (f"（{it['note']}）" if it['note'] else '')
+            pdf.set_font(f, '', 12)
+            lines = pdf.multi_cell(name_w - 4, line_h, name, dry_run=True, output='LINES')
+            h = max(len(lines), 1) * line_h + 2
+            ensure_space(h, cat)
+            y = pdf.get_y()
+            pdf.set_xy(pdf.l_margin + 4, y + 1)
+            pdf.multi_cell(name_w - 4, line_h, name)
+            pdf.set_xy(pdf.l_margin + name_w, y)
+            pdf.set_font(f, '', 15)
+            pdf.cell(qty_w, h, num_fmt(it['qty']) + '  ', align='R')
+            pdf.set_draw_color(200, 200, 200)
+            pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
+            pdf.set_xy(pdf.l_margin, y + h)
+
+    if not blocks:
+        pdf.set_font(f, '', 12)
+        pdf.cell(0, 10, '発注品はありません', new_x='LMARGIN', new_y='NEXT')
+
+    filename = f"発注書_{date_str}_{sup_name}.pdf"
+    response = make_response(bytes(pdf.output()))
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"
+    return response
 
 
 @app.route('/order/history')
@@ -569,13 +499,9 @@ def order_history():
     orders = cur.fetchall()
     release_db(db)
 
-    # 日付ごとにグループ化
-    from collections import OrderedDict
     grouped = OrderedDict()
     for o in orders:
-        key = (o['order_month'], o['order_day'])
-        grouped.setdefault(key, []).append(o)
-
+        grouped.setdefault((o['order_month'], o['order_day']), []).append(o)
     return render_template('history.html', grouped=grouped)
 
 
@@ -609,7 +535,6 @@ def product_add():
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
     release_db(db)
-    cache_del('pw:', 'pws:')
     return redirect(url_for('products'))
 
 
@@ -620,7 +545,6 @@ def product_toggle(pid):
     cur.execute("UPDATE products SET is_active = NOT is_active WHERE id=%s", (pid,))
     db.commit()
     release_db(db)
-    cache_del('pw:', 'pws:')
     return redirect(url_for('products'))
 
 
@@ -632,7 +556,6 @@ def product_base(pid):
                (float(request.form['base_qty']), pid))
     db.commit()
     release_db(db)
-    cache_del('pw:', 'pws:')
     return jsonify(ok=True)
 
 
@@ -644,72 +567,25 @@ def product_supplier(pid):
                (request.form['supplier'], pid))
     db.commit()
     release_db(db)
-    cache_del('pw:', 'pws:')
     return jsonify(ok=True)
-
-
-# ── LINE フォロワー取得 ────────────────────────────────────────────────────────
-
-def get_line_followers():
-    """公式LINEを友達追加したユーザーIDとプロフィール名を取得"""
-    if not LINE_TOKEN:
-        return []
-    results = []
-    next_token = None
-    while True:
-        url = 'https://api.line.me/v2/bot/followers/ids?limit=1000'
-        if next_token:
-            url += f'&start={next_token}'
-        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {LINE_TOKEN}'})
-        try:
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = json_lib.loads(r.read())
-            for uid in data.get('userIds', []):
-                # プロフィール取得
-                preq = urllib.request.Request(
-                    f'https://api.line.me/v2/bot/profile/{uid}',
-                    headers={'Authorization': f'Bearer {LINE_TOKEN}'}
-                )
-                try:
-                    with urllib.request.urlopen(preq, timeout=5) as pr:
-                        profile = json_lib.loads(pr.read())
-                    results.append({'user_id': uid, 'display_name': profile.get('displayName', uid)})
-                except Exception:
-                    results.append({'user_id': uid, 'display_name': uid})
-            next_token = data.get('next')
-            if not next_token:
-                break
-        except Exception:
-            break
-    return results
-
-
-@app.route('/api/line/followers')
-def api_line_followers():
-    followers = get_line_followers()
-    return jsonify(followers=followers)
 
 
 # ── 担当者管理 ────────────────────────────────────────────────────────────────
 
 @app.route('/settings/contacts')
 def contacts_settings():
-    suppliers = get_suppliers_with_contacts()
-    return render_template('contacts.html', suppliers=suppliers, supplier_names=SUPPLIER_NAMES)
+    return render_template('contacts.html', suppliers=get_suppliers_with_contacts())
 
 
 @app.route('/settings/contacts/add', methods=['POST'])
 def contact_add():
     supplier_name = request.form['supplier_name']
-    contact_name  = request.form.get('contact_name', '')
-    fax           = request.form.get('fax', '')
-    line_user_id  = request.form.get('line_user_id', '')
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT COALESCE(MAX(sort_order),0) FROM supplier_contacts WHERE supplier_name=%s", (supplier_name,))
     max_sort = cur.fetchone()['coalesce']
-    cur.execute("INSERT INTO supplier_contacts (supplier_name, contact_name, fax, line_user_id, sort_order) VALUES (%s,%s,%s,%s,%s)",
-                (supplier_name, contact_name, fax, line_user_id, max_sort + 1))
+    cur.execute("INSERT INTO supplier_contacts (supplier_name, contact_name, fax, sort_order) VALUES (%s,%s,%s,%s)",
+                (supplier_name, request.form.get('contact_name', ''), request.form.get('fax', ''), max_sort + 1))
     db.commit()
     release_db(db)
     return redirect(url_for('contacts_settings'))
@@ -719,11 +595,8 @@ def contact_add():
 def contact_update(cid):
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE supplier_contacts SET contact_name=%s, fax=%s, line_user_id=%s WHERE id=%s",
-                (request.form.get('contact_name', ''),
-                 request.form.get('fax', ''),
-                 request.form.get('line_user_id', ''),
-                 cid))
+    cur.execute("UPDATE supplier_contacts SET contact_name=%s, fax=%s WHERE id=%s",
+                (request.form.get('contact_name', ''), request.form.get('fax', ''), cid))
     db.commit()
     release_db(db)
     return redirect(url_for('contacts_settings'))

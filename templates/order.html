@@ -57,6 +57,14 @@
 .order-qty[value="0"] { color: #bbb; }
 
 /* フッター */
+.custom-tab { border-style: dashed; }
+.custom-tab.active { border-style: solid; }
+#custom-badge:not(:empty) { margin-left: 6px; background: #fff; color: var(--acc); border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
+.cat-tab:not(.active) #custom-badge:not(:empty) { background: var(--acc); color: #fff; }
+.custom-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.custom-row input[type=text] { padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 15px; font-family: inherit; min-width: 0; }
+.custom-row .custom-name { flex: 2 1 180px; }
+.custom-row .custom-spec { flex: 1 1 110px; }
 .order-footer {
   position: sticky; bottom: 0; background: var(--surface);
   border-top: 2px solid var(--border); padding: 12px 16px;
@@ -68,7 +76,15 @@
 .footer-btns { display: flex; gap: 8px; }
 
 @media (max-width: 500px) {
-  .order-footer { flex-direction: column; align-items: stretch; }
+  .custom-tab { border-style: dashed; }
+.custom-tab.active { border-style: solid; }
+#custom-badge:not(:empty) { margin-left: 6px; background: #fff; color: var(--acc); border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
+.cat-tab:not(.active) #custom-badge:not(:empty) { background: var(--acc); color: #fff; }
+.custom-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.custom-row input[type=text] { padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 15px; font-family: inherit; min-width: 0; }
+.custom-row .custom-name { flex: 2 1 180px; }
+.custom-row .custom-spec { flex: 1 1 110px; }
+.order-footer { flex-direction: column; align-items: stretch; }
   .footer-btns { flex-direction: column; }
   .footer-btns .btn { text-align: center; justify-content: center; }
   .hide-sp { display: none; }
@@ -109,12 +125,13 @@
 <div class="cat-tabs" id="cat-tabs">
   <button class="cat-tab active" data-cat="" onclick="selectCat(this, '')">すべて</button>
   {% for cat in cats %}
-  <button class="cat-tab" data-cat="{{ cat }}" onclick="selectCat(this, '{{ cat }}')">{{ cat }}</button>
+  <button class="cat-tab" data-cat="{{ cat }}" onclick="selectCat(this, {{ cat|tojson|forceescape }})">{{ cat if cat else '（未分類）' }}</button>
   {% endfor %}
+  <button class="cat-tab custom-tab" data-cat="__custom__" onclick="selectCat(this, '__custom__')">＋ リスト外の品（手入力）<span id="custom-badge"></span></button>
 </div>
 
 <!-- フィルタ -->
-<div class="filter-bar">
+<div class="filter-bar" id="filter-bar">
   <label class="filter-check">
     <input type="checkbox" id="only-shortage" onchange="filterRows()">
     不足品のみ
@@ -160,16 +177,23 @@
 </div>
 {% endfor %}
 
-<!-- その他（手入力） -->
-<div class="card" style="margin-bottom:80px">
+{% if not grouped %}
+<div class="card cat-card" data-cat="" style="margin-bottom:12px; padding:20px; color:var(--fg2); font-size:14px">
+  {{ supplier }} の商品はまだ登録されていません。商品マスターで登録するか、「＋ リスト外の品（手入力）」から入力してください。
+</div>
+{% endif %}
+
+<!-- リスト外の品（手入力） -->
+<div class="card" id="custom-card" style="display:none">
   <div class="card-head" style="justify-content:space-between">
-    <span>その他（手入力）</span>
-    <button class="btn btn-ghost btn-sm" onclick="addCustomRow()" type="button">＋ 追加</button>
+    <span>リスト外の品（手入力）</span>
+    <button class="btn btn-primary btn-sm" onclick="addCustomRow()" type="button">＋ 行を追加</button>
   </div>
   <div id="custom-rows" style="padding:8px 12px">
-    <p id="custom-empty" style="color:var(--fg2);font-size:13px;padding:6px 0">「＋ 追加」で商品リストにない品を入力できます</p>
+    <p id="custom-empty" style="color:var(--fg2);font-size:13px;padding:6px 0">商品リストにない品を入力できます。商品マスターには登録されず、この発注書だけに載ります。</p>
   </div>
 </div>
+<div style="height:80px"></div>
 
 <!-- フッター -->
 <div class="order-footer">
@@ -185,8 +209,8 @@
 
 {% block scripts %}
 <script>
-const STORE    = '{{ store }}';
-const SUPPLIER = '{{ supplier }}';
+const STORE    = {{ store|tojson }};
+const SUPPLIER = {{ supplier|tojson }};
 
 function step(btn, delta) {
   const inp = btn.parentElement.querySelector('.order-qty');
@@ -213,10 +237,13 @@ function onQtyInput(inp) {
 
 function onOrderChange() {
   let count = 0, total = 0;
-  document.querySelectorAll('.order-qty').forEach(inp => {
+  document.querySelectorAll('.order-row .order-qty').forEach(inp => {
     const v = parseInt(inp.value) || 0;
     if (v > 0) { count++; total += v; }
   });
+  const custom = customItems();
+  custom.forEach(c => { count++; total += c.order_qty; });
+  document.getElementById('custom-badge').textContent = custom.length || '';
   document.getElementById('order-count').textContent = count;
   document.getElementById('order-total').textContent = total;
 }
@@ -245,38 +272,51 @@ function autoFill() {
 }
 
 function clearAll() {
-  document.querySelectorAll('.order-qty').forEach(inp => { inp.value = 0; onQtyInput(inp); });
+  document.querySelectorAll('.order-row .order-qty').forEach(inp => { inp.value = 0; onQtyInput(inp); });
   onOrderChange();
 }
 
 let customRowCount = 0;
 function addCustomRow() {
   document.getElementById('custom-empty').style.display = 'none';
-  const idx = ++customRowCount;
   const div = document.createElement('div');
   div.className = 'custom-row';
-  div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)';
   div.innerHTML = `
-    <div class="row-info" style="flex:1">
-      <input type="text" class="custom-name" placeholder="商品名を入力"
-             style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:15px;font-family:inherit">
-    </div>
-    <div class="stepper" style="display:flex;align-items:center;gap:4px">
+    <input type="text" class="custom-name" placeholder="商品名（必須）">
+    <input type="text" class="custom-spec" placeholder="規格・容量（任意）">
+    <div class="stepper">
       <button class="stepper-btn" onclick="stepCustom(this,-1)" type="button">－</button>
-      <input type="number" class="order-qty custom-qty" value="1" min="0" style="width:52px;text-align:center;font-size:16px;padding:6px 4px;border:1px solid var(--border);border-radius:7px">
+      <input type="number" class="order-qty custom-qty" value="1" min="0" step="1" oninput="onOrderChange()">
       <button class="stepper-btn" onclick="stepCustom(this,1)" type="button">＋</button>
     </div>
-    <button onclick="this.closest('.custom-row').remove();updateCustomEmpty()" type="button"
-            style="background:none;border:none;color:#c0392b;font-size:20px;cursor:pointer;padding:0 4px">✕</button>`;
+    <button onclick="this.closest('.custom-row').remove();updateCustomEmpty()" type="button" aria-label="この行を削除"
+            style="background:none;border:none;color:#c0392b;font-size:22px;cursor:pointer;padding:0 6px">✕</button>`;
+  div.querySelector('.custom-name').addEventListener('input', onOrderChange);
   document.getElementById('custom-rows').appendChild(div);
+  div.querySelector('.custom-name').focus();
+  onOrderChange();
 }
 function stepCustom(btn, d) {
   const inp = btn.parentElement.querySelector('.custom-qty');
   inp.value = Math.max(0, (parseInt(inp.value)||0) + d);
+  onOrderChange();
 }
 function updateCustomEmpty() {
   const rows = document.querySelectorAll('#custom-rows .custom-row');
   document.getElementById('custom-empty').style.display = rows.length ? 'none' : '';
+  onOrderChange();
+}
+
+function customItems() {
+  const out = [];
+  document.querySelectorAll('#custom-rows .custom-row').forEach(row => {
+    const name = row.querySelector('.custom-name').value.trim();
+    const spec = row.querySelector('.custom-spec').value.trim();
+    const oq   = parseInt(row.querySelector('.custom-qty').value) || 0;
+    if (name && oq > 0) out.push({product_id: null, base_qty: 0, stock_qty: 0, order_qty: oq,
+                                   custom_name: spec ? `${name}（${spec}）` : name});
+  });
+  return out;
 }
 
 async function saveOrder() {
@@ -291,12 +331,10 @@ async function saveOrder() {
       custom_name: null
     });
   });
-  // その他（手入力）
-  document.querySelectorAll('#custom-rows .custom-row').forEach(row => {
-    const name = row.querySelector('.custom-name').value.trim();
-    const oq   = parseInt(row.querySelector('.custom-qty').value) || 0;
-    if (name && oq > 0) items.push({product_id: null, base_qty: 0, stock_qty: 0, order_qty: oq, custom_name: name});
-  });
+  const unnamed = [...document.querySelectorAll('#custom-rows .custom-row')]
+    .filter(r => !r.querySelector('.custom-name').value.trim() && (parseInt(r.querySelector('.custom-qty').value) || 0) > 0);
+  if (unnamed.length) { toast('リスト外の品に商品名が空の行があります'); return; }
+  items.push(...customItems());
   if (items.length === 0) { toast('発注数が 0 です'); return; }
 
   const month = parseInt(document.getElementById('order-month').value) || null;
@@ -344,9 +382,13 @@ async function saveOrder() {
 function selectCat(btn, cat) {
   document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const custom = cat === '__custom__';
   document.querySelectorAll('.cat-card').forEach(card => {
-    card.style.display = (cat === '' || card.dataset.cat === cat) ? '' : 'none';
+    card.style.display = !custom && (cat === '' || card.dataset.cat === cat) ? '' : 'none';
   });
+  document.getElementById('custom-card').style.display = custom ? '' : 'none';
+  document.getElementById('filter-bar').style.display = custom ? 'none' : '';
+  if (custom && !document.querySelector('#custom-rows .custom-row')) addCustomRow();
   filterRows();
 }
 

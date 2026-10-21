@@ -2,243 +2,102 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>発注書 — {{ order.order_month }}月{{ order.order_day }}日 {{ order.store }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>発注書 — {{ order.order_month }}月{{ order.order_day }}日 {{ order.store }} {{ sup_info.name }}</title>
 <style>
 body {
   font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
-  font-size: 13px;
-  background: #eef2f7;
-  margin: 0; padding: 20px;
-  color: #111;
+  font-size: 15px; background: #eef2f7; margin: 0; padding: 16px; color: #111;
 }
 .screen-header {
-  background: #c2547a; color: #fff;
-  padding: 12px 20px; border-radius: 8px 8px 0 0;
-  display: flex; align-items: center; justify-content: space-between;
+  background: #c2547a; color: #fff; padding: 12px 20px; border-radius: 8px 8px 0 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
 }
 .screen-header h2 { font-size: 16px; font-weight: 700; margin: 0; }
-.print-wrap {
-  background: #fff; border: 1px solid #ccc;
-  border-radius: 0 0 8px 8px; padding: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.1);
-}
-.btn-row { display: flex; gap: 10px; padding: 12px 0 16px; justify-content: flex-end; }
-.btn { padding: 8px 18px; border-radius: 7px; border: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-row { display: flex; gap: 10px; padding: 12px 0; justify-content: flex-end; flex-wrap: wrap; }
+.btn { padding: 10px 18px; border-radius: 7px; border: none; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .btn-print { background: #c2547a; color: #fff; }
 .btn-back  { background: transparent; color: #c2547a; border: 1px solid #c2547a; }
-.btn-line  { background: #06c755; color: #fff; }
-.order-summary { margin-bottom: 12px; font-size: 13px; color: #555; }
+.order-summary { margin-bottom: 10px; color: #555; }
 
-/* 発注書ヘッダー */
-.doc-header {
-  width: 100%; border-collapse: collapse;
-  border: 1.5px solid #333; margin-bottom: 8px; font-size: 13px;
+.sheet {
+  background: #fff; border: 1px solid #ccc; border-radius: 0 0 8px 8px;
+  padding: 20px; max-width: 760px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,.1);
 }
-.doc-header td { padding: 5px 8px; }
-
-/* 4カラムレイアウト */
-.order-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 0 6px;
+.doc-to { font-size: 22px; font-weight: 700; }
+.doc-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 14px; font-size: 15px; }
+table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
+.items thead th {
+  background: #444; color: #fff; text-align: left; padding: 7px 10px; font-weight: 600; font-size: 14px;
 }
-.order-col-list {
-  break-inside: avoid-column;
-}
-
-/* カテゴリ・行 */
-.cat-head {
-  background: #ccc; font-weight: 700; font-size: 10px;
-  padding: 2px 5px; margin-top: 4px;
-  border-top: 1.5px solid #555; border-bottom: 1px solid #999;
-}
-.item-row {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: 1px 5px; border-bottom: 1px solid #ddd; font-size: 10px;
-}
-.item-row .iname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item-row .iqty  { font-weight: 700; font-size: 12px; min-width: 28px; text-align: right; }
+.items thead th.q { text-align: right; width: 5em; }
+.items td { padding: 8px 10px; border-bottom: 1px solid #ccc; vertical-align: top; overflow-wrap: anywhere; }
+.items td.q { text-align: right; font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.items tr.cat td { background: #e2e2e2; font-weight: 700; padding: 6px 10px; border-bottom: 1px solid #999; }
+.note { color: #555; font-size: .85em; }
+.empty { padding: 30px; text-align: center; color: #777; }
 
 @media print {
-  body { background: #fff; padding: 0; margin: 0; }
+  @page {
+    size: A4 portrait; margin: 14mm 14mm 16mm;
+    @bottom-center { content: counter(page) " / " counter(pages) " ページ"; font-size: 9pt; }
+  }
+  body { background: #fff; padding: 0; font-size: 12pt; }
   .screen-header, .btn-row, .order-summary { display: none !important; }
-  #pdf-modal { display: none !important; }
-  .print-wrap { border: none; padding: 0; box-shadow: none; border-radius: 0; }
-  .doc-header { font-size: 10pt; }
-  .cat-head { background: #bbb !important; font-size: 8.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .item-row { font-size: 8.5pt; border-bottom-color: #ccc; }
-  .item-row .iqty { font-size: 10pt; }
-  .order-cols { gap: 0 5mm; }
-  @page { size: A4 portrait; margin: 8mm 6mm; }
+  .sheet { border: none; padding: 0; box-shadow: none; max-width: none; }
+  .doc-to { font-size: 18pt; }
+  .doc-sub { font-size: 12pt; }
+  table.items { font-size: 12pt; }
+  .items thead { display: table-header-group; }
+  .items thead th { font-size: 11pt; }
+  .items td.q { font-size: 14pt; }
+  .items tr { break-inside: avoid; page-break-inside: avoid; }
+  .items tr.cat { break-after: avoid; page-break-after: avoid; }
+  .items thead th, .items tr.cat td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
 </head>
 <body>
 
 <div class="screen-header">
-  <h2>発注書 — {{ order.order_month }}月{{ order.order_day }}日 ({{ order.store }})</h2>
-  <a href="/order/history" style="color:rgba(255,255,255,.8);text-decoration:none;font-size:13px">← 履歴へ</a>
+  <h2>発注書 — {{ order.order_month }}月{{ order.order_day }}日（{{ order.store }}）{{ sup_info.name }}</h2>
+  <a href="/order/history" style="color:rgba(255,255,255,.85);text-decoration:none;font-size:14px">← 履歴へ</a>
 </div>
 
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
-  {% set line_contacts = [] %}
-  {% for c in sup_info.contacts %}{% if c.line_user_id %}{% set _ = line_contacts.append(c) %}{% endif %}{% endfor %}
-  {% if line_contacts %}
-  <div style="display:flex;align-items:center;gap:8px">
-    <select id="contact-sel" style="padding:7px 10px;border:1px solid #ccc;border-radius:7px;font-size:14px;font-family:inherit">
-      {% for c in sup_info.contacts %}
-      {% if c.line_user_id %}
-      <option value="{{ loop.index0 }}">{{ c.name if c.name else '担当者' }}</option>
-      {% endif %}
-      {% endfor %}
-    </select>
-    <button class="btn btn-line" onclick="sendLine(this)" id="line-btn">LINEで送る</button>
-  </div>
-  {% else %}
-  <button class="btn btn-line" style="opacity:.4;cursor:not-allowed" title="LINE IDが未設定です">LINEで送る（未設定）</button>
-  {% endif %}
+  <button class="btn btn-back" onclick="window.print()">この画面を印刷</button>
   <a class="btn btn-print" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
 </div>
 
-<div class="order-summary">
-  発注品目 <strong>{{ order_map|length }}</strong> 品　／
-  合計 <strong>{{ order_map.values()|sum(attribute='order_qty')|int }}</strong> 点
-</div>
+<div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
 
-<div class="print-wrap">
-<table class="doc-header">
-  <tr>
-    <td style="font-size:15px; font-weight:700; width:42%">{{ sup_info.name }}御中{% if sup_info.contacts and sup_info.contacts[0].name %}　担当 {{ sup_info.contacts[0].name }}{% endif %}</td>
-    <td style="text-align:center; width:20%; font-size:14px; font-weight:700">{{ order.order_month }}月 {{ order.order_day }}日</td>
-    <td style="text-align:right; width:16%">(有)イノ　担当<br><span style="font-size:10px">TEL: 072-999-6571</span></td>
-  </tr>
-</table>
-
-{# 発注品をカテゴリ順に収集 #}
-{% set ordered_items = [] %}
-{% set ns = namespace(current_cat='', cat_items=[], all_cats=[]) %}
-{% for grp_num in [1,2,3,4,5] %}
-  {% for p in groups.get(grp_num, []) %}
-    {% set item = order_map.get(p.id) %}
-    {% set oq = item.order_qty if item else 0 %}
-    {% if oq > 0 %}
-      {% if p.category not in ns.all_cats %}
-        {% set _ = ns.all_cats.append(p.category) %}
-      {% endif %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
-
-{# カテゴリごとにまとめる #}
-{% set cat_groups = {} %}
-{% for grp_num in [1,2,3,4,5] %}
-  {% for p in groups.get(grp_num, []) %}
-    {% set item = order_map.get(p.id) %}
-    {% set oq = item.order_qty if item else 0 %}
-    {% if oq > 0 %}
-      {% if p.category not in cat_groups %}
-        {% set _ = cat_groups.update({p.category: []}) %}
-      {% endif %}
-      {% set _ = cat_groups[p.category].append({'name': p.name, 'note': p.note, 'oq': oq}) %}
-    {% endif %}
-  {% endfor %}
-{% endfor %}
-
-{# 全アイテム数を計算して4列に分割 #}
-{% set total_lines = namespace(v=0) %}
-{% for cat, items in cat_groups.items() %}
-  {% set total_lines.v = total_lines.v + items|length + 1 %}
-{% endfor %}
-{% set quarter = (total_lines.v / 4)|round(0, 'ceil')|int %}
-
-{# 4列に振り分け #}
-{% set col1 = [] %}
-{% set col2 = [] %}
-{% set col3 = [] %}
-{% set col4 = [] %}
-{% set filled = namespace(v=0, col=1) %}
-{% for cat, items in cat_groups.items() %}
-  {% set block = [{'type':'cat','name':cat}] %}
-  {% for it in items %}
-    {% set _ = block.append({'type':'item','name':it.name,'note':it.note,'oq':it.oq}) %}
-  {% endfor %}
-  {% if filled.col == 1 %}
-    {% for row in block %}{% set _ = col1.append(row) %}{% endfor %}
-    {% set filled.v = filled.v + block|length %}
-    {% if filled.v >= quarter %}{% set filled.col = 2 %}{% endif %}
-  {% elif filled.col == 2 %}
-    {% for row in block %}{% set _ = col2.append(row) %}{% endfor %}
-    {% set filled.v = filled.v + block|length %}
-    {% if filled.v >= quarter * 2 %}{% set filled.col = 3 %}{% endif %}
-  {% elif filled.col == 3 %}
-    {% for row in block %}{% set _ = col3.append(row) %}{% endfor %}
-    {% set filled.v = filled.v + block|length %}
-    {% if filled.v >= quarter * 3 %}{% set filled.col = 4 %}{% endif %}
-  {% else %}
-    {% for row in block %}{% set _ = col4.append(row) %}{% endfor %}
-  {% endif %}
-{% endfor %}
-
-{% macro render_col(rows) %}
-  {% for row in rows %}
-    {% if row.type == 'cat' %}
-      <div class="cat-head">{{ row.name }}</div>
-    {% else %}
-      <div class="item-row">
-        <span class="iname">{{ row.name }}{% if row.note %} <span style="font-size:8px;color:#666">({{ row.note }})</span>{% endif %}</span>
-        <span class="iqty">{{ row.oq|int }}</span>
-      </div>
-    {% endif %}
-  {% endfor %}
-{% endmacro %}
-
-<div class="order-cols">
-  <div>{{ render_col(col1) }}</div>
-  <div>{{ render_col(col2) }}</div>
-  <div>{{ render_col(col3) }}</div>
-  <div>{{ render_col(col4) }}</div>
-</div>
-{% if custom_items %}
-<div style="margin-top:8px;border-top:1.5px solid #555;padding-top:4px">
-  <div class="cat-head">その他（手入力）</div>
-  {% for c in custom_items %}
-  <div class="item-row">
-    <span class="iname">{{ c.custom_name }}</span>
-    <span class="iqty">{{ c.order_qty|int }}</span>
+<div class="sheet">
+  <div class="doc-to">{{ sup_info.name }} 御中{% if sup_info.contacts and sup_info.contacts[0].name %}　担当 {{ sup_info.contacts[0].name }}{% endif %}</div>
+  <div class="doc-sub">
+    <span>発注日 <strong>{{ order.order_month }}月{{ order.order_day }}日</strong>　店舗 <strong>{{ order.store }}</strong></span>
+    <span>(有)イノ　TEL 072-999-6571</span>
   </div>
-  {% endfor %}
-</div>
-{% endif %}
+
+  {% if blocks %}
+  <table class="items">
+    <thead><tr><th>商品名</th><th class="q">数量</th></tr></thead>
+    <tbody>
+    {% for cat, items in blocks %}
+      <tr class="cat"><td colspan="2">{{ cat }}</td></tr>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.name }}{% if it.note %} <span class="note">（{{ it.note }}）</span>{% endif %}</td>
+        <td class="q">{{ it.qty|n }}</td>
+      </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">発注品はありません</div>
+  {% endif %}
 </div>
 
-<script>
-async function sendLine(btn) {
-  btn.disabled = true;
-  btn.textContent = '送信中…';
-  try {
-    const sel = document.getElementById('contact-sel');
-    const contactIndex = sel ? parseInt(sel.value) : 0;
-    const res = await fetch('/order/{{ order.id }}/send_line', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({contact_index: contactIndex})
-    });
-    const data = await res.json();
-    if (data.ok) {
-      btn.textContent = '送信しました';
-      btn.style.background = '#059142';
-    } else {
-      alert(data.error || '送信に失敗しました');
-      btn.disabled = false;
-      btn.textContent = 'LINEで送る';
-    }
-  } catch(e) {
-    alert('通信エラーが発生しました');
-    btn.disabled = false;
-    btn.textContent = 'LINEで送る';
-  }
-}
-</script>
 </body>
 </html>

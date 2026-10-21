@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS stock (
     store       TEXT    NOT NULL DEFAULT 'イノ',
     current_qty FLOAT   DEFAULT 0,
     updated_at  TEXT,
+    changed_at  TIMESTAMPTZ,
+    checked_at  TIMESTAMPTZ,
+    version     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (product_id, store),
     FOREIGN KEY (product_id) REFERENCES products(id)
 );
@@ -51,10 +54,11 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id          SERIAL PRIMARY KEY,
     order_id    INTEGER NOT NULL,
-    product_id  INTEGER NOT NULL,
+    product_id  INTEGER,
     base_qty    FLOAT,
     stock_qty   FLOAT,
     order_qty   FLOAT   NOT NULL,
+    custom_name TEXT,
     FOREIGN KEY (order_id)   REFERENCES orders(id),
     FOREIGN KEY (product_id) REFERENCES products(id)
 );

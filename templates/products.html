@@ -32,10 +32,7 @@
       <div class="form-group">
         <label>仕入先</label>
         <select name="supplier" style="width:150px">
-          <option>ワールド美容</option>
-          <option>トピー商事</option>
-          <option>アイテム</option>
-          <option>三井コーポレーション</option>
+          {% for s in supplier_names %}<option>{{ s }}</option>{% endfor %}
         </select>
       </div>
       <div class="form-group">
@@ -79,7 +76,7 @@
       <td>
         <select style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px"
                 onchange="updateSupplier({{ p.id }}, this.value)">
-          {% for s in ['ワールド美容','トピー商事','アイテム','三井コーポレーション'] %}
+          {% for s in supplier_names %}
           <option {% if p.supplier == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select>

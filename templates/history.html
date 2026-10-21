@@ -65,10 +65,7 @@
 </div>
 <div class="sup-tabs" style="margin-bottom:16px">
   <button class="sup-tab active" onclick="filterSup(this,'')">すべて</button>
-  <button class="sup-tab" onclick="filterSup(this,'ワールド美容')">ワールド美容</button>
-  <button class="sup-tab" onclick="filterSup(this,'トピー商事')">トピー商事</button>
-  <button class="sup-tab" onclick="filterSup(this,'アイテム')">アイテム</button>
-  <button class="sup-tab" onclick="filterSup(this,'三井コーポレーション')">三井コーポレーション</button>
+  {% for s in supplier_names %}<button class="sup-tab" onclick="filterSup(this,'{{ s }}')">{{ s }}</button>{% endfor %}
 </div>
 
 {% if grouped %}

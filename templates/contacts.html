@@ -23,29 +23,12 @@
 .add-row td { padding: 10px; }
 input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
 .hint { font-size: 11px; color: var(--fg2); margin-top: 3px; }
-.badge-line { background: #d4f5e5; color: #065f46; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-.badge-noline { background: #f0f0f0; color: #888; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 </style>
 {% endblock %}
 
-<!-- LINEフォロワー選択モーダル -->
-<div id="line-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:20px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto">
-    <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">LINEの友達から選択</h3>
-    <div id="follower-list" style="font-size:14px"></div>
-    <button onclick="document.getElementById('line-modal').style.display='none'"
-            class="btn btn-ghost" style="margin-top:12px;width:100%">閉じる</button>
-  </div>
-</div>
 
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
-  <h2 style="font-size:18px; font-weight:700">仕入先 担当者設定</h2>
-  <button class="btn btn-primary" onclick="loadFollowers()">LINEの友達一覧を取得</button>
-</div>
-<p style="font-size:12px; color:var(--fg2); margin-bottom:16px">
-  公式LINE（@705hispn）を友達追加した人の一覧を取得して、担当者のLINE IDを設定できます
-</p>
+<h2 style="font-size:18px; font-weight:700; margin-bottom:16px">仕入先 担当者設定</h2>
 
 {% for sup in suppliers %}
 <div class="sup-section card">
@@ -59,8 +42,6 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
       <tr>
         <th>担当者名</th>
         <th>FAX</th>
-        <th>LINE User ID</th>
-        <th>LINE</th>
         <th></th>
       </tr>
     </thead>
@@ -70,17 +51,6 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
         <form method="post" action="/settings/contacts/{{ c.id }}/update">
         <td><input class="ci" name="contact_name" value="{{ c.name }}" placeholder="大橋様"></td>
         <td><input class="ci" name="fax" value="{{ c.fax }}" placeholder="06-XXXX-XXXX" style="width:140px"></td>
-        <td>
-          <input class="ci" name="line_user_id" value="{{ c.line_user_id }}" placeholder="Uxxxxxxxxxx..." style="font-size:11px">
-          <div class="hint">公式LINEを友達追加後、管理画面で確認できます</div>
-        </td>
-        <td>
-          {% if c.line_user_id %}
-            <span class="badge-line">設定済</span>
-          {% else %}
-            <span class="badge-noline">未設定</span>
-          {% endif %}
-        </td>
         <td style="white-space:nowrap; display:flex; gap:6px; align-items:center; padding-top:10px">
           <button type="submit" class="btn btn-primary btn-sm">保存</button>
         </form>
@@ -96,8 +66,6 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
         <input type="hidden" name="supplier_name" value="{{ sup.name }}">
         <td><input class="ci" name="contact_name" placeholder="担当者名"></td>
         <td><input class="ci" name="fax" placeholder="FAX番号" style="width:140px"></td>
-        <td><input class="ci" name="line_user_id" placeholder="LINE User ID（任意）" style="font-size:11px"></td>
-        <td></td>
         <td><button type="submit" class="btn btn-success btn-sm">追加</button></td>
         </form>
       </tr>
@@ -107,49 +75,5 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
 </div>
 {% endfor %}
 
-<div class="card" style="padding:16px; font-size:13px; color:var(--fg2)">
-  担当者に公式LINE <strong>@705hispn</strong> を友達追加してもらったら、上の「LINEの友達一覧を取得」ボタンでUser IDを確認できます。
-</div>
 {% endblock %}
 
-{% block scripts %}
-<script>
-function loadFollowers() {
-  document.getElementById('follower-list').innerHTML = '取得中…';
-  document.getElementById('line-modal').style.display = 'flex';
-  fetch('/api/line/followers')
-    .then(r => r.json())
-    .then(data => {
-      const list = data.followers;
-      if (!list.length) {
-        document.getElementById('follower-list').innerHTML = 'まだ誰も友達追加していません';
-        return;
-      }
-      let html = '<p style="font-size:12px;color:#888;margin-bottom:8px">「コピー」を押してLINE IDフィールドに貼り付けてください</p>';
-      html += '<table style="width:100%;border-collapse:collapse">';
-      list.forEach(f => {
-        html += `<tr style="border-bottom:1px solid #eee">
-          <td style="padding:8px 4px;font-weight:600">${f.display_name}</td>
-          <td style="padding:8px 4px;font-size:10px;color:#888;word-break:break-all">${f.user_id}</td>
-          <td style="padding:8px 4px">
-            <button onclick="copyId('${f.user_id}')" class="btn btn-ghost btn-sm">コピー</button>
-          </td>
-        </tr>`;
-      });
-      html += '</table>';
-      document.getElementById('follower-list').innerHTML = html;
-    })
-    .catch(() => {
-      document.getElementById('follower-list').innerHTML = 'エラーが発生しました';
-    });
-}
-
-function copyId(uid) {
-  navigator.clipboard.writeText(uid).then(() => {
-    alert('コピーしました！\nLINE IDフィールドに貼り付けてください');
-  }).catch(() => {
-    prompt('LINE User IDをコピーしてください:', uid);
-  });
-}
-</script>
-{% endblock %}
