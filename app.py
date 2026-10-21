@@ -386,16 +386,18 @@ class OrderPDF(FPDF):
     title_text = ''
 
     def header(self):
-        self.set_font(self.font_name, '', 9)
-        self.set_text_color(90, 90, 90)
-        self.cell(0, 5, self.title_text, new_x='LMARGIN', new_y='NEXT')
-        self.set_text_color(0, 0, 0)
-        self.ln(1)
+        if self.page_no() > 1:
+            self.set_font(self.font_name, '', 10)
+            self.cell(0, 6, self.title_text, new_x='LMARGIN', new_y='NEXT')
+            self.ln(1)
 
     def footer(self):
         self.set_y(-12)
-        self.set_font(self.font_name, '', 9)
+        self.set_font(self.font_name, '', 10)
         self.cell(0, 6, f'{self.page_no()} / {{nb}} ページ', align='C')
+
+
+PDF_COLS = 3
 
 
 @app.route('/order/<int:order_id>/pdf')
@@ -412,68 +414,87 @@ def order_pdf(order_id):
         pdf.add_font('NotoSans', '', font_path)
         pdf.font_name = 'NotoSans'
     f = pdf.font_name
-    pdf.title_text = f"発注書  {sup_name}御中  {date_str}  {order['store']}"
-    pdf.set_margins(15, 12, 15)
+    pdf.title_text = f"発注書　{sup_name}御中　{date_str}　{order['store']}"
+    pdf.set_margins(10, 10, 10)
     pdf.set_auto_page_break(auto=False)
     pdf.alias_nb_pages()
+    # 同梱フォントが極細のため、文字に輪郭線を重ねて太く見せる
+    pdf.text_mode = 'FILL_STROKE'
+    pdf.set_line_width(0.25)
     pdf.add_page()
-
-    bottom = pdf.h - 18
-    qty_w = 28
-    name_w = pdf.w - pdf.l_margin - pdf.r_margin - qty_w
-    line_h = 7
 
     pdf.set_font(f, '', 18)
     pdf.cell(0, 10, f"{sup_name} 御中" + (f"　担当 {contact_name}" if contact_name else ''), new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 13)
-    pdf.cell(0, 8, f"発注日 {date_str}　店舗 {order['store']}", new_x='LMARGIN', new_y='NEXT')
-    pdf.set_font(f, '', 11)
-    pdf.cell(0, 6, "(有)イノ　TEL 072-999-6571", new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(3)
+    pdf.cell(110, 8, f"発注日 {date_str}　店舗 {order['store']}")
+    pdf.cell(0, 8, "(有)イノ　TEL 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
 
-    def table_head():
-        pdf.set_font(f, '', 11)
-        pdf.set_fill_color(60, 60, 60)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(name_w, 8, '  商品名', fill=True)
-        pdf.cell(qty_w, 8, '数量  ', fill=True, align='R', new_x='LMARGIN', new_y='NEXT')
-        pdf.set_text_color(0, 0, 0)
+    gap = 3
+    col_w = (pdf.w - pdf.l_margin - pdf.r_margin - gap * (PDF_COLS - 1)) / PDF_COLS
+    qty_w = 13
+    name_w = col_w - qty_w
+    row_h, line_h, head_h = 7.5, 6, 6.5
+    bottom = pdf.h - 16
+    pos = {'col': 0, 'top': pdf.get_y(), 'y': pdf.get_y()}
 
-    def ensure_space(h, cat=None):
-        if pdf.get_y() + h > bottom:
+    def x0():
+        return pdf.l_margin + pos['col'] * (col_w + gap)
+
+    def col_head():
+        pdf.set_font(f, '', 10)
+        pdf.set_fill_color(235, 235, 235)
+        pdf.set_xy(x0(), pos['y'])
+        pdf.cell(name_w, 6, '商品名', border=1, align='C', fill=True)
+        pdf.cell(qty_w, 6, '数量', border=1, align='C', fill=True)
+        pos['y'] += 6
+
+    def next_col():
+        pos['col'] += 1
+        if pos['col'] >= PDF_COLS:
             pdf.add_page()
-            table_head()
-            if cat:
-                cat_row(cat + '（続き）')
+            pos['col'], pos['top'] = 0, pdf.get_y()
+        pos['y'] = pos['top']
+        col_head()
+
+    def ensure(h, cont_cat=None):
+        if pos['y'] + h > bottom:
+            next_col()
+            if cont_cat:
+                cat_row(cont_cat + '（続き）')
 
     def cat_row(text):
-        pdf.set_font(f, '', 12)
-        pdf.set_fill_color(225, 225, 225)
-        pdf.cell(0, 8, '  ' + text, fill=True, new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(f, '', 11)
+        pdf.set_fill_color(205, 205, 205)
+        pdf.set_xy(x0(), pos['y'])
+        pdf.cell(col_w, head_h, text, border=1, align='C', fill=True)
+        pos['y'] += head_h
 
-    table_head()
+    col_head()
     for cat, items in blocks:
-        ensure_space(8 + line_h)
+        ensure(head_h + row_h)
         cat_row(cat)
         for it in items:
             name = it['name'] + (f"（{it['note']}）" if it['note'] else '')
-            pdf.set_font(f, '', 12)
-            lines = pdf.multi_cell(name_w - 4, line_h, name, dry_run=True, output='LINES')
-            h = max(len(lines), 1) * line_h + 2
-            ensure_space(h, cat)
-            y = pdf.get_y()
-            pdf.set_xy(pdf.l_margin + 4, y + 1)
-            pdf.multi_cell(name_w - 4, line_h, name)
-            pdf.set_xy(pdf.l_margin + name_w, y)
+            pdf.set_font(f, '', 13)
+            n = len(pdf.multi_cell(name_w - 2, line_h, name, dry_run=True, output='LINES'))
+            h = max(row_h, n * line_h + 1.5)
+            ensure(h, cat)
+            pdf.set_font(f, '', 13)
+            x, y = x0(), pos['y']
+            pdf.rect(x, y, name_w, h)
+            pdf.rect(x + name_w, y, qty_w, h)
+            pdf.set_xy(x + 1, y + (h - n * line_h) / 2)
+            pdf.multi_cell(name_w - 2, line_h, name)
             pdf.set_font(f, '', 15)
-            pdf.cell(qty_w, h, num_fmt(it['qty']) + '  ', align='R')
-            pdf.set_draw_color(200, 200, 200)
-            pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
-            pdf.set_xy(pdf.l_margin, y + h)
+            pdf.set_xy(x + name_w, y)
+            pdf.cell(qty_w, h, num_fmt(it['qty']), align='C')
+            pos['y'] += h
 
     if not blocks:
-        pdf.set_font(f, '', 12)
-        pdf.cell(0, 10, '発注品はありません', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(f, '', 13)
+        pdf.set_xy(pdf.l_margin, pos['y'] + 4)
+        pdf.cell(0, 10, '発注品はありません')
 
     filename = f"発注書_{date_str}_{sup_name}.pdf"
     response = make_response(bytes(pdf.output()))
