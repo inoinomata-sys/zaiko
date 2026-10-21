@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
 import urllib.parse
+import unicodedata
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
@@ -21,6 +22,11 @@ STORES = ['イノ', 'リッチ']
 SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
                   'ナプラ', 'コタ', 'アルマダ', 'リファ']
 STALE_DAYS = 7
+
+
+def nfkc(v):
+    """全角英数字・半角カナなどの表記ゆれをそろえる"""
+    return unicodedata.normalize('NFKC', v).strip() if v else v
 
 
 def now_jst():
@@ -332,7 +338,7 @@ def order_save():
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (order_id, pid,
               item.get('base_qty', 0), item.get('stock_qty', 0),
-              float(item['order_qty']), item.get('custom_name')))
+              float(item['order_qty']), nfkc(item.get('custom_name'))))
     db.commit()
     release_db(db)
     return jsonify(ok=True, order_id=order_id)
@@ -434,7 +440,8 @@ def order_pdf(order_id):
     col_w = (pdf.w - pdf.l_margin - pdf.r_margin - gap * (PDF_COLS - 1)) / PDF_COLS
     qty_w = 13
     name_w = col_w - qty_w
-    row_h, line_h, head_h = 7.5, 6, 6.5
+    FS = 13
+    row_h, line_h, head_h = 7.5, 6, 7.5
     bottom = pdf.h - 16
     pos = {'col': 0, 'top': pdf.get_y(), 'y': pdf.get_y()}
 
@@ -442,12 +449,12 @@ def order_pdf(order_id):
         return pdf.l_margin + pos['col'] * (col_w + gap)
 
     def col_head():
-        pdf.set_font(f, '', 10)
+        pdf.set_font(f, '', FS)
         pdf.set_fill_color(235, 235, 235)
         pdf.set_xy(x0(), pos['y'])
-        pdf.cell(name_w, 6, '商品名', border=1, align='C', fill=True)
-        pdf.cell(qty_w, 6, '数量', border=1, align='C', fill=True)
-        pos['y'] += 6
+        pdf.cell(name_w, head_h, ' 商品名', border=1, fill=True)
+        pdf.cell(qty_w, head_h, ' 数量', border=1, fill=True)
+        pos['y'] += head_h
 
     def next_col():
         pos['col'] += 1
@@ -464,10 +471,10 @@ def order_pdf(order_id):
                 cat_row(cont_cat + '（続き）')
 
     def cat_row(text):
-        pdf.set_font(f, '', 11)
+        pdf.set_font(f, '', FS)
         pdf.set_fill_color(205, 205, 205)
         pdf.set_xy(x0(), pos['y'])
-        pdf.cell(col_w, head_h, text, border=1, align='C', fill=True)
+        pdf.cell(col_w, head_h, ' ' + text, border=1, fill=True)
         pos['y'] += head_h
 
     col_head()
@@ -476,19 +483,18 @@ def order_pdf(order_id):
         cat_row(cat)
         for it in items:
             name = it['name'] + (f"（{it['note']}）" if it['note'] else '')
-            pdf.set_font(f, '', 13)
+            pdf.set_font(f, '', FS)
             n = len(pdf.multi_cell(name_w - 2, line_h, name, dry_run=True, output='LINES'))
             h = max(row_h, n * line_h + 1.5)
             ensure(h, cat)
-            pdf.set_font(f, '', 13)
+            pdf.set_font(f, '', FS)
             x, y = x0(), pos['y']
             pdf.rect(x, y, name_w, h)
             pdf.rect(x + name_w, y, qty_w, h)
             pdf.set_xy(x + 1, y + (h - n * line_h) / 2)
             pdf.multi_cell(name_w - 2, line_h, name)
-            pdf.set_font(f, '', 15)
-            pdf.set_xy(x + name_w, y)
-            pdf.cell(qty_w, h, num_fmt(it['qty']), align='C')
+            pdf.set_xy(x + name_w + 1, y + (h - n * line_h) / 2)
+            pdf.cell(qty_w - 1, line_h, num_fmt(it['qty']))
             pos['y'] += h
 
     if not blocks:
@@ -551,8 +557,8 @@ def product_add():
     cur.execute("""
         INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
         VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (int(d['col_group']), d['category'], d['name'],
-          float(d.get('base_qty', 0)), d.get('note') or None,
+    """, (int(d['col_group']), nfkc(d['category']), nfkc(d['name']),
+          float(d.get('base_qty', 0)), nfkc(d.get('note')) or None,
           d.get('supplier', 'ワールド美容'), max_sort + 1))
     db.commit()
     release_db(db)
