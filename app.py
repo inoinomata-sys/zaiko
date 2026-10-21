@@ -84,14 +84,7 @@ def handle_error(e):
         return e
     tb = traceback.format_exc()
     app.logger.error(tb)
-    try:
-        conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
-        conn.cursor().execute("INSERT INTO error_log (method, path, error) VALUES (%s,%s,%s)",
-                              (request.method, request.full_path, tb[-4000:]))
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
+    log_event(request.method, request.full_path, tb)
     # DBとの接続が途中で切れていた場合（SSL error など）、GET は1回だけ自動でやり直す
     if (isinstance(e, (psycopg2.OperationalError, psycopg2.InterfaceError))
             and request.method == 'GET' and not request.args.get('_r')):
@@ -201,36 +194,91 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
+SCHEMA_VERSION = 1
+SCHEMA_SQL = [
+    "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
+    "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE stock ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ",
+    "ALTER TABLE order_items ALTER COLUMN product_id DROP NOT NULL",
+    # 使用数（ラベル）の記録。1回の入力ごとに1行。取り消しはマイナスの行として残す
+    """CREATE TABLE IF NOT EXISTS usage_log (
+        id SERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), store TEXT NOT NULL,
+        product_id INTEGER NOT NULL REFERENCES products(id), qty DOUBLE PRECISION NOT NULL)""",
+    "CREATE INDEX IF NOT EXISTS usage_log_store_product ON usage_log (store, product_id)",
+    # この発注に含めた使用記録の最後のid（これより後の使用が次回の仮発注になる）
+    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS usage_upto INTEGER",
+    # 同じ確定操作の二重送信で発注が2件できないようにする
+    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL",
+    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ",
+    "CREATE INDEX IF NOT EXISTS order_items_product ON order_items (product_id)",
+    # 作ったPDFを保存しておき、2回目からはすぐ返す（発注確定後に内容は変わらないため）
+    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf BYTEA",
+    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_ver TEXT",
+    """CREATE TABLE IF NOT EXISTS error_log (
+        id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""",
+]
+
+
 def migrate():
-    # 起動時の準備は専用の接続で行い、終わったら閉じる（プールに残さない）
+    """起動時に、データベースの構造が最新かを1回の問い合わせで確かめ、古い時だけ変更する。
+    （毎回の起動でALTERを実行すると、起動が遅くなり、デプロイ中に他の画面を一時的に止めることがある）"""
     db = psycopg2.connect(DATABASE_URL, connect_timeout=10)
     db.autocommit = True
     cur = db.cursor()
-    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ")
-    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
-    cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS changed_at TIMESTAMPTZ")
-    cur.execute("ALTER TABLE order_items ALTER COLUMN product_id DROP NOT NULL")
-    # 使用数（ラベル）の記録。1回の入力ごとに1行。取り消しはマイナスの行として残す
-    cur.execute("""CREATE TABLE IF NOT EXISTS usage_log (
-        id SERIAL PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now(), store TEXT NOT NULL,
-        product_id INTEGER NOT NULL REFERENCES products(id), qty DOUBLE PRECISION NOT NULL)""")
-    cur.execute("CREATE INDEX IF NOT EXISTS usage_log_store_product ON usage_log (store, product_id)")
-    # usage_upto: この発注に含めた使用記録の最後のid（これより後の使用が次回の仮発注になる）
-    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS usage_upto INTEGER")
-    # request_key: 同じ確定操作の二重送信で発注が2件できないようにする
-    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT")
-    # 作ったPDFを保存しておき、2回目からはすぐ返す（発注確定後に内容は変わらないため）
-    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ")
-    cur.execute("CREATE INDEX IF NOT EXISTS order_items_product ON order_items (product_id)")
-    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf BYTEA")
-    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_ver TEXT")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL")
-    cur.execute("""CREATE TABLE IF NOT EXISTS error_log (
-        id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""")
-    db.close()
+    try:
+        cur.execute("CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)")
+        cur.execute("SELECT version FROM schema_meta WHERE id=1")
+        row = cur.fetchone()
+        if row and row[0] >= SCHEMA_VERSION:
+            return
+        # 複数のプロセスが同時に起動しても、構造の変更は1つだけが行う
+        cur.execute("SELECT pg_try_advisory_lock(7240001)")
+        if not cur.fetchone()[0]:
+            return
+        try:
+            cur.execute("SET lock_timeout = '5s'")
+            for sql in SCHEMA_SQL:
+                cur.execute(sql)
+            cur.execute("""INSERT INTO schema_meta (id, version) VALUES (1, %s)
+                           ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version""", (SCHEMA_VERSION,))
+        finally:
+            cur.execute("SELECT pg_advisory_unlock(7240001)")
+    finally:
+        db.close()
 
 
 migrate()
+
+
+def log_event(kind, path, text=''):
+    """起動・遅い処理などを error_log に残す（失敗しても本来の処理には影響させない）"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+        conn.autocommit = True
+        conn.cursor().execute("INSERT INTO error_log (method, path, error) VALUES (%s,%s,%s)",
+                              (kind, path, text[-4000:]))
+        conn.close()
+    except Exception:
+        pass
+
+
+# サーバーが（デプロイ以外で）勝手に再起動していないかを後から調べられるよう、起動を記録する
+threading.Thread(target=log_event, args=('BOOT', f'pid {os.getpid()}'), daemon=True).start()
+
+
+@app.before_request
+def _start_timer():
+    g.t0 = time.time()
+
+
+@app.after_request
+def _log_slow(resp):
+    t0 = g.get('t0')
+    if t0 and time.time() - t0 > 6 and request.path not in ('/ping',):
+        threading.Thread(target=log_event, args=('SLOW', request.full_path,
+                         f'{time.time() - t0:.1f}s status={resp.status_code}'), daemon=True).start()
+    return resp
 
 
 PRODUCT_STOCK_SQL = """
@@ -338,6 +386,9 @@ def api_update_stock():
     now = now_jst()
     db = get_db()
     with transaction(db) as cur:
+        cur.execute("SELECT 1 FROM products WHERE id=%s", (product_id,))
+        if not cur.fetchone():
+            return jsonify(ok=False, error='商品が見つかりません'), 404
         cur.execute("""
             INSERT INTO stock (product_id, store, current_qty, version)
             VALUES (%s, %s, 0, 0) ON CONFLICT (product_id, store) DO NOTHING
@@ -570,14 +621,38 @@ def order_form():
 
 @app.route('/order/save', methods=['POST'])
 def order_save():
-    data     = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(ok=False, error='入力が不正です'), 400
     store    = data.get('store', 'イノ')
     supplier = data.get('supplier', 'ワールド美容')
     items    = data.get('items', [])
-    month    = data.get('month')
-    day      = data.get('day')
     request_key = data.get('request_key') or None
-    usage_upto  = data.get('usage_upto')
+    try:
+        month = int(data['month']) if data.get('month') not in (None, '') else None
+        day   = int(data['day']) if data.get('day') not in (None, '') else None
+        usage_upto = int(data['usage_upto']) if data.get('usage_upto') is not None else None
+        if not isinstance(items, list):
+            raise ValueError
+        clean = []
+        for it in items:
+            qty = float(it.get('order_qty') or 0)
+            if qty <= 0:
+                continue
+            clean.append({**it, 'order_qty': qty,
+                          'product_id': int(it['product_id']) if it.get('product_id') else None})
+        items = clean
+    except (ValueError, TypeError, AttributeError):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    if store not in STORES or supplier not in SUPPLIER_NAMES:
+        return jsonify(ok=False, error='店舗または仕入先が不正です'), 400
+    if items:
+        db0 = get_db()
+        cur0 = db0.cursor()
+        ids = [i['product_id'] for i in items if i['product_id']]
+        cur0.execute("SELECT id FROM products WHERE id = ANY(%s)", (ids,))
+        if len(cur0.fetchall()) != len(set(ids)):
+            return jsonify(ok=False, error='存在しない商品が含まれています。画面を読み込み直してください'), 400
 
     db = get_db()
     with transaction(db) as cur:
@@ -964,13 +1039,16 @@ def product_toggle(pid):
 
 @app.route('/products/<int:pid>/base', methods=['POST'])
 def product_base(pid):
+    try:
+        qty = float(request.form.get('base_qty', ''))
+    except ValueError:
+        return jsonify(ok=False, error='数を入力してください'), 400
+    if qty < 0:
+        return jsonify(ok=False, error='0以上の数を入力してください'), 400
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE products SET base_qty=%s WHERE id=%s",
-               (float(request.form['base_qty']), pid))
-    db.commit()
-    release_db(db)
-    return jsonify(ok=True)
+    cur.execute("UPDATE products SET base_qty=%s WHERE id=%s", (qty, pid))
+    return jsonify(ok=True) if cur.rowcount else (jsonify(ok=False, error='商品が見つかりません'), 404)
 
 
 @app.route('/products/<int:pid>/supplier', methods=['POST'])

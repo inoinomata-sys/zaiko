@@ -99,7 +99,7 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
       <td class="name" style="white-space:nowrap;{% if not p.is_active %}text-decoration:line-through{% endif %}">{{ p.name }}</td>
       <td class="r">
         <input type="number" value="{{ p.base_qty|n }}" min="0" step="any" inputmode="decimal" style="width:60px;text-align:right"
-               onchange="updateBase({{ p.id }}, this.value)">
+               data-saved="{{ p.base_qty|n }}" onchange="updateBase({{ p.id }}, this.value, this)">
       </td>
       <td>
         <select style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px"
@@ -159,11 +159,18 @@ async function move(btn, dir) {
     row.querySelectorAll('.mv').forEach(b => b.disabled = false);
   }
 }
-async function updateBase(id, val) {
+async function updateBase(id, val, input) {
+  if (val === '' || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
+    toast('0以上の数を入力してください');
+    if (input) input.value = input.dataset.saved;
+    return;
+  }
   const fd = new FormData();
   fd.append('base_qty', val);
-  const res = await fetch(`/products/${id}/base`, {method:'POST', body:fd});
-  if (res.ok) toast('基準数を更新しました');
+  let ok = false;
+  try { ok = (await fetch(`/products/${id}/base`, {method:'POST', body:fd})).ok; } catch (e) {}
+  if (ok) { if (input) input.dataset.saved = val; toast('基準数を更新しました'); }
+  else { toast('基準数の保存に失敗しました。もう一度お試しください'); if (input) input.value = input.dataset.saved; }
 }
 async function updateSupplier(id, val) {
   const fd = new FormData();
