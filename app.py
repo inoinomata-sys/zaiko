@@ -21,8 +21,9 @@ app = Flask(__name__)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 JST = timezone(timedelta(hours=9))
 
+# 起動時には接続を作らない（サーバーが複数プロセスに分かれる時に接続を共有して壊れるのを防ぐ）
 _pool = psycopg2.pool.ThreadedConnectionPool(
-    1, 5, DATABASE_URL, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
+    0, 5, DATABASE_URL, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3)
 
 STORES = ['イノ', 'リッチ']
 SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
@@ -183,7 +184,9 @@ def transaction(conn):
 
 
 def migrate():
-    db = get_db()
+    # 起動時の準備は専用の接続で行い、終わったら閉じる（プールに残さない）
+    db = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+    db.autocommit = True
     cur = db.cursor()
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ")
     cur.execute("ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0")
@@ -201,8 +204,7 @@ def migrate():
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL")
     cur.execute("""CREATE TABLE IF NOT EXISTS error_log (
         id SERIAL PRIMARY KEY, at TIMESTAMPTZ DEFAULT now(), method TEXT, path TEXT, error TEXT)""")
-    db.commit()
-    release_db(db)
+    db.close()
 
 
 migrate()
