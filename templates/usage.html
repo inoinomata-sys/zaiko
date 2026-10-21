@@ -9,11 +9,10 @@
   background: var(--surface); color: var(--fg2); font-size: 16px; font-weight: 700; text-decoration: none;
 }
 .chip.on { background: var(--acc); border-color: var(--acc); color: #fff; }
-.sel, .search {
+.sel {
   font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--border);
   border-radius: 10px; background: var(--surface); max-width: 100%;
 }
-.search { flex: 1 1 180px; min-width: 0; }
 .summary { font-size: 14px; color: var(--fg2); margin-bottom: 12px; }
 .summary b { color: var(--fg); font-size: 16px; }
 
@@ -67,7 +66,6 @@
     <option value="">すべての仕入先</option>
     {% for s in supplier_names %}<option value="{{ s }}" {% if s == supplier %}selected{% endif %}>{{ s }}</option>{% endfor %}
   </select>
-  <input class="search" type="search" id="search" placeholder="商品名で探す（例: 7NB）" autocomplete="off">
 </div>
 
 <div class="cat-scroll" id="cat-tabs">
@@ -190,20 +188,17 @@ document.querySelectorAll('.u-row').forEach(row => {
 
 let currentCat = '';
 function applyFilter() {
-  const q = document.getElementById('search').value.normalize('NFKC').trim().toLowerCase();
   document.querySelectorAll('.cat-card').forEach(card => {
     let any = false;
     if (!currentCat || card.dataset.cat === currentCat) {
       card.querySelectorAll('.u-row').forEach(row => {
-        const show = !q || row.dataset.name.includes(q);
-        row.style.display = show ? '' : 'none';
-        any = any || show;
+        row.style.display = '';
+        any = true;
       });
     }
     card.style.display = any ? '' : 'none';
   });
 }
-document.getElementById('search').addEventListener('input', applyFilter);
 document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
   currentCat = b.dataset.cat;
