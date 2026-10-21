@@ -544,7 +544,7 @@ def products():
     supplier = request.args.get('supplier', SUPPLIER_NAMES[0])
     db = get_db()
     cur = db.cursor()
-    cur.execute("SELECT * FROM products ORDER BY col_group, sort_order")
+    cur.execute("SELECT * FROM products ORDER BY col_group, sort_order, id")
     all_rows = cur.fetchall()
     release_db(db)
     counts = {}
@@ -586,6 +586,44 @@ def product_add():
     db.commit()
     release_db(db)
     return redirect(url_for('products', supplier=supplier, added=name))
+
+
+@app.route('/products/<int:pid>/move', methods=['POST'])
+def product_move(pid):
+    """同じ仕入先・同じカテゴリの中で、1つ上(up)または下(down)の商品と並び順を入れ替える"""
+    direction = (request.get_json() or {}).get('dir')
+    if direction not in ('up', 'down'):
+        return jsonify(ok=False), 400
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT id, supplier, category, col_group, sort_order FROM products WHERE id=%s FOR UPDATE", (pid,))
+    me = cur.fetchone()
+    if not me:
+        release_db(db)
+        return jsonify(ok=False), 404
+    cmp, order = ('<', 'DESC') if direction == 'up' else ('>', 'ASC')
+    cur.execute(f"""
+        SELECT id, col_group, sort_order FROM products
+        WHERE supplier=%s AND category=%s AND id<>%s
+          AND (col_group, sort_order, id) {cmp} (%s, %s, %s)
+        ORDER BY col_group {order}, sort_order {order}, id {order} LIMIT 1 FOR UPDATE
+    """, (me['supplier'], me['category'], pid, me['col_group'], me['sort_order'], pid))
+    other = cur.fetchone()
+    if not other:
+        release_db(db)
+        return jsonify(ok=True, moved=False)
+    if (other['col_group'], other['sort_order']) == (me['col_group'], me['sort_order']):
+        # 並び順が同じ値だと入れ替えても変わらないので、ずらしてから入れ替える
+        bump = -1 if direction == 'up' else 1
+        cur.execute("UPDATE products SET sort_order=sort_order+%s WHERE id=%s", (bump, other['id']))
+        other['sort_order'] += bump
+    cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
+                (other['col_group'], other['sort_order'], pid))
+    cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
+                (me['col_group'], me['sort_order'], other['id']))
+    db.commit()
+    release_db(db)
+    return jsonify(ok=True, moved=True, other_id=other['id'])
 
 
 @app.route('/products/<int:pid>/toggle', methods=['POST'])

@@ -10,6 +10,14 @@
 }
 .sup-tab:hover { text-decoration: none; border-color: var(--acc); color: var(--acc); }
 .sup-tab.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.mv {
+  width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--acc); font-size: 14px; cursor: pointer;
+  touch-action: manipulation; font-family: inherit;
+}
+.mv:active { background: var(--acc); color: #fff; }
+.mv:disabled { opacity: .4; }
+tr.moved td { background: #fff4d6; transition: background .6s; }
 .sup-tab .cnt { margin-left: 6px; font-size: 12px; font-weight: 400; opacity: .8; }
 </style>
 {% endblock %}
@@ -66,6 +74,7 @@
   <table style="min-width:600px">
     <thead>
       <tr>
+        <th style="width:84px">並び順</th>
         <th>カテゴリ</th>
         <th>商品名</th>
         <th class="r">基準</th>
@@ -77,12 +86,16 @@
     </thead>
     <tbody>
     {% if not rows %}
-    <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
+    <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
     {% endif %}
     {% for p in rows %}
-    <tr {% if not p.is_active %}style="opacity:.45"{% endif %}>
-      <td style="font-size:12px;color:var(--fg2)">{{ p.category }}</td>
-      <td class="name" {% if not p.is_active %}style="text-decoration:line-through"{% endif %}>{{ p.name }}</td>
+    <tr data-id="{{ p.id }}" data-key="{{ p.supplier }}|{{ p.category }}" {% if not p.is_active %}style="opacity:.45"{% endif %}>
+      <td style="white-space:nowrap">
+        <button type="button" class="mv" onclick="move(this,'up')" aria-label="上へ">▲</button>
+        <button type="button" class="mv" onclick="move(this,'down')" aria-label="下へ">▼</button>
+      </td>
+      <td style="font-size:12px;color:var(--fg2);white-space:nowrap">{{ p.category }}</td>
+      <td class="name" style="white-space:nowrap;{% if not p.is_active %}text-decoration:line-through{% endif %}">{{ p.name }}</td>
       <td class="r">
         <input type="number" value="{{ p.base_qty|n }}" min="0" step="any" inputmode="decimal" style="width:60px;text-align:right"
                onchange="updateBase({{ p.id }}, this.value)">
@@ -120,6 +133,31 @@
 {% block scripts %}
 <script>
 {% if request.args.get('added') %}toast({{ ('「' ~ request.args.get('added') ~ '」を登録しました')|tojson }}, 3000);{% endif %}
+let moving = false;
+async function move(btn, dir) {
+  if (moving) return;
+  const row = btn.closest('tr');
+  moving = true;
+  row.querySelectorAll('.mv').forEach(b => b.disabled = true);
+  try {
+    const res = await fetch(`/products/${row.dataset.id}/move`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({dir})
+    });
+    const d = await res.json();
+    if (!d.ok) throw 0;
+    if (!d.moved) { toast(dir === 'up' ? 'カテゴリ内の一番上です' : 'カテゴリ内の一番下です'); return; }
+    const other = document.querySelector(`tr[data-id="${d.other_id}"]`);
+    if (!other) { location.reload(); return; }
+    if (dir === 'up') other.before(row); else other.after(row);
+    row.classList.add('moved');
+    setTimeout(() => row.classList.remove('moved'), 700);
+  } catch (e) {
+    toast('並び替えに失敗しました');
+  } finally {
+    moving = false;
+    row.querySelectorAll('.mv').forEach(b => b.disabled = false);
+  }
+}
 async function updateBase(id, val) {
   const fd = new FormData();
   fd.append('base_qty', val);
