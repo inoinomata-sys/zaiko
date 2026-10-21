@@ -17,6 +17,7 @@
 }
 .mv:active { background: var(--acc); color: #fff; }
 .mv:disabled { opacity: .4; }
+tr:target td { background: #fff4d6; }
 tr.moved td { background: #fff4d6; transition: background .6s; }
 .sup-tab .cnt { margin-left: 6px; font-size: 12px; font-weight: 400; opacity: .8; }
 </style>
@@ -89,7 +90,7 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
     <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
     {% endif %}
     {% for p in rows %}
-    <tr data-id="{{ p.id }}" data-key="{{ p.supplier }}|{{ p.category }}" {% if not p.is_active %}style="opacity:.45"{% endif %}>
+    <tr id="p{{ p.id }}" data-id="{{ p.id }}" data-key="{{ p.supplier }}|{{ p.category }}" {% if not p.is_active %}style="opacity:.45"{% endif %}>
       <td style="white-space:nowrap">
         <button type="button" class="mv" onclick="move(this,'up')" aria-label="上へ">▲</button>
         <button type="button" class="mv" onclick="move(this,'down')" aria-label="下へ">▼</button>

@@ -39,7 +39,7 @@ def _get_pool():
     return _pool
 
 STORES = ['イノ', 'リッチ']
-SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム', '三井コーポレーション',
+SUPPLIER_NAMES = ['ワールド美容', 'トピー商事', 'アイテム美容', '三井コーポレーション',
                   'ナプラ', 'コタ', 'アルマダ', 'リファ']
 STALE_DAYS = 7
 
@@ -895,23 +895,27 @@ def product_add():
     if not name:
         return redirect(url_for('products', supplier=supplier))
     db = get_db()
-    cur = db.cursor()
-    # 並び順用の列番号は、同じカテゴリの既存商品から引き継ぐ（新しいカテゴリは最後の列）
-    cur.execute("SELECT MIN(col_group) AS g FROM products WHERE category=%s", (category,))
-    col_group = cur.fetchone()['g']
-    if col_group is None:
-        cur.execute("SELECT COALESCE(MAX(col_group), 1) AS g FROM products")
-        col_group = cur.fetchone()['g']
-    cur.execute("SELECT COALESCE(MAX(sort_order),0) FROM products WHERE col_group=%s", (col_group,))
-    max_sort = cur.fetchone()['coalesce']
-    cur.execute("""
-        INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
-    """, (col_group, category, name, base_qty, nfkc(d.get('note')) or None,
-          supplier, max_sort + 1))
-    db.commit()
-    release_db(db)
-    return redirect(url_for('products', supplier=supplier, added=name))
+    with transaction(db) as cur:
+        # 同じ仕入先・同じカテゴリの最後の商品のすぐ後ろに入れる（一覧でそのカテゴリの中に並ぶように）
+        cur.execute("""SELECT col_group, sort_order FROM products WHERE supplier=%s AND category=%s
+                       ORDER BY col_group DESC, sort_order DESC, id DESC LIMIT 1""", (supplier, category))
+        last = cur.fetchone()
+        if last:
+            col_group, pos = last['col_group'], last['sort_order'] + 1
+            cur.execute("UPDATE products SET sort_order = sort_order + 1 WHERE col_group=%s AND sort_order >= %s",
+                        (col_group, pos))
+        else:
+            # 新しいカテゴリは最後の列の一番後ろ
+            cur.execute("SELECT COALESCE(MAX(col_group), 1) AS g FROM products")
+            col_group = cur.fetchone()['g']
+            cur.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 AS s FROM products WHERE col_group=%s", (col_group,))
+            pos = cur.fetchone()['s']
+        cur.execute("""
+            INSERT INTO products (col_group, category, name, base_qty, note, supplier, sort_order)
+            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id
+        """, (col_group, category, name, base_qty, nfkc(d.get('note')) or None, supplier, pos))
+        new_id = cur.fetchone()['id']
+    return redirect(url_for('products', supplier=supplier, added=name) + f'#p{new_id}')
 
 
 @app.route('/products/<int:pid>/move', methods=['POST'])
