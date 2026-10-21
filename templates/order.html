@@ -56,6 +56,15 @@
 .order-qty:focus { outline: none; background: #f0f7ff; }
 .order-qty[value="0"] { color: #bbb; }
 
+.check-warn {
+  background: #fff8e6; border: 1px solid #f1d38a; color: #6b4e00;
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 12px; line-height: 1.6;
+}
+.check-warn a { font-weight: 700; white-space: nowrap; }
+.chk { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: #e3f5ea; color: #1d6b3f; margin-left: 4px; font-weight: 600; }
+.chk-old { background: #fff1d6; color: #8a5300; }
+.chk-none { background: #fde8e8; color: #b42318; margin-left: 0; }
+
 /* フッター */
 .custom-tab { border-style: dashed; }
 .custom-tab.active { border-style: solid; }
@@ -121,6 +130,14 @@
   </div>
 </div>
 
+{% if counts.unchecked or counts.stale %}
+<div class="check-warn">
+  {% if counts.unchecked %}在庫を数えた記録がない商品（<b>未確認</b>）が <b>{{ counts.unchecked }}</b> 品あります。未確認の商品は在庫数が分からないため、不足数の計算と「不足数を自動入力」の対象外です。{% endif %}
+  {% if counts.stale %}{{ stale_days }}日以上数えていない商品が <b>{{ counts.stale }}</b> 品あります。{% endif %}
+  <a href="/?store={{ store|urlencode }}">在庫画面で数える →</a>
+</div>
+{% endif %}
+
 <!-- カテゴリタブ -->
 <div class="cat-tabs" id="cat-tabs">
   <button class="cat-tab active" data-cat="" onclick="selectCat(this, '')">すべて</button>
@@ -140,6 +157,10 @@
     <input type="checkbox" id="only-order" onchange="filterRows()">
     発注あり
   </label>
+  <label class="filter-check">
+    <input type="checkbox" id="only-unchecked" onchange="filterRows()">
+    未確認・{{ stale_days }}日以上確認なし
+  </label>
   <button class="btn btn-ghost btn-sm" onclick="autoFill()">▶ 不足数を自動入力</button>
   <button class="btn btn-ghost btn-sm" onclick="clearAll()">✕ クリア</button>
 </div>
@@ -151,10 +172,10 @@
     <span>{{ cat if cat else '（未分類）' }}</span>
   </div>
   {% for p in prods %}
-  {% set shortage = [p.base_qty - p.current_qty, 0]|max %}
+  {% set shortage = p.shortage %}
   <div class="order-row {% if shortage > 0 %}has-order{% else %}no-order{% endif %}"
-       data-shortage="{{ shortage }}"
-       data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-stock="{{ p.current_qty }}">
+       data-shortage="{{ shortage }}" data-check="{{ 'unchecked' if p.unchecked else ('stale' if p.stale else 'ok') }}"
+       data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-stock="{{ '' if p.unchecked else p.current_qty }}">
     <div class="row-info">
       <div class="row-name">
         {{ p.name }}
@@ -162,8 +183,13 @@
       </div>
       <div class="row-meta">
         基準 {{ p.base_qty|n }} ／
-        在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty|n }}</span>
-        {% if shortage > 0 %} ／ 不足 {{ shortage|n }}{% endif %}
+        {% if p.unchecked %}
+          在庫 <span class="chk chk-none">未確認</span>
+        {% else %}
+          在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty|n }}</span>
+          {% if shortage > 0 %} ／ 不足 {{ shortage|n }}{% endif %}
+          <span class="chk {% if p.stale %}chk-old{% endif %}">{% if p.days == 0 %}今日確認{% else %}{{ p.days }}日前に確認{% endif %}</span>
+        {% endif %}
       </div>
     </div>
     <div class="stepper">
@@ -251,12 +277,14 @@ function onOrderChange() {
 function filterRows() {
   const onlyShortage = document.getElementById('only-shortage').checked;
   const onlyOrder    = document.getElementById('only-order').checked;
+  const onlyUnchecked = document.getElementById('only-unchecked').checked;
   document.querySelectorAll('.order-row').forEach(row => {
     const sh = parseFloat(row.dataset.shortage) || 0;
     const oq = parseInt(row.querySelector('.order-qty').value) || 0;
     let show = true;
     if (onlyShortage && sh <= 0) show = false;
     if (onlyOrder    && oq <= 0) show = false;
+    if (onlyUnchecked && row.dataset.check === 'ok') show = false;
     row.style.display = show ? '' : 'none';
   });
 }
@@ -268,7 +296,8 @@ function autoFill() {
     if (sh > 0) { inp.value = Math.ceil(sh); onQtyInput(inp); }
   });
   onOrderChange();
-  toast('不足数を自動入力しました');
+  const skipped = document.querySelectorAll('.order-row[data-check="unchecked"]').length;
+  toast('不足数を自動入力しました' + (skipped ? `（未確認の ${skipped} 品は対象外）` : ''), 3500);
 }
 
 function clearAll() {
@@ -326,7 +355,7 @@ async function saveOrder() {
     if (oq > 0) items.push({
       product_id: row.dataset.id || null,
       base_qty:   parseFloat(row.dataset.base) || 0,
-      stock_qty:  parseFloat(row.dataset.stock) || 0,
+      stock_qty:  row.dataset.stock === '' ? null : parseFloat(row.dataset.stock),
       order_qty:  oq,
       custom_name: null
     });

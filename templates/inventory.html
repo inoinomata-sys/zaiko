@@ -12,6 +12,11 @@
 .chip.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
 .chip .num { font-weight: 700; margin-left: 4px; }
 .store-chip { font-size: 16px; padding: 8px 22px; font-weight: 700; }
+.shelf-select {
+  font: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); min-width: 220px; max-width: 100%;
+}
+.notice summary { cursor: pointer; }
 .notice {
   background: #fff8e6; border: 1px solid #f1d38a; color: #7a5a00;
   border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
@@ -75,10 +80,11 @@
 </div>
 
 <div class="bar">
-  <a href="/?store={{ store|urlencode }}" class="chip {% if not current_cat %}on{% endif %}">すべての棚</a>
-  {% for c in cats %}
-  <a href="/?store={{ store|urlencode }}&cat={{ c|urlencode }}" class="chip {% if current_cat == c %}on{% endif %}">{{ c }}</a>
-  {% endfor %}
+  <select class="shelf-select" aria-label="棚を選ぶ"
+          onchange="location.href='/?store={{ store|urlencode }}' + (this.value ? '&cat=' + encodeURIComponent(this.value) : '')">
+    <option value="">すべての棚</option>
+    {% for c in cats %}<option value="{{ c }}" {% if current_cat == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
 </div>
 
 <div class="bar" id="filters">
@@ -88,10 +94,14 @@
   <button class="chip" data-f="shortage">不足<span class="num">{{ counts.shortage }}</span></button>
 </div>
 
-<div class="notice">
-  推計在庫と実在庫の差異：入庫・出庫の記録がまだないため計算できません。表示している数量はすべて人が確認・入力した実在庫です。<br>
-  「未確認」は一度も数えていない商品、<span class="zero-confirmed">0</span>（確認済み）は数えて在庫がなかった商品です。
-</div>
+<details class="notice">
+  <summary>数えた時は、数を入れて<b>「確認」</b>を押す</summary>
+  <div style="margin-top:6px">
+    <b>＋／－</b>は使った・補充した時の数量変更です（「最終更新」が変わります）。<br>
+    実際に数えた時は、数を入れて<b>「確認」</b>を押すと確認日時が記録されます。<br>
+    「未確認」は数えた記録がない商品です。在庫がなかった時は 0 を入れて「確認」を押してください。
+  </div>
+</details>
 
 {% for cat, prods in grouped.items() %}
 <div class="card cat-card" style="margin-bottom:12px">
@@ -118,12 +128,12 @@
     <div class="stepper">
       <button class="stepper-btn" type="button" data-d="-1" aria-label="1減らす">－</button>
       <input class="qty" type="number" inputmode="decimal" min="0" step="any"
-             value="{% if p.unchecked and p.current_qty == 0 %}{% else %}{{ p.current_qty|n }}{% endif %}"
+             value="{% if p.has_stock %}{{ p.current_qty|n }}{% endif %}"
              placeholder="?" data-saved="{{ p.current_qty|n }}">
       <button class="stepper-btn" type="button" data-d="1" aria-label="1増やす">＋</button>
     </div>
     <div class="side">
-      <button class="btn btn-ghost btn-sm check-btn" type="button" title="数量はそのままで確認済みにする">確認</button>
+      <button class="btn btn-ghost btn-sm check-btn" type="button" title="実際に数えた数として確認日時を記録する">確認</button>
       <div class="status"></div>
     </div>
   </div>
@@ -165,9 +175,11 @@ function applyServer(row, d) {
   const base = parseFloat(row.dataset.base) || 0;
   const sh = Math.max(base - d.qty, 0);
   row.querySelector('.short-cell').innerHTML = sh > 0 ? `<span class="short">不足 ${fmt(sh)}</span>` : '';
-  row.querySelector('.check-cell').innerHTML = `<span class="tag tag-ok">確認 ${d.checked_at}</span>`;
+  row.querySelector('.check-cell').innerHTML = d.checked_at
+    ? `<span class="tag tag-ok">確認 ${d.checked_at}</span>`
+    : '<span class="tag tag-unchecked">未確認</span>';
   row.querySelector('.changed-cell').textContent = d.changed_at ? '最終更新 ' + d.changed_at : '';
-  row.dataset.unchecked = 0; row.dataset.stale = 0;
+  if (d.checked_at) { row.dataset.unchecked = 0; row.dataset.stale = 0; }
   row.querySelector('.stepper-btn[data-d="-1"]').disabled = (d.qty + s.pending) <= 0;
 }
 
@@ -253,9 +265,12 @@ document.querySelectorAll('.inv-row').forEach(row => {
   inp.addEventListener('change', () => setDirect(row));
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
   row.querySelector('.check-btn').addEventListener('click', () => {
-    if (inp.value === '') { toast('数量を入力してから確認してください（在庫なしは 0）'); return; }
-    if (parseFloat(inp.value) !== parseFloat(inp.dataset.saved)) { setDirect(row); return; }
-    st(row).queue.push({op: 'check'}); next(row);
+    const v = parseFloat(inp.value);
+    if (inp.value === '' || isNaN(v) || v < 0) { toast('数えた数を入力してから「確認」を押してください（在庫なしは 0）'); return; }
+    const s = st(row);
+    clearTimeout(s.timer); s.pending = 0;
+    s.queue.push({op: 'check', value: v, version: +row.dataset.version});
+    next(row);
   });
   row.querySelector('.stepper-btn[data-d="-1"]').disabled = (parseFloat(inp.dataset.saved) || 0) <= 0;
 });
@@ -263,9 +278,8 @@ document.querySelectorAll('.inv-row').forEach(row => {
 async function checkCategory(btn, cat) {
   const rows = [...btn.closest('.cat-card').querySelectorAll('.inv-row')];
   const blank = rows.filter(r => r.querySelector('.qty').value === '').length;
-  const msg = blank
-    ? `数量が空欄の ${blank} 品は「在庫 0」として確認済みになります。よろしいですか？`
-    : '表示中の数量で、この棚を全部確認済みにします。よろしいですか？';
+  const msg = '表示中の数量で、この棚を全部確認済みにします。'
+    + (blank ? `数量が空欄の ${blank} 品は確認済みになりません。` : '');
   if (!btn.dataset.armed) {
     btn.dataset.armed = 1;
     btn.textContent = 'もう一度押すと確定';
@@ -282,8 +296,8 @@ async function checkCategory(btn, cat) {
     });
     const d = await res.json();
     if (!d.ok) throw 0;
-    toast(`${d.count} 品を確認済みにしました`);
-    location.reload();
+    toast(`${d.count} 品を確認済みにしました` + (d.skipped ? `（数量未入力の ${d.skipped} 品は対象外）` : ''), 3500);
+    setTimeout(() => location.reload(), 1500);
   } catch (e) {
     toast('保存に失敗しました');
     btn.disabled = false; btn.textContent = 'この棚を確認済みにする';

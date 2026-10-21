@@ -1,8 +1,9 @@
 from werkzeug.exceptions import HTTPException
-from flask import Flask, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
+from flask import Flask, g, has_request_context, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
 import traceback
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from collections import OrderedDict
 import urllib.parse
@@ -97,7 +98,7 @@ def ping():
 # ── DB ヘルパー ──────────────────────────────────────────────────────────────
 
 _last_used = {}
-IDLE_CHECK_SEC = 15
+IDLE_CHECK_SEC = 60
 
 
 def _getconn():
@@ -109,28 +110,75 @@ def _getconn():
         return _pool.getconn()
 
 
-def get_db():
+def _set_autocommit(conn):
+    # 読み取りのたびにROLLBACKの往復が発生しないよう自動コミットにする（まとめて書く処理は transaction() を使う）
+    if not conn.autocommit:
+        if conn.info.transaction_status != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+            conn.rollback()
+        conn.autocommit = True
+
+
+def _checkout():
     conn = _getconn()
     # しばらく使っていない接続はDB側で切られていることがあるので、確かめてから使う
     if conn.closed or time.time() - _last_used.get(id(conn), 0) > IDLE_CHECK_SEC:
         try:
+            _set_autocommit(conn)
             conn.cursor().execute('SELECT 1')
-            conn.rollback()
         except Exception:
             _pool.putconn(conn, close=True)
             conn = _getconn()
+    _set_autocommit(conn)
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
 
-def release_db(conn):
+def _checkin(conn):
     _last_used[id(conn)] = time.time()
     try:
-        if not conn.closed:
-            conn.rollback()  # 失敗したトランザクションを残したままプールに戻さない
+        if not conn.closed and conn.info.transaction_status != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+            conn.rollback()
     except Exception:
         pass
-    _pool.putconn(conn, close=conn.closed)
+    _pool.putconn(conn, close=bool(conn.closed))
+
+
+def get_db():
+    """1回のリクエストでは同じ接続を使い回す（DBとの往復を減らすため）"""
+    if has_request_context():
+        if 'db' not in g:
+            g.db = _checkout()
+        return g.db
+    return _checkout()
+
+
+def release_db(conn):
+    if has_request_context() and g.get('db') is conn:
+        return
+    _checkin(conn)
+
+
+@app.teardown_request
+def _release_request_db(exc):
+    conn = g.pop('db', None)
+    if conn is not None:
+        _checkin(conn)
+
+
+@contextmanager
+def transaction(conn):
+    cur = conn.cursor()
+    cur.execute('BEGIN')
+    try:
+        yield cur
+    except BaseException:
+        try:
+            cur.execute('ROLLBACK')
+        except Exception:
+            pass
+        raise
+    else:
+        cur.execute('COMMIT')
 
 
 def migrate():
@@ -151,7 +199,8 @@ migrate()
 
 PRODUCT_STOCK_SQL = """
     SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
-           COALESCE(s.current_qty, 0) AS current_qty, s.changed_at, s.checked_at,
+           COALESCE(s.current_qty, 0) AS current_qty, (s.product_id IS NOT NULL) AS has_stock,
+           s.changed_at, s.checked_at,
            COALESCE(s.version, 0) AS version
     FROM products p
     LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
@@ -185,15 +234,13 @@ def inventory():
         store = 'イノ'
     cat = request.args.get('cat', '')
 
-    db = get_db()
-    cur = db.cursor()
-    cur.execute(
-        "SELECT category FROM products WHERE is_active=true AND category!='' GROUP BY category ORDER BY MIN(sort_order)"
-    )
-    cats = [r['category'] for r in cur.fetchall()]
-    release_db(db)
-
-    rows = products_with_stock(store, cat or None)
+    all_rows = products_with_stock(store)
+    first_sort = {}
+    for r in all_rows:
+        if r['category'] and r['sort_order'] < first_sort.get(r['category'], float('inf')):
+            first_sort[r['category']] = r['sort_order']
+    cats = sorted(first_sort, key=first_sort.get)
+    rows = [r for r in all_rows if r['category'] == cat] if cat else all_rows
     stale_before = now_jst() - timedelta(days=STALE_DAYS)
     grouped = OrderedDict()
     counts = {'unchecked': 0, 'stale': 0, 'shortage': 0}
@@ -201,7 +248,7 @@ def inventory():
         r = dict(r)
         r['unchecked'] = r['checked_at'] is None
         r['stale'] = (not r['unchecked']) and r['checked_at'] < stale_before
-        r['shortage'] = max(float(r['base_qty'] or 0) - float(r['current_qty'] or 0), 0)
+        r['shortage'] = 0 if r['unchecked'] else max(float(r['base_qty'] or 0) - float(r['current_qty'] or 0), 0)
         counts['unchecked'] += r['unchecked']
         counts['stale'] += r['stale']
         counts['shortage'] += r['shortage'] > 0
@@ -223,68 +270,67 @@ def stock_payload(row):
 
 @app.route('/api/stock', methods=['POST'])
 def api_update_stock():
-    """op=delta: 加減（同時操作でも合算）/ op=set: 直接入力（version不一致は409）/ op=check: 数量を変えず確認済みにする"""
+    """在庫数の保存。
+    op=delta: ＋／－（使用・補充など）。同時操作でも合算。確認日時は変えない
+    op=set:   数を直接入力。version不一致なら上書きせず409。確認日時は変えない
+    op=check: 実際に数えて確認した。value があればその数で保存し、確認日時を記録する
+    """
     data = request.get_json() or {}
     try:
         product_id = int(data['product_id'])
         op = data.get('op', 'set')
-        value = float(data.get('value', 0))
+        value = data.get('value')
+        value = None if value in (None, '') else float(value)
     except (KeyError, TypeError, ValueError):
         return jsonify(ok=False, error='入力が不正です'), 400
     store = data.get('store', 'イノ')
     if store not in STORES or op not in ('delta', 'set', 'check'):
         return jsonify(ok=False, error='入力が不正です'), 400
-    if op == 'set' and value < 0:
+    if op in ('delta', 'set') and value is None:
+        return jsonify(ok=False, error='数量がありません'), 400
+    if op in ('set', 'check') and value is not None and value < 0:
         return jsonify(ok=False, error='0未満は保存できません'), 400
 
     now = now_jst()
     db = get_db()
-    try:
-        cur = db.cursor()
+    with transaction(db) as cur:
         cur.execute("""
             INSERT INTO stock (product_id, store, current_qty, version)
             VALUES (%s, %s, 0, 0) ON CONFLICT (product_id, store) DO NOTHING
         """, (product_id, store))
-        cur.execute("SELECT current_qty, version FROM stock WHERE product_id=%s AND store=%s FOR UPDATE",
-                    (product_id, store))
+        cur.execute("SELECT current_qty, version, changed_at, checked_at FROM stock "
+                    "WHERE product_id=%s AND store=%s FOR UPDATE", (product_id, store))
         row = cur.fetchone()
+        current = float(row['current_qty'] or 0)
+        expected = data.get('version')
+        if op != 'delta' and value is not None and expected is not None and int(expected) != row['version']:
+            return jsonify(ok=False, conflict=True,
+                           error='他の端末で先に更新されました。最新の数量を表示します。',
+                           **stock_payload(row)), 409
 
-        if op == 'set':
-            expected = data.get('version')
-            if expected is not None and int(expected) != row['version']:
-                cur.execute("SELECT current_qty, version, changed_at, checked_at FROM stock WHERE product_id=%s AND store=%s",
-                            (product_id, store))
-                latest = cur.fetchone()
-                db.rollback()
-                return jsonify(ok=False, conflict=True,
-                               error='他の端末で先に更新されました。最新の数量を表示します。',
-                               **stock_payload(latest)), 409
+        if op == 'delta':
+            new_qty = max(current + value, 0)
+        elif value is not None:
             new_qty = value
-        elif op == 'delta':
-            new_qty = max(float(row['current_qty'] or 0) + value, 0)
         else:
-            new_qty = float(row['current_qty'] or 0)
-
-        changed = new_qty != float(row['current_qty'] or 0)
+            new_qty = current
+        changed = new_qty != current
         cur.execute("""
-            UPDATE stock SET current_qty=%s, version=version+1, checked_at=%s,
+            UPDATE stock SET current_qty=%s, version=version+1,
                    changed_at=CASE WHEN %s THEN %s ELSE changed_at END,
+                   checked_at=CASE WHEN %s THEN %s ELSE checked_at END,
                    updated_at=%s
             WHERE product_id=%s AND store=%s
             RETURNING current_qty, version, changed_at, checked_at
-        """, (new_qty, now, changed, now, now.strftime('%Y-%m-%d %H:%M'), product_id, store))
+        """, (new_qty, changed, now, op == 'check', now, now.strftime('%Y-%m-%d %H:%M'),
+              product_id, store))
         result = cur.fetchone()
-        db.commit()
-    except Exception:
-        db.rollback()
-        release_db(db)
-        return jsonify(ok=False, error='保存に失敗しました'), 500
-    release_db(db)
     return jsonify(ok=True, **stock_payload(result))
 
 
 @app.route('/api/stock/check_category', methods=['POST'])
 def api_check_category():
+    """棚（カテゴリ）の一括確認。数量が一度も入力されていない商品は対象外（勝手に在庫0にしない）"""
     data = request.get_json() or {}
     store = data.get('store', 'イノ')
     cat = data.get('category')
@@ -294,15 +340,18 @@ def api_check_category():
     db = get_db()
     cur = db.cursor()
     cur.execute("""
-        INSERT INTO stock (product_id, store, current_qty, version, checked_at, updated_at)
-        SELECT id, %s, 0, 1, %s, %s FROM products WHERE is_active=true AND category=%s
-        ON CONFLICT (product_id, store)
-        DO UPDATE SET checked_at=EXCLUDED.checked_at, version=stock.version+1
-    """, (store, now, now.strftime('%Y-%m-%d %H:%M'), cat))
+        UPDATE stock s SET checked_at=%s, version=s.version+1
+        FROM products p
+        WHERE s.product_id=p.id AND s.store=%s AND p.is_active=true AND p.category=%s
+    """, (now, store, cat))
     n = cur.rowcount
-    db.commit()
-    release_db(db)
-    return jsonify(ok=True, count=n, checked_at=jst_fmt(now))
+    cur.execute("""
+        SELECT COUNT(*) AS c FROM products p
+        WHERE p.is_active=true AND p.category=%s
+          AND NOT EXISTS (SELECT 1 FROM stock s WHERE s.product_id=p.id AND s.store=%s)
+    """, (cat, store))
+    skipped = cur.fetchone()['c']
+    return jsonify(ok=True, count=n, skipped=skipped, checked_at=jst_fmt(now))
 
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
@@ -344,14 +393,23 @@ def order_form():
     store    = request.args.get('store', 'イノ')
     supplier = request.args.get('supplier', 'ワールド美容')
 
-    rows = products_with_stock(store, supplier=supplier)
+    now = now_jst()
     grouped = OrderedDict()
-    for r in rows:
+    counts = {'unchecked': 0, 'stale': 0}
+    for r in products_with_stock(store, supplier=supplier):
+        r = dict(r)
+        r['unchecked'] = r['checked_at'] is None
+        r['days'] = None if r['unchecked'] else (now - r['checked_at']).days
+        r['stale'] = not r['unchecked'] and r['days'] >= STALE_DAYS
+        # 数えた記録がない商品は在庫数が分からないので、不足数は出さない（在庫0扱いで発注しないため）
+        r['shortage'] = 0 if r['unchecked'] else max(float(r['base_qty'] or 0) - float(r['current_qty'] or 0), 0)
+        counts['unchecked'] += r['unchecked']
+        counts['stale'] += r['stale']
         grouped.setdefault(r['category'], []).append(r)
 
     return render_template('order.html', store=store, grouped=grouped,
                            cats=list(grouped.keys()), supplier=supplier,
-                           sup_info=supplier_info(supplier))
+                           sup_info=supplier_info(supplier), counts=counts, stale_days=STALE_DAYS)
 
 
 @app.route('/order/save', methods=['POST'])
@@ -364,7 +422,12 @@ def order_save():
     day      = data.get('day')
 
     db = get_db()
-    cur = db.cursor()
+    with transaction(db) as cur:
+        order_id = _insert_order(cur, store, supplier, month, day, items)
+    return jsonify(ok=True, order_id=order_id)
+
+
+def _insert_order(cur, store, supplier, month, day, items):
     cur.execute("""
         INSERT INTO orders (store, supplier, order_month, order_day, status, created_at)
         VALUES (%s, %s, %s, %s, 'confirmed', %s)
@@ -381,9 +444,7 @@ def order_save():
             INSERT INTO order_items (order_id, product_id, base_qty, stock_qty, order_qty, custom_name)
             VALUES %s
         """, rows, page_size=1000)
-    db.commit()
-    release_db(db)
-    return jsonify(ok=True, order_id=order_id)
+    return order_id
 
 
 CUSTOM_CAT = 'リスト外の品（手入力）'
@@ -632,35 +693,31 @@ def product_move(pid):
     direction = (request.get_json() or {}).get('dir')
     if direction not in ('up', 'down'):
         return jsonify(ok=False), 400
-    db = get_db()
-    cur = db.cursor()
-    cur.execute("SELECT id, supplier, category, col_group, sort_order FROM products WHERE id=%s FOR UPDATE", (pid,))
-    me = cur.fetchone()
-    if not me:
-        release_db(db)
-        return jsonify(ok=False), 404
     cmp, order = ('<', 'DESC') if direction == 'up' else ('>', 'ASC')
-    cur.execute(f"""
-        SELECT id, col_group, sort_order FROM products
-        WHERE supplier=%s AND category=%s AND id<>%s
-          AND (col_group, sort_order, id) {cmp} (%s, %s, %s)
-        ORDER BY col_group {order}, sort_order {order}, id {order} LIMIT 1 FOR UPDATE
-    """, (me['supplier'], me['category'], pid, me['col_group'], me['sort_order'], pid))
-    other = cur.fetchone()
-    if not other:
-        release_db(db)
-        return jsonify(ok=True, moved=False)
-    if (other['col_group'], other['sort_order']) == (me['col_group'], me['sort_order']):
-        # 並び順が同じ値だと入れ替えても変わらないので、ずらしてから入れ替える
-        bump = -1 if direction == 'up' else 1
-        cur.execute("UPDATE products SET sort_order=sort_order+%s WHERE id=%s", (bump, other['id']))
-        other['sort_order'] += bump
-    cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
-                (other['col_group'], other['sort_order'], pid))
-    cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
-                (me['col_group'], me['sort_order'], other['id']))
-    db.commit()
-    release_db(db)
+    db = get_db()
+    with transaction(db) as cur:
+        cur.execute("SELECT id, supplier, category, col_group, sort_order FROM products WHERE id=%s FOR UPDATE", (pid,))
+        me = cur.fetchone()
+        if not me:
+            return jsonify(ok=False), 404
+        cur.execute(f"""
+            SELECT id, col_group, sort_order FROM products
+            WHERE supplier=%s AND category=%s AND id<>%s
+              AND (col_group, sort_order, id) {cmp} (%s, %s, %s)
+            ORDER BY col_group {order}, sort_order {order}, id {order} LIMIT 1 FOR UPDATE
+        """, (me['supplier'], me['category'], pid, me['col_group'], me['sort_order'], pid))
+        other = cur.fetchone()
+        if not other:
+            return jsonify(ok=True, moved=False)
+        if (other['col_group'], other['sort_order']) == (me['col_group'], me['sort_order']):
+            # 並び順が同じ値だと入れ替えても変わらないので、ずらしてから入れ替える
+            bump = -1 if direction == 'up' else 1
+            cur.execute("UPDATE products SET sort_order=sort_order+%s WHERE id=%s", (bump, other['id']))
+            other['sort_order'] += bump
+        cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
+                    (other['col_group'], other['sort_order'], pid))
+        cur.execute("UPDATE products SET col_group=%s, sort_order=%s WHERE id=%s",
+                    (me['col_group'], me['sort_order'], other['id']))
     return jsonify(ok=True, moved=True, other_id=other['id'])
 
 
