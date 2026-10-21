@@ -28,6 +28,7 @@
 .tag-unchecked { background: #fde8e8; color: #b42318; }
 .tag-stale { background: #fff1d6; color: #8a5300; }
 .tag-ok { background: #e3f5ea; color: #1d6b3f; }
+.ordered { color: #1d4f80; font-weight: 600; }
 .zero-confirmed { color: var(--danger); font-weight: 700; }
 
 .stepper { display: flex; align-items: center; flex-shrink: 0; }
@@ -116,6 +117,7 @@
           {% else %}<span class="tag tag-ok">確認 {{ p.checked_at|jst }}</span>{% endif %}
         </span>
         <span class="changed-cell">{% if p.changed_at %}最終更新 {{ p.changed_at|jst }}{% endif %}</span>
+        {% if p.ordered_qty %}<span class="ordered">{{ p.ordered_at|md }}発注分 {{ p.ordered_qty|n }} を含む</span>{% endif %}
       </div>
     </div>
     <div class="stepper">

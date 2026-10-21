@@ -201,6 +201,7 @@
           在庫 <span class="chk chk-none">未確認</span>
         {% else %}
           在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty|n }}</span>
+          {% if p.ordered_qty %}<span class="use">（{{ p.ordered_at|md }}発注分 {{ p.ordered_qty|n }} 含む）</span>{% endif %}
           {% if shortage > 0 %} ／ 不足 {{ shortage|n }}{% endif %}
           <span class="chk {% if p.stale %}chk-old{% endif %}">{% if p.days == 0 %}今日確認{% else %}{{ p.days }}日前に確認{% endif %}</span>
         {% endif %}

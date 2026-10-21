@@ -61,6 +61,11 @@ def num_fmt(v):
     return str(int(f)) if f == int(f) else f'{f:g}'
 
 
+@app.template_filter('md')
+def md_fmt(v):
+    return v.astimezone(JST).strftime('%-m/%-d') if v else ''
+
+
 @app.template_filter('jst')
 def jst_fmt(v):
     if not v:
@@ -215,6 +220,8 @@ def migrate():
     # request_key: 同じ確定操作の二重送信で発注が2件できないようにする
     cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_key TEXT")
     # 作ったPDFを保存しておき、2回目からはすぐ返す（発注確定後に内容は変わらないため）
+    cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ")
+    cur.execute("CREATE INDEX IF NOT EXISTS order_items_product ON order_items (product_id)")
     cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf BYTEA")
     cur.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pdf_ver TEXT")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS orders_request_key ON orders (request_key) WHERE request_key IS NOT NULL")
@@ -230,16 +237,24 @@ PRODUCT_STOCK_SQL = """
     SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
            COALESCE(s.current_qty, 0) AS current_qty, (s.product_id IS NOT NULL) AS has_stock,
            s.changed_at, s.checked_at,
-           COALESCE(s.version, 0) AS version
+           COALESCE(s.version, 0) AS version,
+           ord.qty AS ordered_qty, ord.last AS ordered_at
     FROM products p
     LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
+    -- 最後に数えた後に発注した数（在庫に足してあるが、まだ届いていないかもしれない分）
+    LEFT JOIN LATERAL (
+        SELECT SUM(oi.order_qty) AS qty, MAX(o.confirmed_at) AS last
+        FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE oi.product_id = p.id AND o.store = %s
+          AND o.confirmed_at > COALESCE(s.checked_at, '-infinity'::timestamptz)
+    ) ord ON true
     WHERE p.is_active=true {where}
     ORDER BY p.col_group, p.sort_order
 """
 
 
 def products_with_stock(store='イノ', cat=None, supplier=None):
-    where, params = '', [store]
+    where, params = '', [store, store]
     if cat:
         where += " AND p.category=%s"
         params.append(cat)
@@ -383,6 +398,22 @@ def api_check_category():
     return jsonify(ok=True, count=n, skipped=skipped, checked_at=jst_fmt(now))
 
 
+def add_to_stock(cur, store, amounts):
+    """在庫数に加減する（発注確定で＋、使用入力で－）。確認日時は変えない。
+    amounts: {product_id: 加える数}"""
+    rows = [(pid, store, q) for pid, q in amounts.items() if q]
+    if not rows:
+        return
+    now = now_jst()
+    psycopg2.extras.execute_values(cur, """
+        INSERT INTO stock (product_id, store, current_qty, version, changed_at, updated_at)
+        VALUES %s
+        ON CONFLICT (product_id, store) DO UPDATE
+        SET current_qty = stock.current_qty + EXCLUDED.current_qty,
+            version = stock.version + 1, changed_at = EXCLUDED.changed_at, updated_at = EXCLUDED.updated_at
+    """, rows, template=f"(%s, %s, %s, 1, '{now.isoformat()}'::timestamptz, '{now.strftime('%Y-%m-%d %H:%M')}')")
+
+
 # ── 使用入力（ラベル） ────────────────────────────────────────────────────────
 
 PENDING_USAGE_SQL = """
@@ -461,6 +492,7 @@ def api_usage():
             return jsonify(ok=False, error='0より少なくはできません', **cur_u), 400
         cur.execute("INSERT INTO usage_log (store, product_id, qty) VALUES (%s,%s,%s)",
                     (store, product_id, delta))
+        add_to_stock(cur, store, {product_id: -delta})
         cur_u = pending_usage(cur, store, product_id=product_id).get(product_id, {'pending': 0, 'today': 0})
     return jsonify(ok=True, **cur_u)
 
@@ -569,8 +601,9 @@ def order_save():
 
 def _insert_order(cur, store, supplier, month, day, items, request_key=None, usage_upto=None):
     cur.execute("""
-        INSERT INTO orders (store, supplier, order_month, order_day, status, created_at, request_key, usage_upto)
-        VALUES (%s, %s, %s, %s, 'confirmed', %s, %s, %s)
+        INSERT INTO orders (store, supplier, order_month, order_day, status, created_at, request_key, usage_upto,
+                            confirmed_at)
+        VALUES (%s, %s, %s, %s, 'confirmed', %s, %s, %s, now())
         RETURNING id
     """, (store, supplier, month, day, now_jst().strftime('%Y-%m-%d %H:%M'), request_key,
           int(usage_upto) if usage_upto is not None else None))
@@ -585,6 +618,12 @@ def _insert_order(cur, store, supplier, month, day, items, request_key=None, usa
             INSERT INTO order_items (order_id, product_id, base_qty, stock_qty, order_qty, custom_name)
             VALUES %s
         """, rows, page_size=1000)
+    # 入荷処理はしない運用なので、発注した時点で在庫に足す（届く予定の分も在庫として扱う）
+    amounts = {}
+    for r in rows:
+        if r[1]:
+            amounts[r[1]] = amounts.get(r[1], 0) + r[4]
+    add_to_stock(cur, store, amounts)
     return order_id
 
 
