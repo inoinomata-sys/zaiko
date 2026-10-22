@@ -174,6 +174,16 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   cursor: pointer; white-space: nowrap; touch-action: manipulation;
 }
 .cat-scroll button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+#to-top {
+  position: fixed; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--acc); color: #fff; font-size: 22px; font-weight: 700; line-height: 1;
+  box-shadow: 0 3px 12px rgba(0,0,0,.28); z-index: 900; opacity: 0; pointer-events: none;
+  transition: opacity .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+/* 操作ボタン（＋／－や▲▼）がある側と重ならないよう、商品マスターは左、そのほかは右に置く */
+#to-top[data-side="left"] { right: auto; left: 14px; }
+#to-top.show { opacity: .92; pointer-events: auto; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 {% block head %}{% endblock %}
@@ -198,8 +208,26 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
 <main>
 {% block content %}{% endblock %}
 </main>
+<button id="to-top" type="button" aria-label="一番上に戻る" data-side="{{ 'right' if request.path.startswith('/products') else 'left' }}">↑</button>
 <div id="toast"></div>
 <script>
+(function () {
+  const btn = document.getElementById('to-top');
+  function place() {
+    // 画面の下に固定された発注フッターがある時は、その上に出す
+    const f = document.querySelector('.order-footer');
+    btn.style.bottom = f ? `calc(${f.offsetHeight + 14}px + env(safe-area-inset-bottom, 0px))` : '';
+  }
+  function update() { btn.classList.toggle('show', window.scrollY > 500); }
+  window.addEventListener('scroll', update, {passive: true});
+  window.addEventListener('resize', place);
+  btn.addEventListener('click', () => window.scrollTo({top: 0, behavior: 'smooth'}));
+  place(); update();
+  // スクロールの合図が遅れる環境（慣性スクロール中など）でも、ボタンの出し入れが遅れないよう見張る
+  setInterval(update, 300);
+  window.addEventListener('load', place);
+})();
+
 function toast(msg, dur=2200) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');

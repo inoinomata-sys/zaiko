@@ -10,6 +10,17 @@
 }
 .sup-tab:hover { text-decoration: none; border-color: var(--acc); color: var(--acc); }
 .sup-tab.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.master-table { min-width: 680px; }
+.st-label { display: none; font-size: 10px; color: var(--fg2); text-align: center; }
+.master-table td.name { white-space: nowrap; }
+@media (max-width: 560px) {
+  /* スマホでは、基準の入力欄が最初から見えるように、カテゴリ列を隠して商品名を折り返す */
+  .master-table { min-width: 0; }
+  .master-table .col-cat { display: none; }
+  .st-label { display: block; }
+  .master-table td.name { white-space: normal; min-width: 96px; max-width: 150px; overflow-wrap: anywhere; font-size: 14px; }
+  .mv { width: 32px; height: 32px; }
+}
 .mv {
   width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface); color: var(--acc); font-size: 14px; cursor: pointer;
@@ -51,8 +62,12 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
         <input type="text" name="name" required placeholder="例: 7NB" style="width:160px">
       </div>
       <div class="form-group">
-        <label>基準数</label>
-        <input type="number" name="base_qty" value="1" min="0" step="any" inputmode="decimal" style="width:80px">
+        <label>基準数 イノ</label>
+        <input type="number" name="base_qty_ino" value="1" min="0" step="any" inputmode="decimal" style="width:80px">
+      </div>
+      <div class="form-group">
+        <label>基準数 リッチ</label>
+        <input type="number" name="base_qty_rich" value="1" min="0" step="any" inputmode="decimal" style="width:80px">
       </div>
       <div class="form-group">
         <label>仕入先</label>
@@ -73,13 +88,14 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
 
 <div class="card">
   <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-  <table style="min-width:600px">
+  <table class="master-table">
     <thead>
       <tr>
         <th style="width:84px">並び順</th>
-        <th>カテゴリ</th>
+        <th class="col-cat">カテゴリ</th>
         <th>商品名</th>
-        <th class="r">基準</th>
+        <th class="r">基準 イノ</th>
+        <th class="r">基準 リッチ</th>
         <th>仕入先</th>
         <th>備考</th>
         <th>状態</th>
@@ -88,7 +104,7 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
     </thead>
     <tbody>
     {% if not rows %}
-    <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
+    <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
     {% endif %}
     {% for p in rows %}
     <tr id="p{{ p.id }}" data-id="{{ p.id }}" data-key="{{ p.supplier }}|{{ p.category }}" {% if not p.is_active %}style="opacity:.45"{% endif %}>
@@ -96,12 +112,16 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
         <button type="button" class="mv" onclick="move(this,'up')" aria-label="上へ">▲</button>
         <button type="button" class="mv" onclick="move(this,'down')" aria-label="下へ">▼</button>
       </td>
-      <td style="font-size:12px;color:var(--fg2);white-space:nowrap">{{ p.category }}</td>
-      <td class="name" style="white-space:nowrap;{% if not p.is_active %}text-decoration:line-through{% endif %}">{{ p.name }}</td>
+      <td class="col-cat" style="font-size:12px;color:var(--fg2);white-space:nowrap">{{ p.category }}</td>
+      <td class="name" {% if not p.is_active %}style="text-decoration:line-through"{% endif %}>{{ p.name }}</td>
+      {% for st in stores %}
       <td class="r">
-        <input type="number" value="{{ p.base_qty|n }}" min="0" step="any" inputmode="decimal" style="width:60px;text-align:right"
-               data-saved="{{ p.base_qty|n }}" onchange="updateBase({{ p.id }}, this.value, this)">
+        <div class="st-label">{{ st }}</div>
+        <input type="number" value="{{ p.base_by_store[st]|n }}" min="0" step="any" inputmode="decimal" style="width:60px;text-align:right"
+               aria-label="基準 {{ st }}" data-saved="{{ p.base_by_store[st]|n }}"
+               onchange="updateBase({{ p.id }}, this.value, this, {{ st|tojson|forceescape }})">
       </td>
+      {% endfor %}
       <td>
         <select style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px"
                 onchange="updateSupplier({{ p.id }}, this.value)">
@@ -188,7 +208,7 @@ async function move(btn, dir) {
     row.querySelectorAll('.mv').forEach(b => b.disabled = false);
   }
 }
-async function updateBase(id, val, input) {
+async function updateBase(id, val, input, store) {
   if (val === '' || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
     toast('0以上の数を入力してください');
     if (input) input.value = input.dataset.saved;
@@ -196,9 +216,10 @@ async function updateBase(id, val, input) {
   }
   const fd = new FormData();
   fd.append('base_qty', val);
+  fd.append('store', store);
   let ok = false;
   try { ok = (await fetch(`/products/${id}/base`, {method:'POST', body:fd})).ok; } catch (e) {}
-  if (ok) { if (input) input.dataset.saved = val; toast('基準数を更新しました'); }
+  if (ok) { if (input) input.dataset.saved = val; toast(`基準数（${store}）を更新しました`); }
   else { toast('基準数の保存に失敗しました。もう一度お試しください'); if (input) input.value = input.dataset.saved; }
 }
 async function updateSupplier(id, val) {

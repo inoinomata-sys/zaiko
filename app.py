@@ -2,6 +2,7 @@ from werkzeug.exceptions import HTTPException
 from flask import Flask, g, has_request_context, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
 import sys
+import math
 import traceback
 import time
 import threading
@@ -232,7 +233,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -258,6 +259,14 @@ SCHEMA_SQL = [
     # 商品追加の自動やり直しで、同じ商品が2件できないようにする
     "ALTER TABLE products ADD COLUMN IF NOT EXISTS request_key TEXT",
     "CREATE UNIQUE INDEX IF NOT EXISTS products_request_key ON products (request_key) WHERE request_key IS NOT NULL",
+    # 店舗ごとの基準在庫。行がない店舗は products.base_qty を使う（これまでの値がそのまま初期値）
+    """CREATE TABLE IF NOT EXISTS product_base (
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        store TEXT NOT NULL, base_qty DOUBLE PRECISION NOT NULL, PRIMARY KEY (product_id, store))""",
+    # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
+    """CREATE TABLE IF NOT EXISTS order_drafts (
+        store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
+        saved_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (store, supplier))""",
 ]
 
 
@@ -323,13 +332,15 @@ def _log_slow(resp):
 
 
 PRODUCT_STOCK_SQL = """
-    SELECT p.id, p.col_group, p.category, p.name, p.base_qty, p.note, p.sort_order, p.supplier,
+    SELECT p.id, p.col_group, p.category, p.name, COALESCE(pb.base_qty, p.base_qty) AS base_qty,
+           p.note, p.sort_order, p.supplier,
            COALESCE(s.current_qty, 0) AS current_qty, (s.product_id IS NOT NULL) AS has_stock,
            s.changed_at, s.checked_at,
            COALESCE(s.version, 0) AS version,
            ord.qty AS ordered_qty, ord.last AS ordered_at
     FROM products p
     LEFT JOIN stock s ON p.id = s.product_id AND s.store = %s
+    LEFT JOIN product_base pb ON pb.product_id = p.id AND pb.store = %s
     -- 最後に数えた後に発注した数（在庫に足してあるが、まだ届いていないかもしれない分）
     LEFT JOIN LATERAL (
         SELECT SUM(oi.order_qty) AS qty, MAX(o.confirmed_at) AS last
@@ -343,7 +354,7 @@ PRODUCT_STOCK_SQL = """
 
 
 def products_with_stock(store='イノ', cat=None, supplier=None):
-    where, params = '', [store, store]
+    where, params = '', [store, store, store]
     if cat:
         where += " AND p.category=%s"
         params.append(cat)
@@ -638,12 +649,21 @@ def order_form():
     cur.execute("""SELECT COUNT(*) AS c FROM orders WHERE store=%s AND supplier=%s
                    AND order_month=%s AND order_day=%s""", (store, supplier, now.month, now.day))
     ordered_today = 0 if supplier in NO_HISTORY_SUPPLIERS else cur.fetchone()['c']
+    cur.execute("SELECT data, saved_at FROM order_drafts WHERE store=%s AND supplier=%s", (store, supplier))
+    draft_row = cur.fetchone()
+    draft = (draft_row['data'] if draft_row else None) or {}
+    draft_items = draft.get('items', {})
     grouped = OrderedDict()
     counts = {'unchecked': 0, 'stale': 0, 'usage': 0}
     for r in products_with_stock(store, supplier=supplier):
         r = dict(r)
         r['usage'] = usage_map.get(r['id'], {}).get('pending', 0)
         counts['usage'] += r['usage'] > 0
+        # 保存した下書きがあればその数。下書きの後に増えた使用数は上乗せする
+        default = math.ceil(r['usage'])
+        saved = draft_items.get(str(r['id']))
+        r['qty0'] = default if not saved else max(
+            0, int(saved[0]) + math.ceil(max(0.0, r['usage'] - float(saved[1]))))
         r['unchecked'] = r['checked_at'] is None
         r['days'] = None if r['unchecked'] else (now - r['checked_at']).days
         r['stale'] = not r['unchecked'] and r['days'] >= STALE_DAYS
@@ -657,7 +677,48 @@ def order_form():
                            cats=list(grouped.keys()), supplier=supplier,
                            sup_info=supplier_info(supplier), counts=counts, stale_days=STALE_DAYS,
                            usage_upto=usage_upto, ordered_today=ordered_today,
-                           request_key=uuid.uuid4().hex)
+                           request_key=uuid.uuid4().hex,
+                           draft_custom=draft.get('custom', []),
+                           draft_saved=jst_fmt(draft_row['saved_at']) if draft_row else '')
+
+
+@app.route('/api/order_draft', methods=['POST'])
+def api_order_draft():
+    """発注画面の入力途中の数を保存する（自動保存・保存ボタン共通）"""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    store, supplier = data.get('store'), data.get('supplier')
+    if store not in STORES or supplier not in SUPPLIER_NAMES:
+        return jsonify(ok=False, error='入力が不正です'), 400
+    try:
+        items = {str(int(k)): [int(v[0]), float(v[1])] for k, v in (data.get('items') or {}).items()}
+        custom = [{'name': str(c.get('name', ''))[:200], 'spec': str(c.get('spec', ''))[:100],
+                   'qty': max(0, int(c.get('qty') or 0))} for c in (data.get('custom') or [])][:100]
+    except (ValueError, TypeError, AttributeError, IndexError):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    db = get_db()
+    cur = db.cursor()
+    key = data.get('request_key')
+    if key:
+        # この画面ですでに発注を確定していたら、下書きは作り直さない
+        cur.execute("SELECT 1 FROM orders WHERE request_key=%s", (key,))
+        if cur.fetchone():
+            return jsonify(ok=True, skipped=True)
+    cur.execute("""
+        INSERT INTO order_drafts (store, supplier, data, saved_at) VALUES (%s, %s, %s, now())
+        ON CONFLICT (store, supplier) DO UPDATE SET data = EXCLUDED.data, saved_at = now()
+        RETURNING saved_at""", (store, supplier, psycopg2.extras.Json({'items': items, 'custom': custom})))
+    return jsonify(ok=True, saved_at=jst_fmt(cur.fetchone()['saved_at']))
+
+
+@app.route('/api/order_draft/clear', methods=['POST'])
+def api_order_draft_clear():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    db.cursor().execute("DELETE FROM order_drafts WHERE store=%s AND supplier=%s",
+                        (data.get('store'), data.get('supplier')))
+    return jsonify(ok=True)
 
 
 @app.route('/order/save', methods=['POST'])
@@ -711,6 +772,7 @@ def order_save():
                 return jsonify(ok=False, duplicate=True,
                                error=f'{month}月{day}日の {store}・{supplier} の発注はすでに確定済みです。'), 409
         order_id = _insert_order(cur, store, supplier, month, day, items, request_key, usage_upto)
+        cur.execute("DELETE FROM order_drafts WHERE store=%s AND supplier=%s", (store, supplier))
     threading.Thread(target=warm_pdf, args=(order_id,), daemon=True).start()
     return jsonify(ok=True, order_id=order_id)
 
@@ -989,8 +1051,14 @@ def products():
     db = get_db()
     cur = db.cursor()
     cur.execute("SELECT * FROM products ORDER BY col_group, sort_order, id")
-    all_rows = cur.fetchall()
-    release_db(db)
+    all_rows = [dict(r) for r in cur.fetchall()]
+    cur.execute("SELECT product_id, store, base_qty FROM product_base")
+    per_store = {}
+    for b in cur.fetchall():
+        per_store.setdefault(b['product_id'], {})[b['store']] = b['base_qty']
+    for r in all_rows:
+        # 店舗ごとの基準在庫（未入力の店舗は、これまでの共通の基準数）
+        r['base_by_store'] = {st: per_store.get(r['id'], {}).get(st, r['base_qty']) for st in STORES}
     counts = {}
     for r in all_rows:
         counts[r['supplier']] = counts.get(r['supplier'], 0) + 1
@@ -1009,10 +1077,14 @@ def product_add():
     note = nfkc(d.get('note')) or None
     supplier = d.get('supplier') or SUPPLIER_NAMES[0]
     request_key = d.get('request_key') or None
-    try:
-        base_qty = max(float(d.get('base_qty') or 0), 0)
-    except ValueError:
-        base_qty = 0
+    def num(key, default):
+        try:
+            return max(float(d.get(key) or default), 0)
+        except ValueError:
+            return default
+    # 店舗ごとの基準数（どちらか片方だけ入力された時は、もう片方も同じ数にする）
+    base_ino, base_rich = num('base_qty_ino', num('base_qty', 1)), num('base_qty_rich', num('base_qty', 1))
+    base_qty = base_ino
 
     def fail(msg):
         return (jsonify(ok=False, error=msg), 400) if wants_json else redirect(url_for('products', supplier=supplier))
@@ -1050,6 +1122,8 @@ def product_add():
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
         """, (col_group, category, name, base_qty, note, supplier, pos, request_key))
         new_id = cur.fetchone()['id']
+        cur.execute("INSERT INTO product_base (product_id, store, base_qty) VALUES (%s,'イノ',%s),(%s,'リッチ',%s)",
+                    (new_id, base_ino, new_id, base_rich))
     url = url_for('products', supplier=supplier, added=name) + f'#p{new_id}'
     return jsonify(ok=True, url=url) if wants_json else redirect(url)
 
@@ -1100,6 +1174,9 @@ def product_toggle(pid):
 
 @app.route('/products/<int:pid>/base', methods=['POST'])
 def product_base(pid):
+    store = request.form.get('store', '')
+    if store not in STORES:
+        return jsonify(ok=False, error='店舗が不正です'), 400
     try:
         qty = float(request.form.get('base_qty', ''))
     except ValueError:
@@ -1108,8 +1185,12 @@ def product_base(pid):
         return jsonify(ok=False, error='0以上の数を入力してください'), 400
     db = get_db()
     cur = db.cursor()
-    cur.execute("UPDATE products SET base_qty=%s WHERE id=%s", (qty, pid))
-    return jsonify(ok=True) if cur.rowcount else (jsonify(ok=False, error='商品が見つかりません'), 404)
+    cur.execute("SELECT 1 FROM products WHERE id=%s", (pid,))
+    if not cur.fetchone():
+        return jsonify(ok=False, error='商品が見つかりません'), 404
+    cur.execute("""INSERT INTO product_base (product_id, store, base_qty) VALUES (%s,%s,%s)
+                   ON CONFLICT (product_id, store) DO UPDATE SET base_qty = EXCLUDED.base_qty""", (pid, store, qty))
+    return jsonify(ok=True)
 
 
 @app.route('/products/<int:pid>/supplier', methods=['POST'])

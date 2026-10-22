@@ -27,10 +27,27 @@
 
 .row-info { flex: 1; min-width: 0; }
 .row-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; line-height: 1.4; }
-.row-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
-.row-meta .low  { color: var(--warn); font-weight: 600; }
-.row-meta .out  { color: var(--danger); font-weight: 700; }
-.row-meta .use  { color: #1d4f80; font-weight: 700; }
+/* 在庫・基準・不足・使用を、ラベル付きの大きな数字で並べる */
+.stats { display: flex; align-items: stretch; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 54px; padding: 3px 8px; border-radius: 8px; background: #f3f5f8; line-height: 1.15;
+}
+.stat .lbl { font-size: 11px; color: var(--fg2); font-weight: 600; }
+.stat .num { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--fg); }
+.stat .num.ok { color: #1d7a4a; }
+.stat .num.low { color: #c46a00; }
+.stat .num.out { color: var(--danger); }
+.stat .num.none { font-size: 14px; color: #b42318; padding: 3px 0; }
+.stat .num.base, .stat .num.muted { color: #6b7684; font-weight: 700; }
+.stat-stock { background: #eef7f1; }
+.stat-short.on { background: #fff0d6; box-shadow: inset 0 0 0 2px #f0a63a; }
+.stat .num.short { color: #c46a00; font-size: 22px; }
+.stat-use { background: #e8f1fb; }
+.stat .num.use { color: #1d4f80; }
+.row-sub { margin-top: 5px; display: flex; gap: 6px; flex-wrap: wrap; }
+.row-sub .chk { margin-left: 0; }
+.chk-ord { background: #e8f1fb; color: #1d4f80; }
 
 /* ±ステッパー */
 .stepper { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
@@ -84,6 +101,8 @@
 .footer-info { font-size: 14px; }
 .footer-info strong { font-size: 18px; }
 .footer-btns { display: flex; gap: 8px; }
+.draft-status { font-size: 11px; color: var(--fg2); min-height: 14px; }
+.draft-status.err { color: var(--danger); font-weight: 700; }
 
 @media (max-width: 560px) {
   .order-row { flex-wrap: wrap; }
@@ -135,6 +154,13 @@
     </div>
   </div>
 </div>
+
+{% if draft_saved %}
+<div class="check-warn" style="background:#f3f0ff;border-color:#cfc6f5;color:#44307a" id="draft-banner">
+  保存した発注数（{{ draft_saved }}）を表示しています。
+  <a href="#" onclick="discardDraft(); return false;">最初の状態に戻す</a>
+</div>
+{% endif %}
 
 {% if ordered_today %}
 <div class="check-warn" style="background:#fde8e8;border-color:#f3b4b4;color:#8a1c1c">
@@ -199,23 +225,40 @@
         {{ p.name }}
         {% if p.note %}<span class="badge badge-muted" style="font-size:11px; margin-left:4px">{{ p.note }}</span>{% endif %}
       </div>
-      <div class="row-meta">
-        {% if p.usage > 0 %}<span class="use">使用 {{ p.usage|n }}</span> ／ {% endif %}
-        基準 {{ p.base_qty|n }} ／
-        {% if p.unchecked %}
-          在庫 <span class="chk chk-none">未確認</span>
-        {% else %}
-          在庫 <span class="{% if p.current_qty == 0 %}out{% elif p.current_qty < p.base_qty %}low{% endif %}">{{ p.current_qty|n }}</span>
-          {% if p.ordered_qty %}<span class="use">（{{ p.ordered_at|md }}発注分 {{ p.ordered_qty|n }} 含む）</span>{% endif %}
-          {% if shortage > 0 %} ／ 不足 {{ shortage|n }}{% endif %}
-          <span class="chk {% if p.stale %}chk-old{% endif %}">{% if p.days == 0 %}今日確認{% else %}{{ p.days }}日前に確認{% endif %}</span>
+      <div class="stats">
+        <div class="stat stat-stock">
+          <span class="lbl">在庫</span>
+          {% if p.unchecked %}
+            <span class="num none">未確認</span>
+          {% else %}
+            <span class="num {% if p.current_qty <= 0 %}out{% elif p.current_qty < p.base_qty %}low{% else %}ok{% endif %}">{{ p.current_qty|n }}</span>
+          {% endif %}
+        </div>
+        <div class="stat">
+          <span class="lbl">基準</span>
+          <span class="num base">{{ p.base_qty|n }}</span>
+        </div>
+        <div class="stat stat-short {% if shortage > 0 %}on{% endif %}">
+          <span class="lbl">不足</span>
+          <span class="num {% if shortage > 0 %}short{% else %}muted{% endif %}">{% if p.unchecked %}？{% elif shortage > 0 %}{{ shortage|n }}{% else %}0{% endif %}</span>
+        </div>
+        {% if p.usage > 0 %}
+        <div class="stat stat-use">
+          <span class="lbl">使用</span>
+          <span class="num use">{{ p.usage|n }}</span>
+        </div>
         {% endif %}
+      </div>
+      <div class="row-sub">
+        {% if p.unchecked %}<span class="chk chk-none">まだ数えていません</span>
+        {% else %}<span class="chk {% if p.stale %}chk-old{% endif %}">{% if p.days == 0 %}今日確認{% else %}{{ p.days }}日前に確認{% endif %}</span>{% endif %}
+        {% if p.ordered_qty %}<span class="chk chk-ord">{{ p.ordered_at|md }}発注分 {{ p.ordered_qty|n }} 含む</span>{% endif %}
       </div>
     </div>
     <div class="stepper">
       <button class="stepper-btn" onclick="step(this,-1)" type="button">－</button>
-      <input class="order-qty" type="number" min="0" step="1" value="{{ (p.usage|round(0, 'ceil'))|int }}"
-             data-id="{{ p.id }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
+      <input class="order-qty" type="number" min="0" step="1" value="{{ p.qty0 }}"
+             data-id="{{ p.id }}" data-usage="{{ p.usage }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
       <button class="stepper-btn" onclick="step(this,1)" type="button">＋</button>
     </div>
   </div>
@@ -246,8 +289,10 @@
   <div class="footer-info">
     発注 <strong id="order-count">0</strong> 品 &nbsp;
     計 <strong id="order-total">0</strong> 点
+    <div class="draft-status" id="draft-status">{% if draft_saved %}{{ draft_saved }} 保存済み{% endif %}</div>
   </div>
   <div class="footer-btns">
+    <button class="btn btn-ghost" onclick="saveDraft(true)" id="draft-btn" type="button">💾 保存</button>
     <button class="btn btn-primary" onclick="saveOrder()" id="save-btn">発注書を確定して印刷</button>
   </div>
 </div>
@@ -283,7 +328,77 @@ function onQtyInput(inp) {
   }
 }
 
+// ── 下書きの保存（自動保存＋保存ボタン） ──
+let draftLoading = true, draftDirty = false, draftTimer = null, draftLocked = false;
+const DRAFT_CUSTOM = {{ draft_custom|tojson }};
+
+function collectDraft() {
+  const items = {};
+  document.querySelectorAll('.order-row .order-qty').forEach(inp => {
+    const usage = parseFloat(inp.dataset.usage) || 0;
+    const qty = parseInt(inp.value) || 0;
+    if (qty !== Math.ceil(usage)) items[inp.dataset.id] = [qty, usage];
+  });
+  const custom = [...document.querySelectorAll('#custom-rows .custom-row')].map(r => ({
+    name: r.querySelector('.custom-name').value.trim(), spec: r.querySelector('.custom-spec').value.trim(),
+    qty: parseInt(r.querySelector('.custom-qty').value) || 0})).filter(c => c.name || c.spec);
+  return {store: STORE, supplier: SUPPLIER, request_key: REQUEST_KEY, items, custom};
+}
+
+function setDraftStatus(text, err) {
+  const el = document.getElementById('draft-status');
+  el.textContent = text; el.classList.toggle('err', !!err);
+}
+
+async function saveDraft(manual) {
+  if (draftLocked) return;
+  clearTimeout(draftTimer);
+  setDraftStatus('保存中…');
+  try {
+    const res = await fetch('/api/order_draft', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                  body: JSON.stringify(collectDraft())});
+    const d = await res.json();
+    if (!d.ok) throw 0;
+    draftDirty = false;
+    setDraftStatus((d.saved_at || '') + ' 保存済み');
+    if (manual) toast('発注数を保存しました。ほかのページに移動しても残ります');
+  } catch (e) {
+    setDraftStatus('保存できませんでした（もう一度「保存」を押してください）', true);
+    if (manual) toast('保存に失敗しました。もう一度お試しください');
+  }
+}
+
+async function discardDraft() {
+  if (!confirm('保存した発注数を消して、最初の状態（使用入力の数）に戻しますか？')) return;
+  draftLocked = true;
+  try {
+    await fetch('/api/order_draft/clear', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                           body: JSON.stringify({store: STORE, supplier: SUPPLIER})});
+  } catch (e) {}
+  location.reload();
+}
+
+function scheduleDraftSave() {
+  if (draftLoading || draftLocked) return;
+  draftDirty = true;
+  setDraftStatus('入力中…');
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => saveDraft(false), 1200);
+}
+
+// ページを離れる・アプリを閉じる時に、まだ保存していない分を送る
+function flushDraft() {
+  if (!draftDirty || draftLocked) return;
+  draftDirty = false;
+  try {
+    navigator.sendBeacon('/api/order_draft', new Blob([JSON.stringify(collectDraft())], {type: 'application/json'}));
+  } catch (e) {}
+}
+window.addEventListener('pagehide', flushDraft);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushDraft(); });
+
 function onOrderChange() {
+  scheduleDraftSave();
   let count = 0, total = 0;
   document.querySelectorAll('.order-row .order-qty').forEach(inp => {
     const v = parseInt(inp.value) || 0;
@@ -328,7 +443,7 @@ function clearAll() {
 }
 
 let customRowCount = 0;
-function addCustomRow() {
+function addCustomRow(focus = true) {
   document.getElementById('custom-empty').style.display = 'none';
   const div = document.createElement('div');
   div.className = 'custom-row';
@@ -344,7 +459,7 @@ function addCustomRow() {
             style="background:none;border:none;color:#c0392b;font-size:22px;cursor:pointer;padding:0 6px">✕</button>`;
   div.querySelector('.custom-name').addEventListener('input', onOrderChange);
   document.getElementById('custom-rows').appendChild(div);
-  div.querySelector('.custom-name').focus();
+  if (focus) div.querySelector('.custom-name').focus();
   onOrderChange();
 }
 function stepCustom(btn, d) {
@@ -424,6 +539,7 @@ async function saveOrder(allowDuplicate) {
   clearTimeout(slowTimer);
 
   if (res.ok) {
+    draftLocked = true; clearTimeout(draftTimer);
     const data = await res.json();
     window.location.href = `/order/${data.order_id}/print`;
   } else if (res.status === 409) {
@@ -457,6 +573,13 @@ function selectCat(btn, cat) {
 })();
 
 document.querySelectorAll('.order-row .order-qty').forEach(onQtyInput);
+DRAFT_CUSTOM.forEach(c => {
+  addCustomRow(false);
+  const row = document.querySelector('#custom-rows .custom-row:last-child');
+  row.querySelector('.custom-name').value = c.name; row.querySelector('.custom-spec').value = c.spec;
+  row.querySelector('.custom-qty').value = c.qty;
+});
 onOrderChange();
+draftLoading = false;
 </script>
 {% endblock %}
