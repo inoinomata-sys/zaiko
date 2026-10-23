@@ -1086,8 +1086,10 @@ def customer_order_pdf(oid):
         pdf.set_xy(pdf.l_margin + name_w, y)
         pdf.cell(qty_w, h, str(it['qty']), align='C')
         pdf.cell(amt_w - 1, h, yen_fmt(it['amount']), align='R')
+        # 区切り線だけ灰色にして、すぐ黒に戻す（文字の輪郭も同じ「線の色」を使うため、戻さないと文字が薄くなる）
         pdf.set_draw_color(190, 190, 190)
         pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
+        pdf.set_draw_color(0, 0, 0)
         pdf.set_xy(pdf.l_margin, y + h)
     pdf.ln(2)
     pdf.set_font(f, '', 12)
@@ -1180,8 +1182,9 @@ def prices_pdf():
             pdf.set_font(f, '', 14)
             pdf.set_xy(pdf.l_margin + name_w + spec_w, y)
             pdf.cell(price_w - 2, h, yen_fmt(it['price']), align='R')
-            pdf.set_draw_color(190, 190, 190)
+            pdf.set_draw_color(190, 190, 190)   # 区切り線だけ灰色。文字の輪郭に使う線の色は、すぐ黒に戻す
             pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
+            pdf.set_draw_color(0, 0, 0)
             pdf.set_xy(pdf.l_margin, y + h)
         pdf.ln(3)
 
