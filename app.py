@@ -2,6 +2,7 @@ from werkzeug.exceptions import HTTPException
 from flask import Flask, g, has_request_context, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
 import sys
+import hashlib
 import math
 import traceback
 import time
@@ -245,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -279,6 +280,9 @@ SCHEMA_SQL = [
     """CREATE TABLE IF NOT EXISTS price_items (
         id SERIAL PRIMARY KEY, category TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, spec TEXT,
         price INTEGER NOT NULL, note TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true)""",
+    # レジ（POS）の商品番号。同じ番号の商品は、再取り込みで更新される（tools/import_pos_goods.py）
+    "ALTER TABLE price_items ADD COLUMN IF NOT EXISTS pos_id INTEGER",
+    "CREATE UNIQUE INDEX IF NOT EXISTS price_items_pos_id ON price_items (pos_id) WHERE pos_id IS NOT NULL",
     # お客様ごとの注文（商品袋に貼る注文用紙）。商品名・規格・単価は、その時の内容を控えとして残す
     """CREATE TABLE IF NOT EXISTS customer_orders (
         id SERIAL PRIMARY KEY, customer TEXT NOT NULL, phone TEXT, memo TEXT, request_key TEXT UNIQUE,
@@ -1102,10 +1106,22 @@ def customer_order_pdf(oid):
     return response
 
 
+_price_pdf_cache = {}
+
+
 @app.route('/prices/pdf')
 def prices_pdf():
     groups = load_prices()
     now = now_jst()
+    # 値段・商品・日付が変わらない間は、作ったPDFを使い回す（433品で作成に約4秒かかるため）
+    sig = hashlib.md5(repr(([(c, [(i['id'], i['name'], i['spec'], i['price'], i['note']) for i in v]) for c, v in groups.items()],
+                            now.date().isoformat())).encode()).hexdigest()
+    fn = urllib.parse.quote(f"{PRICE_TITLE}_{now.month}月{now.day}日.pdf")
+    if _price_pdf_cache.get('sig') == sig:
+        resp = make_response(_price_pdf_cache['data'])
+        resp.headers['Content-Type'] = 'application/pdf'
+        resp.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{fn}"
+        return resp
     pdf = OrderPDF(orientation='P', unit='mm', format='A4')
     font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
     if os.path.exists(font_path):
@@ -1169,9 +1185,10 @@ def prices_pdf():
             pdf.set_xy(pdf.l_margin, y + h)
         pdf.ln(3)
 
-    response = make_response(bytes(pdf.output()))
+    data = bytes(pdf.output())
+    _price_pdf_cache.update(sig=sig, data=data)
+    response = make_response(data)
     response.headers['Content-Type'] = 'application/pdf'
-    fn = urllib.parse.quote(f"{PRICE_TITLE}_{now.month}月{now.day}日.pdf")
     response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{fn}"
     return response
 
