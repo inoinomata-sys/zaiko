@@ -162,6 +162,13 @@ function addCustom(name, price, qty) {
   return d;
 }
 document.querySelectorAll('#custom-rows .c-row[data-name]').forEach(el => { addCustom(el.dataset.name, el.dataset.price, el.dataset.qty); el.remove(); });
+// 手入力中は、画面下の合計バーを隠す（iPhoneのキーボードと重なって、入力欄が隠れて動かなくなるのを防ぐ）
+(function () {
+  const card = document.getElementById('custom-card'), bar = document.getElementById('cart-bar');
+  if (!card || !bar) return;
+  card.addEventListener('focusin', e => { if (e.target.matches('input')) bar.style.display = 'none'; });
+  card.addEventListener('focusout', () => setTimeout(() => { if (!card.contains(document.activeElement)) bar.style.display = ''; }, 150));
+})();
 document.getElementById('custom-add')?.addEventListener('click', () => { addCustom('', '', 1).querySelector('.c-n').focus(); recalc(); });
 const customVals = () => crows().map(r => ({name: r.querySelector('.c-n').value.trim(), price: parseInt(r.querySelector('.c-p').value) || 0,
   qty: Math.max(0, Math.min(9999, parseInt(r.querySelector('.qty').value) || 0))})).filter(c => c.qty > 0 && (c.name || c.price));
