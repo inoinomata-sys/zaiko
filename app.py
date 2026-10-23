@@ -960,14 +960,14 @@ def prices():
 DISCOUNT_ROUND = 10   # 割引後の支払額は、この円単位で繰り上げる（画面の計算 prices.html と同じにする）
 
 
-def calc_discount(subtotal, pct):
-    """(割引額, 支払額)。支払額 = 小計×(100-割引率)% を 10円単位に繰り上げ（小計は超えない）"""
+def calc_discount(amounts, pct):
+    """(割引額, 支払額)。レジ（POS）と同じく、商品の行ごとに「金額×(100-割引率)%」を10円単位に繰り上げて足す"""
+    subtotal = sum(amounts)
     p100 = int(round(float(pct or 0) * 100))
     if p100 <= 0:
         return 0, subtotal
-    num = subtotal * (10000 - p100)
     unit = 10000 * DISCOUNT_ROUND
-    payable = min(subtotal, (num + unit - 1) // unit * DISCOUNT_ROUND)
+    payable = sum(min(a, (a * (10000 - p100) + unit - 1) // unit * DISCOUNT_ROUND) for a in amounts)
     return subtotal - payable, payable
 
 
@@ -994,8 +994,12 @@ def customer_orders():
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
     orders = cur.fetchall()
+    lines = {}
+    cur.execute("SELECT order_id, unit_price * qty AS a FROM customer_order_items WHERE order_id = ANY(%s)", ([o['id'] for o in orders],))
+    for r in cur.fetchall():
+        lines.setdefault(r['order_id'], []).append(r['a'])
     for o in orders:
-        o['total'] = calc_discount(o['total'], o['discount_pct'])[1]
+        o['total'] = calc_discount(lines.get(o['id'], []), o['discount_pct'])[1]
     return render_template('customer_orders.html', orders=orders)
 
 
@@ -1067,7 +1071,7 @@ def customer_order_save():
 @app.route('/customer-orders/<int:oid>')
 def customer_order_view(oid):
     order, items, total = load_customer_order(get_db().cursor(), oid)
-    disc, payable = calc_discount(total, order['discount_pct'])
+    disc, payable = calc_discount([i['amount'] for i in items], order['discount_pct'])
     return render_template('customer_order.html', order=order, items=items, subtotal=total, disc=disc, total=payable,
                            pct=pct_fmt(order['discount_pct']), note=PRICE_NOTE)
 
@@ -1081,7 +1085,7 @@ def customer_order_delete(oid):
 @app.route('/customer-orders/<int:oid>/pdf')
 def customer_order_pdf(oid):
     order, items, subtotal = load_customer_order(get_db().cursor(), oid)
-    disc, total = calc_discount(subtotal, order['discount_pct'])
+    disc, total = calc_discount([i['amount'] for i in items], order['discount_pct'])
     pdf = OrderPDF(orientation='P', unit='mm', format='A5')
     font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
     if os.path.exists(font_path):

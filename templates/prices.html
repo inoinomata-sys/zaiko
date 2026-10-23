@@ -137,11 +137,12 @@ const _rows = [...document.querySelectorAll('.p-row')];   // 毎回探し直さ�
 const rows = () => _rows;
 const crows = () => [...document.querySelectorAll('#custom-rows .c-row')];
 const DISC_UNIT = 10;   // 割引後は10円単位に繰り上げ（サーバーの calc_discount と同じ）
-function calcDisc(sub, pct) {
+function calcDisc(amounts, pct) {   // レジ（POS）と同じ：行ごとに10円単位へ繰り上げて足す
+  const sub = amounts.reduce((x, y) => x + y, 0);
   const p100 = Math.round((parseFloat(pct) || 0) * 100);
   if (p100 <= 0 || p100 > 10000) return [0, sub];
   const unit = 10000 * DISC_UNIT;
-  const pay = Math.min(sub, Math.floor((sub * (10000 - p100) + unit - 1) / unit) * DISC_UNIT);
+  const pay = amounts.reduce((x, a) => x + Math.min(a, Math.floor((a * (10000 - p100) + unit - 1) / unit) * DISC_UNIT), 0);
   return [sub - pay, pay];
 }
 function addCustom(name, price, qty) {
@@ -205,15 +206,15 @@ const STORE_KEY = 'cart:new';
 function readQty(row) { return Math.max(0, Math.min(9999, parseInt(row.querySelector('.qty').value) || 0)); }
 let saveTimer = null;
 function recalc() {
-  let n = 0, total = 0;
+  let n = 0, total = 0; const amts = [];
   rows().forEach(row => {
     const q = readQty(row);
     row.classList.toggle('sel', q > 0);
     row.querySelector('.qty').classList.toggle('zero', q === 0);
-    if (q > 0) { n++; total += q * parseInt(row.dataset.price); }
+    if (q > 0) { n++; total += q * parseInt(row.dataset.price); amts.push(q * parseInt(row.dataset.price)); }
   });
-  customVals().forEach(c => { n++; total += c.qty * c.price; });
-  const [disc, pay] = calcDisc(total, document.getElementById('c-disc').value);
+  customVals().forEach(c => { n++; total += c.qty * c.price; amts.push(c.qty * c.price); });
+  const [disc, pay] = calcDisc(amts, document.getElementById('c-disc').value);
   document.getElementById('c-count').textContent = n;
   document.getElementById('c-subline').hidden = !disc;
   document.getElementById('c-sub').textContent = yen(total);
