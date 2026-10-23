@@ -26,6 +26,13 @@
 }
 .qty::-webkit-outer-spin-button, .qty::-webkit-inner-spin-button { -webkit-appearance: none; }
 .qty.zero { color: #bbb; }
+.c-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.c-row input[type=text], .c-row input[type=number] { font-size: 16px; padding: 10px 10px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; font-family: inherit; }
+.c-row .c-n { flex: 1 1 160px; }
+.c-row .c-p { width: 96px; }
+.c-del { border: none; background: none; color: var(--danger); font-size: 22px; cursor: pointer; padding: 4px 8px; }
+.cart-disc { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; margin-bottom: 8px; }
+.cart-disc input { width: 70px; font-size: 18px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; text-align: right; font-family: inherit; }
 .cart-bar {
   position: sticky; bottom: 0; background: var(--surface); border-top: 2px solid var(--border);
   padding: 10px 14px; z-index: 50; box-shadow: 0 -4px 16px rgba(0,0,0,.08); margin: 14px -16px 0;
@@ -57,6 +64,15 @@
 </p>
 
 {% if groups %}
+<div class="card" id="custom-card" style="margin-bottom:12px">
+  <div class="card-head"><span>その他（品名・値段を入れて追加）</span></div>
+  <div id="custom-rows">
+  {% for c in customs %}
+  <div class="c-row" data-name="{{ c.name }}" data-price="{{ c.unit_price }}" data-qty="{{ c.qty }}"></div>
+  {% endfor %}
+  </div>
+  <div style="padding:10px 14px"><button type="button" class="btn btn-ghost" id="custom-add">＋ 商品を追加</button></div>
+</div>
 <input type="search" id="q" placeholder="商品名で探す（注文を受ける時に）" autocomplete="off"
        style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:10px">
 <div class="cat-scroll" id="cat-tabs">
@@ -85,7 +101,9 @@
 {% endfor %}
 
 <div class="cart-bar" id="cart-bar">
-  <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　合計 <strong class="total" id="c-total">¥0</strong></div>
+  <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　<span id="c-subline" hidden>小計 <span id="c-sub"></span>　</span>合計 <strong class="total" id="c-total">¥0</strong></div>
+  <div class="cart-disc">割引 <input type="number" id="c-disc" min="0" max="100" step="any" inputmode="decimal" placeholder="0" value="{{ editing.discount_pct if editing and editing.discount_pct != '0' else '' }}"> %
+    <span id="c-discamt" style="color:var(--danger); font-weight:700"></span></div>
   <div class="cart-fields">
     <input type="text" id="c-name" class="cname" placeholder="お客様名（必須）" maxlength="60" autocomplete="off"
            value="{{ editing.customer if editing else '' }}">
@@ -116,6 +134,36 @@ const REQUEST_KEY = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() :
 const yen = n => '¥' + Number(n).toLocaleString('ja-JP');
 const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
 const rows = () => [...document.querySelectorAll('.p-row')];
+const crows = () => [...document.querySelectorAll('#custom-rows .c-row')];
+const DISC_UNIT = 10;   // 割引後は10円単位に繰り上げ（サーバーの calc_discount と同じ）
+function calcDisc(sub, pct) {
+  const p100 = Math.round((parseFloat(pct) || 0) * 100);
+  if (p100 <= 0 || p100 > 10000) return [0, sub];
+  const unit = 10000 * DISC_UNIT;
+  const pay = Math.min(sub, Math.floor((sub * (10000 - p100) + unit - 1) / unit) * DISC_UNIT);
+  return [sub - pay, pay];
+}
+function addCustom(name, price, qty) {
+  const d = document.createElement('div'); d.className = 'c-row';
+  d.innerHTML = '<input type="text" class="c-n" maxlength="80" placeholder="品名" autocomplete="off">' +
+    '<input type="number" class="c-p" min="0" max="9999999" inputmode="numeric" placeholder="値段">' +
+    '<div class="stepper"><button class="stepper-btn" type="button" data-d="-1">－</button>' +
+    '<input class="qty" type="number" min="0" max="9999" inputmode="numeric" value="1">' +
+    '<button class="stepper-btn" type="button" data-d="1">＋</button></div>' +
+    '<button type="button" class="c-del" aria-label="この行を消す">✕</button>';
+  d.querySelector('.c-n').value = name || ''; d.querySelector('.c-p').value = price || ''; d.querySelector('.qty').value = qty == null ? 1 : qty;
+  d.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => {
+    const q = d.querySelector('.qty'); q.value = Math.max(0, (parseInt(q.value) || 0) + parseInt(b.dataset.d)); recalc();
+  }));
+  d.querySelectorAll('input').forEach(i => i.addEventListener('input', recalc));
+  d.querySelector('.c-del').addEventListener('click', () => { d.remove(); recalc(); });
+  document.getElementById('custom-rows').appendChild(d);
+  return d;
+}
+document.querySelectorAll('#custom-rows .c-row[data-name]').forEach(el => { addCustom(el.dataset.name, el.dataset.price, el.dataset.qty); el.remove(); });
+document.getElementById('custom-add')?.addEventListener('click', () => { addCustom('', '', 1).querySelector('.c-n').focus(); recalc(); });
+const customVals = () => crows().map(r => ({name: r.querySelector('.c-n').value.trim(), price: parseInt(r.querySelector('.c-p').value) || 0,
+  qty: Math.max(0, Math.min(9999, parseInt(r.querySelector('.qty').value) || 0))})).filter(c => c.qty > 0 && (c.name || c.price));
 
 // ── 商品名・カテゴリでの絞り込み ──
 let currentCat = '';
@@ -155,8 +203,13 @@ function recalc() {
     row.querySelector('.qty').classList.toggle('zero', q === 0);
     if (q > 0) { n++; total += q * parseInt(row.dataset.price); }
   });
+  customVals().forEach(c => { n++; total += c.qty * c.price; });
+  const [disc, pay] = calcDisc(total, document.getElementById('c-disc').value);
   document.getElementById('c-count').textContent = n;
-  document.getElementById('c-total').textContent = yen(total);
+  document.getElementById('c-subline').hidden = !disc;
+  document.getElementById('c-sub').textContent = yen(total);
+  document.getElementById('c-discamt').textContent = disc ? '割引 －' + yen(disc) : '';
+  document.getElementById('c-total').textContent = yen(pay);
   saveLocal();
 }
 rows().forEach(row => {
@@ -173,7 +226,7 @@ function saveLocal() {
   try {
     const items = {};
     rows().forEach(r => { const q = readQty(r); if (q > 0) items[r.dataset.id] = q; });
-    localStorage.setItem(STORE_KEY, JSON.stringify({items, name: document.getElementById('c-name').value,
+    localStorage.setItem(STORE_KEY, JSON.stringify({items, customs: customVals(), disc: document.getElementById('c-disc').value, name: document.getElementById('c-name').value,
       phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value}));
   } catch (e) {}
 }
@@ -183,16 +236,21 @@ function restoreLocal() {
     const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (!d) return;
     rows().forEach(r => { if (d.items && d.items[r.dataset.id]) r.querySelector('.qty').value = d.items[r.dataset.id]; });
+    (d.customs || []).forEach(c => addCustom(c.name, c.price, c.qty));
+    document.getElementById('c-disc').value = d.disc || '';
     document.getElementById('c-name').value = d.name || '';
     document.getElementById('c-phone').value = d.phone || '';
     document.getElementById('c-memo').value = d.memo || '';
   } catch (e) {}
 }
 ['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id)?.addEventListener('input', saveLocal));
+document.getElementById('c-disc')?.addEventListener('input', recalc);
 
 document.getElementById('c-clear')?.addEventListener('click', () => {
   if (!confirm('選んだ商品と、お客様名などを全部消しますか？')) return;
   rows().forEach(r => r.querySelector('.qty').value = 0);
+  crows().forEach(r => r.remove());
+  document.getElementById('c-disc').value = '';
   ['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id).value = '');
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   recalc();
@@ -204,12 +262,14 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
   const customer = document.getElementById('c-name').value.trim();
   const items = rows().map(r => ({price_id: parseInt(r.dataset.id), qty: readQty(r)})).filter(i => i.qty > 0);
   if (!customer) { toast('お客様名を入れてください'); document.getElementById('c-name').focus(); return; }
-  if (!items.length) { toast('商品の数量を入れてください'); return; }
+  const customs = customVals();
+  if (customs.some(c => !c.name)) { toast('「その他」の品名を入れてください'); return; }
+  if (!items.length && !customs.length) { toast('商品の数量を入れてください'); return; }
   const btn = document.getElementById('c-save'); const label = btn.textContent;
   saving = true; btn.disabled = true; btn.textContent = '保存中…';
   try {
     const res = await fetch('/customer-orders/save', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items,
+      body: JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0,
         phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value})});
     const d = await res.json();
     if (!d.ok) { toast(d.error || '保存に失敗しました', 4000); throw 0; }

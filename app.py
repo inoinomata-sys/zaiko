@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -292,6 +292,8 @@ SCHEMA_SQL = [
         price_id INTEGER REFERENCES price_items(id) ON DELETE SET NULL,
         name TEXT NOT NULL, spec TEXT, unit_price INTEGER NOT NULL, qty INTEGER NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)""",
     "CREATE INDEX IF NOT EXISTS customer_order_items_order ON customer_order_items (order_id)",
+    # キャンペーン等の割引（注文ごとに％を入力）
+    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -930,21 +932,43 @@ def load_prices():
 def prices():
     groups = load_prices()
     editing = None
+    customs = []
     qty = {}
     oid = request.args.get('order', type=int)
     if oid:
         # お客様の注文を直す時は、選んだ数量とお客様名を入れた状態で開く
         cur = get_db().cursor()
-        cur.execute("SELECT id, customer, phone, memo FROM customer_orders WHERE id=%s", (oid,))
+        cur.execute("SELECT id, customer, phone, memo, discount_pct FROM customer_orders WHERE id=%s", (oid,))
         editing = cur.fetchone()
         if editing:
+            editing['discount_pct'] = pct_fmt(editing['discount_pct'])
+            cur.execute("SELECT name, unit_price, qty FROM customer_order_items WHERE order_id=%s AND price_id IS NULL ORDER BY sort_order, id", (oid,))
+            customs = [dict(r) for r in cur.fetchall()]
             cur.execute("SELECT price_id, qty FROM customer_order_items WHERE order_id=%s AND price_id IS NOT NULL", (oid,))
             qty = {r['price_id']: r['qty'] for r in cur.fetchall()}
     return render_template('prices.html', groups=groups, total=sum(len(v) for v in groups.values()),
-                           note=PRICE_NOTE, title=PRICE_TITLE, editing=editing, qty=qty)
+                           note=PRICE_NOTE, title=PRICE_TITLE, editing=editing, qty=qty, customs=customs)
 
 
 # ── お客様ごとの注文（商品袋に貼る注文用紙） ───────────────────────────────────
+
+DISCOUNT_ROUND = 10   # 割引後の支払額は、この円単位で繰り上げる（画面の計算 prices.html と同じにする）
+
+
+def calc_discount(subtotal, pct):
+    """(割引額, 支払額)。支払額 = 小計×(100-割引率)% を 10円単位に繰り上げ（小計は超えない）"""
+    p100 = int(round(float(pct or 0) * 100))
+    if p100 <= 0:
+        return 0, subtotal
+    num = subtotal * (10000 - p100)
+    unit = 10000 * DISCOUNT_ROUND
+    payable = min(subtotal, (num + unit - 1) // unit * DISCOUNT_ROUND)
+    return subtotal - payable, payable
+
+
+def pct_fmt(pct):
+    return ('%g' % float(pct or 0))
+
 
 def load_customer_order(cur, oid):
     cur.execute("SELECT * FROM customer_orders WHERE id=%s", (oid,))
@@ -961,10 +985,13 @@ def load_customer_order(cur, oid):
 def customer_orders():
     cur = get_db().cursor()
     cur.execute("""
-        SELECT o.id, o.customer, o.phone, o.created_at, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+        SELECT o.id, o.customer, o.phone, o.created_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
-    return render_template('customer_orders.html', orders=cur.fetchall())
+    orders = cur.fetchall()
+    for o in orders:
+        o['total'] = calc_discount(o['total'], o['discount_pct'])[1]
+    return render_template('customer_orders.html', orders=orders)
 
 
 @app.route('/customer-orders/save', methods=['POST'])
@@ -980,11 +1007,22 @@ def customer_order_save():
     try:
         items = [(int(i['price_id']), int(i['qty'])) for i in (data.get('items') or []) if int(i['qty']) > 0]
         oid = int(data['id']) if data.get('id') else None
-    except (KeyError, TypeError, ValueError):
+        customs = []
+        for c in (data.get('customs') or []):
+            cq, cp, cn = int(c['qty']), int(c['price']), (nfkc(str(c.get('name') or '')) or '')[:80]
+            if cq <= 0:
+                continue
+            if not cn or cp < 0 or cp > 9999999 or cq > 9999:
+                return jsonify(ok=False, error='「その他」の品名・値段・数量を確認してください'), 400
+            customs.append((cn, cp, cq))
+        disc = round(float(data.get('discount_pct') or 0), 2)
+        if not 0 <= disc <= 100:
+            return jsonify(ok=False, error='割引は0〜100%で入力してください'), 400
+    except (KeyError, TypeError, ValueError, OverflowError):
         return jsonify(ok=False, error='入力が不正です'), 400
-    if not items:
+    if not items and not customs:
         return jsonify(ok=False, error='商品を選んでください'), 400
-    if len(items) > 300 or any(q > 9999 for _, q in items):
+    if len(items) + len(customs) > 300 or any(q > 9999 for _, q in items):
         return jsonify(ok=False, error='数量または品数が多すぎます'), 400
     request_key = data.get('request_key') or None
     db = get_db()
@@ -995,8 +1033,8 @@ def customer_order_save():
         if len(snap) != len(set(ids)):
             return jsonify(ok=False, error='価格表にない商品が含まれています。画面を読み込み直してください'), 400
         if oid:
-            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, updated_at=now()
-                           WHERE id=%s RETURNING id""", (customer, phone, memo, oid))
+            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, updated_at=now()
+                           WHERE id=%s RETURNING id""", (customer, phone, memo, disc, oid))
             if not cur.fetchone():
                 return jsonify(ok=False, error='注文が見つかりません'), 404
             cur.execute("DELETE FROM customer_order_items WHERE order_id=%s", (oid,))
@@ -1006,22 +1044,27 @@ def customer_order_save():
                 done = cur.fetchone()
                 if done:
                     return jsonify(ok=True, id=done['id'], repeated=True)
-            cur.execute("INSERT INTO customer_orders (customer, phone, memo, request_key) VALUES (%s,%s,%s,%s) RETURNING id",
-                        (customer, phone, memo, request_key))
+            cur.execute("INSERT INTO customer_orders (customer, phone, memo, discount_pct, request_key) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                        (customer, phone, memo, disc, request_key))
             oid = cur.fetchone()['id']
         # 価格表の並び順で、その時の商品名・規格・単価を控えとして残す
         order_of = {r['id']: n for n, r in enumerate(sorted(snap.values(), key=lambda r: r['id']))}
+        # 「その他」（価格表にない商品）を先頭に、続けて価格表の商品
+        rows_ = [(oid, None, cn, None, cp, cq, n) for n, (cn, cp, cq) in enumerate(customs)]
+        rows_ += [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, len(customs) + n)
+                  for n, (pid, q) in enumerate(items)]
         psycopg2.extras.execute_values(cur, """
             INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order) VALUES %s
-        """, [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, n)
-              for n, (pid, q) in enumerate(items)])
+        """, rows_)
     return jsonify(ok=True, id=oid)
 
 
 @app.route('/customer-orders/<int:oid>')
 def customer_order_view(oid):
     order, items, total = load_customer_order(get_db().cursor(), oid)
-    return render_template('customer_order.html', order=order, items=items, total=total, note=PRICE_NOTE)
+    disc, payable = calc_discount(total, order['discount_pct'])
+    return render_template('customer_order.html', order=order, items=items, subtotal=total, disc=disc, total=payable,
+                           pct=pct_fmt(order['discount_pct']), note=PRICE_NOTE)
 
 
 @app.route('/customer-orders/<int:oid>/delete', methods=['POST'])
@@ -1032,7 +1075,8 @@ def customer_order_delete(oid):
 
 @app.route('/customer-orders/<int:oid>/pdf')
 def customer_order_pdf(oid):
-    order, items, total = load_customer_order(get_db().cursor(), oid)
+    order, items, subtotal = load_customer_order(get_db().cursor(), oid)
+    disc, total = calc_discount(subtotal, order['discount_pct'])
     pdf = OrderPDF(orientation='P', unit='mm', format='A5')
     font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
     if os.path.exists(font_path):
@@ -1092,8 +1136,14 @@ def customer_order_pdf(oid):
         pdf.set_draw_color(0, 0, 0)
         pdf.set_xy(pdf.l_margin, y + h)
     pdf.ln(2)
+    if disc:
+        pdf.set_font(f, '', 12)
+        pdf.cell(W - 62, 8, f"小計 {len(items)} 品")
+        pdf.cell(62, 8, yen_fmt(subtotal), align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(W - 62, 8, f"{pct_fmt(order['discount_pct'])}% 割引")
+        pdf.cell(62, 8, f"－{yen_fmt(disc)}", align='R', new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 12)
-    pdf.cell(W - 62, 11, f"合計 {len(items)} 品" + ("　" + PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''))
+    pdf.cell(W - 62, 11, ("" if disc else f"合計 {len(items)} 品") + ("　" + PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''))
     pdf.set_font(f, '', 18)
     pdf.cell(62, 11, f"合計 {yen_fmt(total)}", align='R', new_x='LMARGIN', new_y='NEXT')
     if order['memo']:

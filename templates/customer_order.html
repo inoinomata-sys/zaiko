@@ -38,7 +38,11 @@
     {% endfor %}
     </tbody>
   </table>
-  <div class="sum"><span>{{ items|length }} 品　{{ note }}</span><span>合計 <strong>{{ total|yen }}</strong></span></div>
+  {% if disc %}
+  <div class="sum"><span>小計 {{ items|length }} 品</span><span>{{ subtotal|yen }}</span></div>
+  <div class="sum"><span>{{ pct }}% 割引</span><span>－{{ disc|yen }}</span></div>
+  {% endif %}
+  <div class="sum"><span>{% if not disc %}{{ items|length }} 品　{% endif %}{{ note }}</span><span>合計 <strong>{{ total|yen }}</strong></span></div>
   {% if order.memo %}<div class="meta" style="margin-top:10px">メモ: {{ order.memo }}</div>{% endif %}
 </div>
 
