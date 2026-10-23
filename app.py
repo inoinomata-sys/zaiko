@@ -918,7 +918,7 @@ PRICE_NOTE = '表示の価格は税込です。'
 PRICE_SHOP = '(有)イノ　TEL 072-999-6571'
 
 
-PRICE_FIRST_CATEGORIES = ['コタ', 'コアミー ケア用品']
+PRICE_FIRST_CATEGORIES = ['コアミー シャンプー', 'コアミー ケア用品']
 
 
 def load_prices():
