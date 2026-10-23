@@ -133,7 +133,8 @@ const EDIT_ID = {{ (editing.id if editing else None)|tojson }};
 const REQUEST_KEY = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 const yen = n => '¥' + Number(n).toLocaleString('ja-JP');
 const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
-const rows = () => [...document.querySelectorAll('.p-row')];
+const _rows = [...document.querySelectorAll('.p-row')];   // 毎回探し直さない（品数が多くても軽く）
+const rows = () => _rows;
 const crows = () => [...document.querySelectorAll('#custom-rows .c-row')];
 const DISC_UNIT = 10;   // 割引後は10円単位に繰り上げ（サーバーの calc_discount と同じ）
 function calcDisc(sub, pct) {
@@ -195,6 +196,7 @@ document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('c
 // ── 数量と合計 ──
 const STORE_KEY = 'cart:new';
 function readQty(row) { return Math.max(0, Math.min(9999, parseInt(row.querySelector('.qty').value) || 0)); }
+let saveTimer = null;
 function recalc() {
   let n = 0, total = 0;
   rows().forEach(row => {
@@ -210,7 +212,7 @@ function recalc() {
   document.getElementById('c-sub').textContent = yen(total);
   document.getElementById('c-discamt').textContent = disc ? '割引 －' + yen(disc) : '';
   document.getElementById('c-total').textContent = yen(pay);
-  saveLocal();
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveLocal, 400);
 }
 rows().forEach(row => {
   const inp = row.querySelector('.qty');
@@ -267,11 +269,19 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
   if (!items.length && !customs.length) { toast('商品の数量を入れてください'); return; }
   const btn = document.getElementById('c-save'); const label = btn.textContent;
   saving = true; btn.disabled = true; btn.textContent = '保存中…';
+  const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0,
+    phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value});
   try {
-    const res = await fetch('/customer-orders/save', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0,
-        phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value})});
-    const d = await res.json();
+    // 30秒で応答がなければ中断して、自動でやり直す（同じ注文が二重にならないよう request_key で守っている）
+    let d = null;
+    for (let t = 1; t <= 3 && !d; t++) {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 30000);
+      try {
+        const res = await fetch('/customer-orders/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body, signal: ctl.signal});
+        d = await res.json();
+      } catch (e) { if (t === 3) throw e; btn.textContent = '再送中…'; await new Promise(r => setTimeout(r, 1500)); }
+      finally { clearTimeout(to); }
+    }
     if (!d.ok) { toast(d.error || '保存に失敗しました', 4000); throw 0; }
     try { if (!EDIT_ID) localStorage.removeItem(STORE_KEY); } catch (e) {}
     location.href = '/customer-orders/' + d.id;
