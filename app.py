@@ -918,6 +918,9 @@ PRICE_NOTE = '表示の価格は税込です。'
 PRICE_SHOP = '(有)イノ　TEL 072-999-6571'
 
 
+PRICE_FIRST_CATEGORIES = ['コタ', 'コアミー ケア用品']
+
+
 def load_prices():
     db = get_db()
     cur = db.cursor()
@@ -925,7 +928,9 @@ def load_prices():
     groups = OrderedDict()
     for r in cur.fetchall():
         groups.setdefault(r['category'] or 'その他', []).append(r)
-    return groups
+    # よく使うカテゴリを先頭に（残りは今までの並び）
+    first = [c for c in PRICE_FIRST_CATEGORIES if c in groups]
+    return OrderedDict([(c, groups[c]) for c in first] + [(c, v) for c, v in groups.items() if c not in first])
 
 
 @app.route('/prices')
