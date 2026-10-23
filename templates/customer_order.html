@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}注文用紙 — {{ order.customer|sama }}{% endblock %}
+
+{% block head %}
+<style>
+.slip { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; max-width: 640px; margin: 0 auto 14px; }
+.slip h2 { font-size: 22px; font-weight: 800; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.slip .meta { font-size: 13px; color: var(--fg2); line-height: 1.6; }
+.slip table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.slip th { background: #e8e8e8; font-size: 12px; padding: 6px 8px; text-align: left; }
+.slip td { padding: 9px 8px; border-bottom: 1px solid #ddd; vertical-align: top; font-size: 15px; }
+.slip td.q, .slip th.q { text-align: center; width: 3.2em; }
+.slip td.a, .slip th.a { text-align: right; white-space: nowrap; }
+.slip .sub { font-size: 12px; color: var(--fg2); }
+.slip .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; font-size: 14px; }
+.slip .sum strong { font-size: 26px; }
+.act { display: flex; gap: 8px; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
+.act .btn { flex: 1 1 140px; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:640px; margin:0 auto 10px"><a href="/customer-orders" style="font-size:13px; color:var(--fg2)">← お客様注文の一覧に戻る</a></div>
+
+<div class="slip">
+  <div class="meta">ご注文用紙　受付 {{ order.created_at|jst }}</div>
+  <h2>{{ order.customer|sama }}</h2>
+  <div class="meta">{% if order.phone %}TEL {{ order.phone }}　{% endif %}(有)イノ　TEL 072-999-6571</div>
+  <table>
+    <thead><tr><th>商品名</th><th class="q">数量</th><th class="a">金額</th></tr></thead>
+    <tbody>
+    {% for it in items %}
+      <tr>
+        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}</div></td>
+        <td class="q">{{ it.qty }}</td>
+        <td class="a">{{ it.amount|yen }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <div class="sum"><span>{{ items|length }} 品　{{ note }}</span><span>合計 <strong>{{ total|yen }}</strong></span></div>
+  {% if order.memo %}<div class="meta" style="margin-top:10px">メモ: {{ order.memo }}</div>{% endif %}
+</div>
+
+<div class="act">
+  <a class="btn btn-primary" id="pdf-btn" href="/customer-orders/{{ order.id }}/pdf" download>注文用紙 PDF</a>
+  <a class="btn btn-ghost" href="/prices?order={{ order.id }}">直す</a>
+  <button class="btn btn-ghost" type="button" id="del-btn" style="color:var(--danger)">削除</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('del-btn').addEventListener('click', async () => {
+  if (!confirm({{ ('「' ~ (order.customer|sama) ~ '」の注文を削除しますか？（元に戻せません）')|tojson }})) return;
+  try {
+    const res = await fetch('/customer-orders/{{ order.id }}/delete', {method: 'POST'});
+    if (!res.ok) throw 0;
+    location.href = '/customer-orders';
+  } catch (e) { toast('削除に失敗しました。もう一度お試しください'); }
+});
+
+// iPhoneのホーム画面アプリでは、共有メニュー（ファイルに保存・LINE・プリント）を使う
+(function () {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const btn = document.getElementById('pdf-btn');
+  if (!ios) return;
+  const url = btn.getAttribute('href'); let file = null;
+  btn.removeAttribute('download'); btn.style.pointerEvents = 'none'; btn.style.opacity = '.6'; btn.textContent = 'PDFを準備中…';
+  const fallback = () => { btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '注文用紙 PDF'; };
+  if (!navigator.canShare) { fallback(); return; }
+  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+    const f = new File([b], {{ ('注文用紙_' ~ (order.customer|sama|replace(' ', '')) ~ '.pdf')|tojson }}, {type: 'application/pdf'});
+    if (!navigator.canShare({files: [f]})) return fallback();
+    file = f; btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '注文用紙を保存・共有・印刷';
+  }).catch(fallback);
+  btn.addEventListener('click', e => { if (!file) return; e.preventDefault(); navigator.share({files: [file]}).catch(() => {}); });
+})();
+</script>
+{% endblock %}

@@ -196,6 +196,8 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注書作成</a>
   <a href="/order/history" class="nav-link {% if request.path == '/order/history' %}active{% endif %}">発注履歴</a>
   <a href="/products" class="nav-link {% if request.path == '/products' %}active{% endif %}">商品マスター</a>
+  <a href="/prices" class="nav-link {% if request.path.startswith('/prices') %}active{% endif %}">価格表</a>
+  <a href="/customer-orders" class="nav-link {% if request.path.startswith('/customer-orders') %}active{% endif %}">お客様注文</a>
   <a href="/settings/contacts" class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">担当者設定</a>
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
@@ -215,7 +217,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   const btn = document.getElementById('to-top');
   function place() {
     // 画面の下に固定された発注フッターがある時は、その上に出す
-    const f = document.querySelector('.order-footer');
+    const f = document.querySelector('.order-footer, .cart-bar');
     btn.style.bottom = f ? `calc(${f.offsetHeight + 14}px + env(safe-area-inset-bottom, 0px))` : '';
   }
   function update() { btn.classList.toggle('show', window.scrollY > 500); }

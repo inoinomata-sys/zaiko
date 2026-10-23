@@ -66,6 +66,18 @@ def num_fmt(v):
     return str(int(f)) if f == int(f) else f'{f:g}'
 
 
+@app.template_filter('sama')
+def sama_fmt(name):
+    """お客様名の後ろに「様」を付ける（すでに付いている時は重ねない）"""
+    name = (name or '').strip()
+    return name if name.endswith('様') else f"{name} 様"
+
+
+@app.template_filter('yen')
+def yen_fmt(v):
+    return f"¥{int(v):,}"
+
+
 @app.template_filter('md')
 def md_fmt(v):
     return v.astimezone(JST).strftime('%-m/%-d') if v else ''
@@ -233,7 +245,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 6
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -263,6 +275,19 @@ SCHEMA_SQL = [
     """CREATE TABLE IF NOT EXISTS product_base (
         product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         store TEXT NOT NULL, base_qty DOUBLE PRECISION NOT NULL, PRIMARY KEY (product_id, store))""",
+    # お客様に渡す価格表（在庫・発注の商品マスターとは別に持つ）
+    """CREATE TABLE IF NOT EXISTS price_items (
+        id SERIAL PRIMARY KEY, category TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, spec TEXT,
+        price INTEGER NOT NULL, note TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT true)""",
+    # お客様ごとの注文（商品袋に貼る注文用紙）。商品名・規格・単価は、その時の内容を控えとして残す
+    """CREATE TABLE IF NOT EXISTS customer_orders (
+        id SERIAL PRIMARY KEY, customer TEXT NOT NULL, phone TEXT, memo TEXT, request_key TEXT UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""",
+    """CREATE TABLE IF NOT EXISTS customer_order_items (
+        id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES customer_orders(id) ON DELETE CASCADE,
+        price_id INTEGER REFERENCES price_items(id) ON DELETE SET NULL,
+        name TEXT NOT NULL, spec TEXT, unit_price INTEGER NOT NULL, qty INTEGER NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0)""",
+    "CREATE INDEX IF NOT EXISTS customer_order_items_order ON customer_order_items (order_id)",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -878,6 +903,277 @@ class OrderPDF(FPDF):
 
 
 PDF_COLS = 3
+
+
+# ── お客様用の価格表 ─────────────────────────────────────────────────────────
+
+PRICE_TITLE = '商品価格表'
+PRICE_NOTE = '表示の価格は税込です。'
+PRICE_SHOP = '(有)イノ　TEL 072-999-6571'
+
+
+def load_prices():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT id, category, name, spec, price, note FROM price_items WHERE is_active ORDER BY sort_order, id")
+    groups = OrderedDict()
+    for r in cur.fetchall():
+        groups.setdefault(r['category'] or 'その他', []).append(r)
+    return groups
+
+
+@app.route('/prices')
+def prices():
+    groups = load_prices()
+    editing = None
+    qty = {}
+    oid = request.args.get('order', type=int)
+    if oid:
+        # お客様の注文を直す時は、選んだ数量とお客様名を入れた状態で開く
+        cur = get_db().cursor()
+        cur.execute("SELECT id, customer, phone, memo FROM customer_orders WHERE id=%s", (oid,))
+        editing = cur.fetchone()
+        if editing:
+            cur.execute("SELECT price_id, qty FROM customer_order_items WHERE order_id=%s AND price_id IS NOT NULL", (oid,))
+            qty = {r['price_id']: r['qty'] for r in cur.fetchall()}
+    return render_template('prices.html', groups=groups, total=sum(len(v) for v in groups.values()),
+                           note=PRICE_NOTE, title=PRICE_TITLE, editing=editing, qty=qty)
+
+
+# ── お客様ごとの注文（商品袋に貼る注文用紙） ───────────────────────────────────
+
+def load_customer_order(cur, oid):
+    cur.execute("SELECT * FROM customer_orders WHERE id=%s", (oid,))
+    order = cur.fetchone()
+    if not order:
+        abort(404)
+    cur.execute("""SELECT name, spec, unit_price, qty, unit_price * qty AS amount
+                   FROM customer_order_items WHERE order_id=%s ORDER BY sort_order, id""", (oid,))
+    items = cur.fetchall()
+    return order, items, sum(i['amount'] for i in items)
+
+
+@app.route('/customer-orders')
+def customer_orders():
+    cur = get_db().cursor()
+    cur.execute("""
+        SELECT o.id, o.customer, o.phone, o.created_at, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+        FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
+        GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
+    return render_template('customer_orders.html', orders=cur.fetchall())
+
+
+@app.route('/customer-orders/save', methods=['POST'])
+def customer_order_save():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    customer = (nfkc(str(data.get('customer') or '')) or '')[:60]
+    phone = (nfkc(str(data.get('phone') or '')) or '')[:30]
+    memo = (nfkc(str(data.get('memo') or '')) or '')[:200]
+    if not customer:
+        return jsonify(ok=False, error='お客様名を入力してください'), 400
+    try:
+        items = [(int(i['price_id']), int(i['qty'])) for i in (data.get('items') or []) if int(i['qty']) > 0]
+        oid = int(data['id']) if data.get('id') else None
+    except (KeyError, TypeError, ValueError):
+        return jsonify(ok=False, error='入力が不正です'), 400
+    if not items:
+        return jsonify(ok=False, error='商品を選んでください'), 400
+    if len(items) > 300 or any(q > 9999 for _, q in items):
+        return jsonify(ok=False, error='数量または品数が多すぎます'), 400
+    request_key = data.get('request_key') or None
+    db = get_db()
+    with transaction(db) as cur:
+        ids = [i for i, _ in items]
+        cur.execute("SELECT id, name, spec, price FROM price_items WHERE id = ANY(%s)", (ids,))
+        snap = {r['id']: r for r in cur.fetchall()}
+        if len(snap) != len(set(ids)):
+            return jsonify(ok=False, error='価格表にない商品が含まれています。画面を読み込み直してください'), 400
+        if oid:
+            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, updated_at=now()
+                           WHERE id=%s RETURNING id""", (customer, phone, memo, oid))
+            if not cur.fetchone():
+                return jsonify(ok=False, error='注文が見つかりません'), 404
+            cur.execute("DELETE FROM customer_order_items WHERE order_id=%s", (oid,))
+        else:
+            if request_key:
+                cur.execute("SELECT id FROM customer_orders WHERE request_key=%s", (request_key,))
+                done = cur.fetchone()
+                if done:
+                    return jsonify(ok=True, id=done['id'], repeated=True)
+            cur.execute("INSERT INTO customer_orders (customer, phone, memo, request_key) VALUES (%s,%s,%s,%s) RETURNING id",
+                        (customer, phone, memo, request_key))
+            oid = cur.fetchone()['id']
+        # 価格表の並び順で、その時の商品名・規格・単価を控えとして残す
+        order_of = {r['id']: n for n, r in enumerate(sorted(snap.values(), key=lambda r: r['id']))}
+        psycopg2.extras.execute_values(cur, """
+            INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order) VALUES %s
+        """, [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, n)
+              for n, (pid, q) in enumerate(items)])
+    return jsonify(ok=True, id=oid)
+
+
+@app.route('/customer-orders/<int:oid>')
+def customer_order_view(oid):
+    order, items, total = load_customer_order(get_db().cursor(), oid)
+    return render_template('customer_order.html', order=order, items=items, total=total, note=PRICE_NOTE)
+
+
+@app.route('/customer-orders/<int:oid>/delete', methods=['POST'])
+def customer_order_delete(oid):
+    get_db().cursor().execute("DELETE FROM customer_orders WHERE id=%s", (oid,))
+    return jsonify(ok=True)
+
+
+@app.route('/customer-orders/<int:oid>/pdf')
+def customer_order_pdf(oid):
+    order, items, total = load_customer_order(get_db().cursor(), oid)
+    pdf = OrderPDF(orientation='P', unit='mm', format='A5')
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
+    if os.path.exists(font_path):
+        pdf.add_font('NotoSans', '', font_path)
+        pdf.font_name = 'NotoSans'
+    f = pdf.font_name
+    pdf.title_text = f"ご注文用紙　{sama_fmt(order['customer'])}"
+    pdf.set_margins(8, 8, 8)
+    pdf.set_auto_page_break(auto=False)
+    pdf.alias_nb_pages()
+    pdf.text_mode = 'FILL_STROKE'   # 同梱フォントが極細のため、輪郭線で太く見せる
+    pdf.set_line_width(0.25)
+    pdf.add_page()
+    W = pdf.w - 16
+    name_w, qty_w = W - 14 - 32, 14
+    amt_w = 32
+    bottom = pdf.h - 14
+
+    pdf.set_font(f, '', 11)
+    pdf.cell(0, 6, f"ご注文用紙　受付 {jst_fmt(order['created_at'])}", new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 22)
+    pdf.multi_cell(0, 11, sama_fmt(order['customer']), new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 11)
+    if order['phone']:
+        pdf.cell(0, 6, f"TEL {order['phone']}", new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6, PRICE_SHOP, new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
+
+    def head():
+        pdf.set_font(f, '', 10)
+        pdf.set_fill_color(225, 225, 225)
+        pdf.cell(name_w, 7, ' 商品名', fill=True)
+        pdf.cell(qty_w, 7, '数量', fill=True, align='C')
+        pdf.cell(amt_w, 7, '金額 ', fill=True, align='R', new_x='LMARGIN', new_y='NEXT')
+    head()
+    for it in items:
+        pdf.set_font(f, '', 11)
+        lines = pdf.multi_cell(name_w - 2, 5.6, it['name'], dry_run=True, output='LINES')
+        sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}"
+        h = len(lines) * 5.6 + 5 + 2
+        if pdf.get_y() + h > bottom - 16:
+            pdf.add_page()
+            head()
+        y = pdf.get_y()
+        pdf.set_xy(pdf.l_margin + 1, y + 1)
+        pdf.multi_cell(name_w - 2, 5.6, it['name'])
+        pdf.set_font(f, '', 8.5)
+        pdf.set_x(pdf.l_margin + 1)
+        pdf.cell(name_w - 2, 4.5, sub)
+        pdf.set_font(f, '', 13)
+        pdf.set_xy(pdf.l_margin + name_w, y)
+        pdf.cell(qty_w, h, str(it['qty']), align='C')
+        pdf.cell(amt_w - 1, h, yen_fmt(it['amount']), align='R')
+        pdf.set_draw_color(190, 190, 190)
+        pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
+        pdf.set_xy(pdf.l_margin, y + h)
+    pdf.ln(2)
+    pdf.set_font(f, '', 12)
+    pdf.cell(W - 62, 11, f"合計 {len(items)} 品" + ("　" + PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''))
+    pdf.set_font(f, '', 18)
+    pdf.cell(62, 11, f"合計 {yen_fmt(total)}", align='R', new_x='LMARGIN', new_y='NEXT')
+    if order['memo']:
+        pdf.ln(2)
+        pdf.set_font(f, '', 10)
+        pdf.multi_cell(0, 5.5, f"メモ: {order['memo']}")
+
+    response = make_response(bytes(pdf.output()))
+    response.headers['Content-Type'] = 'application/pdf'
+    fn = urllib.parse.quote(f"注文用紙_{sama_fmt(order['customer']).replace(' ', '')}.pdf")
+    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{fn}"
+    return response
+
+
+@app.route('/prices/pdf')
+def prices_pdf():
+    groups = load_prices()
+    now = now_jst()
+    pdf = OrderPDF(orientation='P', unit='mm', format='A4')
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
+    if os.path.exists(font_path):
+        pdf.add_font('NotoSans', '', font_path)
+        pdf.font_name = 'NotoSans'
+    f = pdf.font_name
+    pdf.title_text = f"{PRICE_TITLE}　{PRICE_SHOP}"
+    pdf.set_margins(15, 12, 15)
+    pdf.set_auto_page_break(auto=False)
+    pdf.alias_nb_pages()
+    pdf.text_mode = 'FILL_STROKE'   # 同梱フォントが極細のため、輪郭線で太く見せる
+    pdf.set_line_width(0.25)
+    pdf.add_page()
+
+    pdf.set_font(f, '', 24)
+    pdf.cell(0, 13, PRICE_TITLE, new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 11)
+    pdf.cell(0, 6, f"{now.year}年{now.month}月{now.day}日現在　{PRICE_SHOP}", new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6, PRICE_NOTE, new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(3)
+
+    name_w, spec_w, price_w = 100, 42, 38
+    line_h, FS = 6.5, 12
+    bottom = pdf.h - 16
+
+    def cat_bar(text):
+        pdf.set_font(f, '', 12)
+        pdf.set_fill_color(215, 215, 215)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(name_w + spec_w + price_w, 8, ' ' + text, fill=True, new_x='LMARGIN', new_y='NEXT')
+
+    if not groups:
+        pdf.set_font(f, '', 13)
+        pdf.cell(0, 10, 'まだ商品が登録されていません', new_x='LMARGIN', new_y='NEXT')
+    for cat, items in groups.items():
+        if pdf.get_y() + 8 + 10 > bottom:
+            pdf.add_page()
+        cat_bar(cat)
+        for it in items:
+            name = it['name'] + (f"（{it['note']}）" if it['note'] else '')
+            spec = it['spec'] or ''
+            pdf.set_font(f, '', FS)
+            n_name = len(pdf.multi_cell(name_w - 2, line_h, name, dry_run=True, output='LINES'))
+            n_spec = len(pdf.multi_cell(spec_w - 2, line_h, spec, dry_run=True, output='LINES')) if spec else 1
+            h = max(n_name, n_spec) * line_h + 3
+            if pdf.get_y() + h > bottom:
+                pdf.add_page()
+                cat_bar(cat + '（続き）')
+            y = pdf.get_y()
+            pdf.set_font(f, '', FS)
+            pdf.set_xy(pdf.l_margin + 1, y + 1.5)
+            pdf.multi_cell(name_w - 2, line_h, name)
+            if spec:
+                pdf.set_xy(pdf.l_margin + name_w + 1, y + 1.5)
+                pdf.multi_cell(spec_w - 2, line_h, spec)
+            pdf.set_font(f, '', 14)
+            pdf.set_xy(pdf.l_margin + name_w + spec_w, y)
+            pdf.cell(price_w - 2, h, yen_fmt(it['price']), align='R')
+            pdf.set_draw_color(190, 190, 190)
+            pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
+            pdf.set_xy(pdf.l_margin, y + h)
+        pdf.ln(3)
+
+    response = make_response(bytes(pdf.output()))
+    response.headers['Content-Type'] = 'application/pdf'
+    fn = urllib.parse.quote(f"{PRICE_TITLE}_{now.month}月{now.day}日.pdf")
+    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{fn}"
+    return response
 
 
 PDF_VER = '3'  # PDFのレイアウトを変えたら上げる（保存済みのPDFを作り直させるため）

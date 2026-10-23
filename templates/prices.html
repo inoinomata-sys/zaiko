@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}価格表{% endblock %}
+
+{% block head %}
+<style>
+.p-row { display: flex; align-items: center; gap: 10px 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.p-row:last-child { border-bottom: none; }
+.p-row.sel { background: #fdf3f7; }
+.p-info { flex: 1 1 200px; min-width: 0; }
+.p-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; line-height: 1.4; }
+.p-spec { font-size: 12px; color: var(--fg2); margin-top: 2px; overflow-wrap: anywhere; }
+.p-price { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stepper { display: flex; align-items: center; flex-shrink: 0; margin-left: auto; }
+.stepper-btn {
+  width: 46px; height: 46px; border: 2px solid var(--acc); background: #fff; color: var(--acc);
+  font-size: 24px; font-weight: 700; cursor: pointer; font-family: inherit; user-select: none;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:first-child { border-radius: 8px 0 0 8px; }
+.stepper-btn:last-child  { border-radius: 0 8px 8px 0; }
+.stepper-btn:active { background: var(--acc); color: #fff; }
+.qty {
+  width: 54px; height: 46px; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-family: inherit; background: #fff; border: none; border-top: 2px solid var(--acc); border-bottom: 2px solid var(--acc);
+  -moz-appearance: textfield;
+}
+.qty::-webkit-outer-spin-button, .qty::-webkit-inner-spin-button { -webkit-appearance: none; }
+.qty.zero { color: #bbb; }
+.cart-bar {
+  position: sticky; bottom: 0; background: var(--surface); border-top: 2px solid var(--border);
+  padding: 10px 14px; z-index: 50; box-shadow: 0 -4px 16px rgba(0,0,0,.08); margin: 14px -16px 0;
+}
+.cart-sum { font-size: 14px; margin-bottom: 8px; }
+.cart-sum strong { font-size: 19px; }
+.cart-sum .total { font-size: 22px; margin-left: 8px; }
+.cart-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+.cart-fields input[type=text], .cart-fields input[type=tel] {
+  font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; min-width: 0; font-family: inherit;
+}
+.cart-fields .cname { flex: 2 1 160px; }
+.cart-fields .cphone { flex: 1 1 120px; }
+.cart-fields .cmemo { flex: 3 1 220px; }
+.cart-more { margin-top: 6px; font-size: 13px; color: var(--fg2); }
+.cart-more summary { cursor: pointer; padding: 2px 0; }
+.cart-btns { display: flex; gap: 8px; margin-top: 8px; }
+.cart-btns .btn { flex: 1; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px">
+  <h1 style="font-size:20px; font-weight:700">{% if editing %}注文を直す{% else %}{{ title }}{% endif %}</h1>
+  <a class="btn btn-ghost btn-sm" id="pdf-btn" href="/prices/pdf" download>価格表 PDF</a>
+</div>
+<p style="font-size:13px; color:var(--fg2); margin-bottom:12px">
+  {{ note }}　<span id="count">{{ total }}</span> 品　／　数量を入れると、下でお客様の注文用紙が作れます
+</p>
+
+{% if groups %}
+<input type="search" id="q" placeholder="商品名で探す（注文を受ける時に）" autocomplete="off"
+       style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:10px">
+<div class="cat-scroll" id="cat-tabs">
+  <button type="button" class="on" data-cat="">すべて</button>
+  {% for cat in groups.keys() %}<button type="button" data-cat="{{ cat }}">{{ cat }}</button>{% endfor %}
+</div>
+
+{% for cat, items in groups.items() %}
+<div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
+  <div class="card-head"><span>{{ cat }} <span style="font-size:13px; color:var(--fg2); font-weight:400">{{ items|length }} 品</span></span></div>
+  {% for it in items %}
+  <div class="p-row" data-id="{{ it.id }}" data-price="{{ it.price }}">
+    <div class="p-info">
+      <div class="p-name">{{ it.name }}{% if it.note %} <span class="badge badge-muted" style="font-size:11px">{{ it.note }}</span>{% endif %}</div>
+      {% if it.spec %}<div class="p-spec">{{ it.spec }}</div>{% endif %}
+    </div>
+    <div class="p-price">{{ it.price|yen }}</div>
+    <div class="stepper">
+      <button class="stepper-btn" type="button" data-d="-1" aria-label="1減らす">－</button>
+      <input class="qty zero" type="number" min="0" max="9999" step="1" inputmode="numeric" value="{{ qty.get(it.id, 0) }}">
+      <button class="stepper-btn" type="button" data-d="1" aria-label="1増やす">＋</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+<div class="cart-bar" id="cart-bar">
+  <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　合計 <strong class="total" id="c-total">¥0</strong></div>
+  <div class="cart-fields">
+    <input type="text" id="c-name" class="cname" placeholder="お客様名（必須）" maxlength="60" autocomplete="off"
+           value="{{ editing.customer if editing else '' }}">
+  </div>
+  <details class="cart-more" {% if editing and (editing.phone or editing.memo) %}open{% endif %}>
+    <summary>電話・メモを入れる</summary>
+    <div class="cart-fields" style="margin-top:6px">
+      <input type="tel" id="c-phone" class="cphone" placeholder="電話（任意）" maxlength="30" value="{{ editing.phone if editing and editing.phone else '' }}">
+      <input type="text" id="c-memo" class="cmemo" placeholder="メモ（任意：受け取り日など）" maxlength="200" value="{{ editing.memo if editing and editing.memo else '' }}">
+    </div>
+  </details>
+  <div class="cart-btns">
+    <button class="btn btn-ghost" type="button" id="c-clear">クリア</button>
+    <button class="btn btn-primary" type="button" id="c-save">{% if editing %}注文を保存{% else %}注文用紙を作る{% endif %}</button>
+  </div>
+</div>
+{% else %}
+<div class="card" style="padding:28px; text-align:center; color:var(--fg2)">
+  まだ商品が登録されていません。<br>商品名と値段のExcelを渡すと、ここに一覧が出て、注文用紙が作れます。
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EDIT_ID = {{ (editing.id if editing else None)|tojson }};
+const REQUEST_KEY = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+const yen = n => '¥' + Number(n).toLocaleString('ja-JP');
+const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+const rows = () => [...document.querySelectorAll('.p-row')];
+
+// ── 商品名・カテゴリでの絞り込み ──
+let currentCat = '';
+function applyFilter() {
+  const qEl = document.getElementById('q');
+  const q = qEl ? norm(qEl.value) : '';
+  let shown = 0;
+  document.querySelectorAll('.cat-card').forEach(card => {
+    let any = false;
+    if (!currentCat || card.dataset.cat === currentCat) {
+      card.querySelectorAll('.p-row').forEach(row => {
+        const show = !q || norm(row.querySelector('.p-info').textContent).includes(q);
+        row.style.display = show ? '' : 'none';
+        any = any || show; shown += show ? 1 : 0;
+      });
+    }
+    card.style.display = any ? '' : 'none';
+  });
+  document.getElementById('count').textContent = shown;
+}
+document.getElementById('q')?.addEventListener('input', applyFilter);
+document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  currentCat = b.dataset.cat;
+  applyFilter();
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
+}));
+
+// ── 数量と合計 ──
+const STORE_KEY = 'cart:new';
+function readQty(row) { return Math.max(0, Math.min(9999, parseInt(row.querySelector('.qty').value) || 0)); }
+function recalc() {
+  let n = 0, total = 0;
+  rows().forEach(row => {
+    const q = readQty(row);
+    row.classList.toggle('sel', q > 0);
+    row.querySelector('.qty').classList.toggle('zero', q === 0);
+    if (q > 0) { n++; total += q * parseInt(row.dataset.price); }
+  });
+  document.getElementById('c-count').textContent = n;
+  document.getElementById('c-total').textContent = yen(total);
+  saveLocal();
+}
+rows().forEach(row => {
+  const inp = row.querySelector('.qty');
+  row.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => {
+    inp.value = Math.max(0, readQty(row) + parseInt(b.dataset.d)); recalc();
+  }));
+  inp.addEventListener('input', recalc);
+});
+
+// 別のページを見に行って戻っても、選んだ商品が消えないよう、この端末に控えておく（新規の注文の時だけ）
+function saveLocal() {
+  if (EDIT_ID) return;
+  try {
+    const items = {};
+    rows().forEach(r => { const q = readQty(r); if (q > 0) items[r.dataset.id] = q; });
+    localStorage.setItem(STORE_KEY, JSON.stringify({items, name: document.getElementById('c-name').value,
+      phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value}));
+  } catch (e) {}
+}
+function restoreLocal() {
+  if (EDIT_ID) return;
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!d) return;
+    rows().forEach(r => { if (d.items && d.items[r.dataset.id]) r.querySelector('.qty').value = d.items[r.dataset.id]; });
+    document.getElementById('c-name').value = d.name || '';
+    document.getElementById('c-phone').value = d.phone || '';
+    document.getElementById('c-memo').value = d.memo || '';
+  } catch (e) {}
+}
+['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id)?.addEventListener('input', saveLocal));
+
+document.getElementById('c-clear')?.addEventListener('click', () => {
+  if (!confirm('選んだ商品と、お客様名などを全部消しますか？')) return;
+  rows().forEach(r => r.querySelector('.qty').value = 0);
+  ['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id).value = '');
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  recalc();
+});
+
+let saving = false;
+document.getElementById('c-save')?.addEventListener('click', async () => {
+  if (saving) return;
+  const customer = document.getElementById('c-name').value.trim();
+  const items = rows().map(r => ({price_id: parseInt(r.dataset.id), qty: readQty(r)})).filter(i => i.qty > 0);
+  if (!customer) { toast('お客様名を入れてください'); document.getElementById('c-name').focus(); return; }
+  if (!items.length) { toast('商品の数量を入れてください'); return; }
+  const btn = document.getElementById('c-save'); const label = btn.textContent;
+  saving = true; btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const res = await fetch('/customer-orders/save', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items,
+        phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value})});
+    const d = await res.json();
+    if (!d.ok) { toast(d.error || '保存に失敗しました', 4000); throw 0; }
+    try { if (!EDIT_ID) localStorage.removeItem(STORE_KEY); } catch (e) {}
+    location.href = '/customer-orders/' + d.id;
+  } catch (e) {
+    saving = false; btn.disabled = false; btn.textContent = label;
+    if (e !== 0) toast('通信が切れました。もう一度押してください（入力は残っています）', 4000);
+  }
+});
+
+restoreLocal();
+recalc();
+
+// ── 価格表PDF（iPhoneのホーム画面アプリでは共有メニューを使う） ──
+(function () {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const btn = document.getElementById('pdf-btn');
+  if (!ios || !btn) return;
+  const url = btn.getAttribute('href'); let file = null;
+  btn.removeAttribute('download'); btn.style.pointerEvents = 'none'; btn.style.opacity = '.6'; btn.textContent = 'PDFを準備中…';
+  const fallback = () => { btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '価格表 PDF'; };
+  if (!navigator.canShare) { fallback(); return; }
+  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+    const f = new File([b], '商品価格表.pdf', {type: 'application/pdf'});
+    if (!navigator.canShare({files: [f]})) return fallback();
+    file = f; btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '価格表PDFを保存・共有';
+  }).catch(fallback);
+  btn.addEventListener('click', e => { if (!file) return; e.preventDefault(); navigator.share({files: [file]}).catch(() => {}); });
+})();
+</script>
+{% endblock %}
