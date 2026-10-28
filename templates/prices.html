@@ -296,14 +296,14 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
   const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0, campaign: document.getElementById('c-camp').checked,
     phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value});
   try {
-    // 30秒で応答がなければ中断して、自動でやり直す（同じ注文が二重にならないよう request_key で守っている）
+    // 12秒で応答がなければ中断して、自動でやり直す（電波の切れ目で応答だけ届かないことがあるため、短めに）（同じ注文が二重にならないよう request_key で守っている）
     let d = null;
-    for (let t = 1; t <= 3 && !d; t++) {
-      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 30000);
+    for (let t = 1; t <= 5 && !d; t++) {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 12000);
       try {
         const res = await fetch('/customer-orders/save', {method: 'POST', headers: {'Content-Type': 'application/json'}, body, signal: ctl.signal});
         d = await res.json();
-      } catch (e) { if (t === 3) throw e; btn.textContent = '再送中…'; await new Promise(r => setTimeout(r, 1500)); }
+      } catch (e) { if (t === 5) throw e; btn.textContent = '再送中…'; await new Promise(r => setTimeout(r, 1500)); }
       finally { clearTimeout(to); }
     }
     if (!d.ok) { toast(d.error || '保存に失敗しました', 4000); throw 0; }
