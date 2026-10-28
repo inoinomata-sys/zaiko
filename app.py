@@ -429,7 +429,13 @@ def inventory():
         counts['shortage'] += r['shortage'] > 0
         grouped.setdefault(r['category'], []).append(r)
 
+    sups = [n for n in SUPPLIER_NAMES if any(r['supplier'] == n for r in all_rows)]
+    cat_sups = {}
+    for r in all_rows:
+        cat_sups.setdefault(r['category'] or '', set()).add(r['supplier'] or '')
+    cat_sups = {c: sorted(v) for c, v in cat_sups.items()}
     return render_template('inventory.html',
+        sups=sups, cat_sups=cat_sups,
         store=store, cats=cats, current_cat=cat, grouped=grouped,
         counts=counts, stale_days=STALE_DAYS)
 

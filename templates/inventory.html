@@ -76,6 +76,10 @@
   {% endfor %}
 </div>
 
+<div class="cat-scroll" id="sup-tabs">
+  <button type="button" class="on" data-sup="">すべての会社</button>
+  {% for n in sups %}<button type="button" data-sup="{{ n }}">{{ n }}</button>{% endfor %}
+</div>
 <div class="cat-scroll" id="cat-tabs">
   <button type="button" class="{% if not current_cat %}on{% endif %}" data-cat="">すべての棚</button>
   {% for c in cats %}<button type="button" class="{% if current_cat == c %}on{% endif %}" data-cat="{{ c }}">{{ c }}</button>{% endfor %}
@@ -104,7 +108,7 @@
     <button class="btn btn-ghost btn-sm" type="button" onclick="checkCategory(this, {{ cat|tojson|forceescape }})">この棚を確認済みにする</button>
   </div>
   {% for p in prods %}
-  <div class="inv-row" data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-version="{{ p.version }}"
+  <div class="inv-row" data-sup="{{ p.supplier or '' }}" data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-version="{{ p.version }}"
        data-unchecked="{{ 1 if p.unchecked else 0 }}" data-stale="{{ 1 if p.stale else 0 }}">
     <div class="inv-info">
       <div class="inv-name">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</div>
@@ -301,15 +305,28 @@ async function checkCategory(btn, cat) {
   }
 }
 
-let currentCat = {{ current_cat|tojson }}, currentF = 'all';
+let currentCat = {{ current_cat|tojson }}, currentF = 'all', currentSup = '';
+const CAT_SUPS = {{ cat_sups|tojson }};
+try { currentSup = localStorage.getItem('inv:sup') || ''; } catch (e) {}
+if (currentSup && !document.querySelector('#sup-tabs button[data-sup="' + CSS.escape(currentSup) + '"]')) currentSup = '';
 function applyFilter() {
+  // 会社を選ぶと、その会社にある棚だけを上のタブに出す
+  document.querySelectorAll('#cat-tabs button').forEach(b => {
+    const c = b.dataset.cat;
+    b.style.display = (!c || !currentSup || (CAT_SUPS[c] || []).includes(currentSup)) ? '' : 'none';
+  });
+  if (currentCat && currentSup && !(CAT_SUPS[currentCat] || []).includes(currentSup)) {
+    currentCat = '';
+    document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', !x.dataset.cat));
+  }
+  document.querySelectorAll('#sup-tabs button').forEach(x => x.classList.toggle('on', x.dataset.sup === currentSup));
   document.querySelectorAll('.cat-card').forEach(card => {
     let any = false;
     if (!currentCat || card.dataset.cat === currentCat) {
       card.querySelectorAll('.inv-row').forEach(row => {
         const f = currentF, short = !!row.querySelector('.short');
-        const show = f === 'all' || (f === 'unchecked' && row.dataset.unchecked === '1')
-          || (f === 'stale' && row.dataset.stale === '1') || (f === 'shortage' && short);
+        const show = (!currentSup || row.dataset.sup === currentSup) && (f === 'all' || (f === 'unchecked' && row.dataset.unchecked === '1')
+          || (f === 'stale' && row.dataset.stale === '1') || (f === 'shortage' && short));
         row.style.display = show ? '' : 'none';
         any = any || show;
       });
@@ -321,6 +338,13 @@ document.querySelectorAll('#filters .chip').forEach(chip => chip.addEventListene
   document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('on', c === chip));
   currentF = chip.dataset.f;
   applyFilter();
+}));
+document.querySelectorAll('#sup-tabs button').forEach(b => b.addEventListener('click', () => {
+  currentSup = b.dataset.sup;
+  try { localStorage.setItem('inv:sup', currentSup); } catch (e) {}
+  applyFilter();
+  window.scrollTo({top: 0});
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
 }));
 document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
