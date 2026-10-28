@@ -31,7 +31,7 @@
     <tbody>
     {% for it in items %}
       <tr>
-        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if order.campaign %}　{{ it.pct|pctf }}%引{% endif %}</div></td>
+        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div></td>
         <td class="q">{{ it.qty }}</td>
         <td class="a">{{ it.amount|yen }}</td>
       </tr>

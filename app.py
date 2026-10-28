@@ -1031,9 +1031,10 @@ def load_customer_order(cur, oid):
     order = cur.fetchone()
     if not order:
         abort(404)
-    cur.execute("""SELECT name, spec, unit_price, qty, unit_price * qty AS amount,
-                          COALESCE(discount_pct, %s) AS pct
-                   FROM customer_order_items WHERE order_id=%s ORDER BY sort_order, id""", (order['discount_pct'], oid))
+    cur.execute("""SELECT i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
+                          COALESCE(i.discount_pct, %s) AS pct, p.category
+                   FROM customer_order_items i LEFT JOIN price_items p ON p.id = i.price_id
+                   WHERE i.order_id=%s ORDER BY i.sort_order, i.id""", (order['discount_pct'], oid))
     items = cur.fetchall()
     return order, items, sum(i['amount'] for i in items)
 
@@ -1041,6 +1042,17 @@ def load_customer_order(cur, oid):
 def order_discount(order, items):
     """(割引額, 支払額, 割引の表示)。割引率が行ごとに違う時は「割引」だけにして、率は各行に出す"""
     disc, pay = calc_discount_lines([(i['amount'], i['pct']) for i in items])
+    for i in items:   # 行ごとの割引の説明（例: 「16%引き＋アルマダ特別割引（−¥2,000）」）
+        i['label'] = ''
+        if order['campaign']:
+            d = calc_discount_lines([(i['amount'], i['pct'])])[0]
+            if d > 0:
+                tier = pct_fmt(order['discount_pct'])
+                if price_kind(i['category'], i['name']) == 'a':
+                    head = (f"{tier}%引き＋" if float(order['discount_pct'] or 0) > 0 else '') + 'アルマダ特別割引'
+                else:
+                    head = f"{pct_fmt(i['pct'])}%引き"
+                i['label'] = f"{head}（－{yen_fmt(d)}）"
     rates = {pct_fmt(i['pct']) for i in items if float(i['pct'] or 0) > 0}
     label = f"{rates.pop()}% 割引" if len(rates) == 1 else "割引（商品ごとの割引率）"
     return disc, pay, label
@@ -1190,7 +1202,7 @@ def customer_order_pdf(oid):
     for it in items:
         pdf.set_font(f, '', 11)
         lines = pdf.multi_cell(name_w - 2, 5.6, it['name'], dry_run=True, output='LINES')
-        sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}" + (f"　{pct_fmt(it['pct'])}%引" if order['campaign'] else '')
+        sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}" + (f"　{it['label']}" if it['label'] else '')
         h = len(lines) * 5.6 + 5 + 2
         if pdf.get_y() + h > bottom - 16:
             pdf.add_page()
