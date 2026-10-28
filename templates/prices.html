@@ -84,7 +84,7 @@
 <div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
   <div class="card-head"><span>{{ cat }} <span style="font-size:13px; color:var(--fg2); font-weight:400">{{ items|length }} 品</span></span></div>
   {% for it in items %}
-  <div class="p-row" data-id="{{ it.id }}" data-price="{{ it.price }}">
+  <div class="p-row" data-id="{{ it.id }}" data-price="{{ it.price }}" data-kind="{{ it.kind }}">
     <div class="p-info">
       <div class="p-name">{{ it.name }}{% if it.note %} <span class="badge badge-muted" style="font-size:11px">{{ it.note }}</span>{% endif %}</div>
       {% if it.spec %}<div class="p-spec">{{ it.spec }}</div>{% endif %}
@@ -102,7 +102,7 @@
 
 <div class="cart-bar" id="cart-bar">
   <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　<span id="c-subline" hidden>小計 <span id="c-sub"></span>　</span>合計 <strong class="total" id="c-total">¥0</strong></div>
-  <div class="cart-disc">割引 <input type="number" id="c-disc" min="0" max="100" step="any" inputmode="decimal" placeholder="0" value="{{ editing.discount_pct if editing and editing.discount_pct != '0' else '' }}"> %
+  <div class="cart-disc"><label style="display:flex; align-items:center; gap:4px"><input type="checkbox" id="c-camp" style="width:auto" {% if not editing or editing.campaign %}checked{% endif %}>年末キャンペーン</label>　割引 <input type="number" id="c-disc" min="0" max="100" step="any" inputmode="decimal" placeholder="0" value="{{ editing.discount_pct if editing and editing.discount_pct != '0' else '' }}"> %
     <span id="c-discamt" style="color:var(--danger); font-weight:700"></span></div>
   <div class="cart-fields">
     <input type="text" id="c-name" class="cname" placeholder="お客様名（必須）" maxlength="60" autocomplete="off"
@@ -145,6 +145,11 @@ function calcDisc(amounts, pct) {   // レジ（POS）と同じ：行ごとに10
   const pay = amounts.reduce((x, a) => x + Math.min(a, Math.floor((a * (10000 - p100) + unit - 1) / unit) * DISC_UNIT), 0);
   return [sub - pay, pay];
 }
+// ── 年末キャンペーン：割引率は通常の商品の税込合計で決まる（サーバーの campaign_tier と同じ）──
+const TIERS = [[15000, 8], [20000, 10], [30000, 12], [40000, 13], [80000, 14]];
+function tierPct(s) { if (s <= 0) return 0; for (const [m, p] of TIERS) if (s <= m) return p; return 16; }
+function kindRate(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? 5 : k === 'f10' ? 10 : t; }
+let discManual = false;   // 割引率を手で入れた時は、自動で書き換えない
 function addCustom(name, price, qty) {
   const d = document.createElement('div'); d.className = 'c-row';
   d.innerHTML = '<input type="text" class="c-n" maxlength="80" placeholder="品名" autocomplete="off">' +
@@ -206,15 +211,23 @@ const STORE_KEY = 'cart:new';
 function readQty(row) { return Math.max(0, Math.min(9999, parseInt(row.querySelector('.qty').value) || 0)); }
 let saveTimer = null;
 function recalc() {
-  let n = 0, total = 0; const amts = [];
+  let n = 0, total = 0, normal = 0; const lines = [];
+  const camp = document.getElementById('c-camp').checked;
   rows().forEach(row => {
     const q = readQty(row);
     row.classList.toggle('sel', q > 0);
     row.querySelector('.qty').classList.toggle('zero', q === 0);
-    if (q > 0) { n++; total += q * parseInt(row.dataset.price); amts.push(q * parseInt(row.dataset.price)); }
+    if (q > 0) {
+      const a = q * parseInt(row.dataset.price), k = row.dataset.kind || 'n';
+      n++; total += a; lines.push([a, k]); if (k === 'n') normal += a;
+    }
   });
-  customVals().forEach(c => { n++; total += c.qty * c.price; amts.push(c.qty * c.price); });
-  const [disc, pay] = calcDisc(amts, document.getElementById('c-disc').value);
+  customVals().forEach(c => { const a = c.qty * c.price; n++; total += a; lines.push([a, 'n']); normal += a; });
+  const dEl = document.getElementById('c-disc');
+  if (camp && !discManual) { const t = tierPct(normal); dEl.value = t || ''; }
+  const base = parseFloat(dEl.value) || 0;
+  let disc = 0, pay = 0;
+  lines.forEach(([a, k]) => { const [d, p] = calcDisc([a], camp ? kindRate(k, base) : base); disc += d; pay += p; });
   document.getElementById('c-count').textContent = n;
   document.getElementById('c-subline').hidden = !disc;
   document.getElementById('c-sub').textContent = yen(total);
@@ -236,7 +249,7 @@ function saveLocal() {
   try {
     const items = {};
     rows().forEach(r => { const q = readQty(r); if (q > 0) items[r.dataset.id] = q; });
-    localStorage.setItem(STORE_KEY, JSON.stringify({items, customs: customVals(), disc: document.getElementById('c-disc').value, name: document.getElementById('c-name').value,
+    localStorage.setItem(STORE_KEY, JSON.stringify({items, customs: customVals(), disc: document.getElementById('c-disc').value, manual: discManual, camp: document.getElementById('c-camp').checked, name: document.getElementById('c-name').value,
       phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value}));
   } catch (e) {}
 }
@@ -248,19 +261,22 @@ function restoreLocal() {
     rows().forEach(r => { if (d.items && d.items[r.dataset.id]) r.querySelector('.qty').value = d.items[r.dataset.id]; });
     (d.customs || []).forEach(c => addCustom(c.name, c.price, c.qty));
     document.getElementById('c-disc').value = d.disc || '';
+    discManual = !!d.manual;
+    if (d.camp !== undefined) document.getElementById('c-camp').checked = d.camp;
     document.getElementById('c-name').value = d.name || '';
     document.getElementById('c-phone').value = d.phone || '';
     document.getElementById('c-memo').value = d.memo || '';
   } catch (e) {}
 }
 ['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id)?.addEventListener('input', saveLocal));
-document.getElementById('c-disc')?.addEventListener('input', recalc);
+document.getElementById('c-disc')?.addEventListener('input', () => { discManual = document.getElementById('c-disc').value !== ''; recalc(); });
+document.getElementById('c-camp')?.addEventListener('change', () => { discManual = false; if (!document.getElementById('c-camp').checked) document.getElementById('c-disc').value = ''; recalc(); });
 
 document.getElementById('c-clear')?.addEventListener('click', () => {
   if (!confirm('選んだ商品と、お客様名などを全部消しますか？')) return;
   rows().forEach(r => r.querySelector('.qty').value = 0);
   crows().forEach(r => r.remove());
-  document.getElementById('c-disc').value = '';
+  document.getElementById('c-disc').value = ''; discManual = false;
   ['c-name', 'c-phone', 'c-memo'].forEach(id => document.getElementById(id).value = '');
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   recalc();
@@ -277,7 +293,7 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
   if (!items.length && !customs.length) { toast('商品の数量を入れてください'); return; }
   const btn = document.getElementById('c-save'); const label = btn.textContent;
   saving = true; btn.disabled = true; btn.textContent = '保存中…';
-  const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0,
+  const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0, campaign: document.getElementById('c-camp').checked,
     phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value});
   try {
     // 30秒で応答がなければ中断して、自動でやり直す（同じ注文が二重にならないよう request_key で守っている）

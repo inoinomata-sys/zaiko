@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 10
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -294,6 +294,9 @@ SCHEMA_SQL = [
     "CREATE INDEX IF NOT EXISTS customer_order_items_order ON customer_order_items (order_id)",
     # キャンペーン等の割引（注文ごとに％を入力）
     "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0",
+    # 割引率が商品ごとに違う注文（年末キャンペーン）。行ごとの割引率が空なら、注文全体の割引率を使う
+    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS campaign BOOLEAN NOT NULL DEFAULT false",
+    "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(6,2)",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -933,6 +936,7 @@ def load_prices():
     cur.execute("SELECT id, category, name, spec, price, note FROM price_items WHERE is_active ORDER BY sort_order, id")
     groups = OrderedDict()
     for r in cur.fetchall():
+        r['kind'] = price_kind(r['category'], r['name'])
         groups.setdefault(r['category'] or 'その他', []).append(r)
     # よく使うカテゴリを先頭に（残りは今までの並び）
     first = [c for c in PRICE_FIRST_CATEGORIES if c in groups]
@@ -949,7 +953,7 @@ def prices():
     if oid:
         # お客様の注文を直す時は、選んだ数量とお客様名を入れた状態で開く
         cur = get_db().cursor()
-        cur.execute("SELECT id, customer, phone, memo, discount_pct FROM customer_orders WHERE id=%s", (oid,))
+        cur.execute("SELECT id, customer, phone, memo, discount_pct, campaign FROM customer_orders WHERE id=%s", (oid,))
         editing = cur.fetchone()
         if editing:
             editing['discount_pct'] = pct_fmt(editing['discount_pct'])
@@ -966,19 +970,60 @@ def prices():
 DISCOUNT_ROUND = 10   # 割引後の支払額は、この円単位で繰り上げる（画面の計算 prices.html と同じにする）
 
 
-def calc_discount(amounts, pct):
-    """(割引額, 支払額)。レジ（POS）と同じく、商品の行ごとに「金額×(100-割引率)%」を10円単位に繰り上げて足す"""
-    subtotal = sum(amounts)
-    p100 = int(round(float(pct or 0) * 100))
-    if p100 <= 0:
-        return 0, subtotal
+def calc_discount_lines(pairs):
+    """(割引額, 支払額)。pairs は (金額, 割引率) の並び。
+    レジ（POS）と同じく、商品の行ごとに「金額×(100-割引率)%」を10円単位に繰り上げて足す"""
+    subtotal = sum(a for a, _ in pairs)
     unit = 10000 * DISCOUNT_ROUND
-    payable = sum(min(a, (a * (10000 - p100) + unit - 1) // unit * DISCOUNT_ROUND) for a in amounts)
+    payable = 0
+    for a, pct in pairs:
+        p100 = int(round(float(pct or 0) * 100))
+        payable += a if p100 <= 0 else min(a, (a * (10000 - p100) + unit - 1) // unit * DISCOUNT_ROUND)
     return subtotal - payable, payable
+
+
+def calc_discount(amounts, pct):
+    return calc_discount_lines([(a, pct) for a in amounts])
+
+
+# ── 年末キャンペーン（割引率が商品ごとに違う） ──
+# 割引率は「通常の商品」の税込合計で決まる。画面の計算 prices.html と同じにする
+CAMPAIGN_TIERS = [(15000, 8), (20000, 10), (30000, 12), (40000, 13), (80000, 14)]
+CAMPAIGN_TOP = 16
+
+
+def campaign_tier(normal_total):
+    if normal_total <= 0:
+        return 0
+    for limit, pct in CAMPAIGN_TIERS:
+        if normal_total <= limit:
+            return pct
+    return CAMPAIGN_TOP
+
+
+def price_kind(category, name):
+    """n=通常 a=アルマダ(さらに5%) f5=一律5% f10=一律10%"""
+    name = name or ''
+    if 'ステラボーテ' in name:
+        return 'f10'
+    if category == 'リファ' or 'リファ' in name or 'オーガニックノート' in name:
+        return 'f5'
+    if category == 'アルマダ' or 'アルマダ' in name or 'エグタム' in name or 'エグータム' in name:
+        return 'a'
+    return 'n'
+
+
+def kind_rate(kind, tier):
+    if kind == 'a':
+        return round(100 - (100 - tier) * 0.95, 2)
+    return {'f5': 5, 'f10': 10}.get(kind, tier)
 
 
 def pct_fmt(pct):
     return ('%g' % float(pct or 0))
+
+
+app.add_template_filter(pct_fmt, 'pctf')
 
 
 def load_customer_order(cur, oid):
@@ -986,10 +1031,19 @@ def load_customer_order(cur, oid):
     order = cur.fetchone()
     if not order:
         abort(404)
-    cur.execute("""SELECT name, spec, unit_price, qty, unit_price * qty AS amount
-                   FROM customer_order_items WHERE order_id=%s ORDER BY sort_order, id""", (oid,))
+    cur.execute("""SELECT name, spec, unit_price, qty, unit_price * qty AS amount,
+                          COALESCE(discount_pct, %s) AS pct
+                   FROM customer_order_items WHERE order_id=%s ORDER BY sort_order, id""", (order['discount_pct'], oid))
     items = cur.fetchall()
     return order, items, sum(i['amount'] for i in items)
+
+
+def order_discount(order, items):
+    """(割引額, 支払額, 割引の表示)。割引率が行ごとに違う時は「割引」だけにして、率は各行に出す"""
+    disc, pay = calc_discount_lines([(i['amount'], i['pct']) for i in items])
+    rates = {pct_fmt(i['pct']) for i in items if float(i['pct'] or 0) > 0}
+    label = f"{rates.pop()}% 割引" if len(rates) == 1 else "割引（商品ごとの割引率）"
+    return disc, pay, label
 
 
 @app.route('/customer-orders')
@@ -1001,11 +1055,12 @@ def customer_orders():
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
     orders = cur.fetchall()
     lines = {}
-    cur.execute("SELECT order_id, unit_price * qty AS a FROM customer_order_items WHERE order_id = ANY(%s)", ([o['id'] for o in orders],))
+    cur.execute("SELECT order_id, unit_price * qty AS a, discount_pct FROM customer_order_items WHERE order_id = ANY(%s)", ([o['id'] for o in orders],))
+    pct_of = {o['id']: o['discount_pct'] for o in orders}
     for r in cur.fetchall():
-        lines.setdefault(r['order_id'], []).append(r['a'])
+        lines.setdefault(r['order_id'], []).append((r['a'], r['discount_pct'] if r['discount_pct'] is not None else pct_of[r['order_id']]))
     for o in orders:
-        o['total'] = calc_discount(lines.get(o['id'], []), o['discount_pct'])[1]
+        o['total'] = calc_discount_lines(lines.get(o['id'], []))[1]
     return render_template('customer_orders.html', orders=orders)
 
 
@@ -1030,6 +1085,7 @@ def customer_order_save():
             if not cn or cp < 0 or cp > 9999999 or cq > 9999:
                 return jsonify(ok=False, error='「その他」の品名・値段・数量を確認してください'), 400
             customs.append((cn, cp, cq))
+        campaign = bool(data.get('campaign'))
         disc = round(float(data.get('discount_pct') or 0), 2)
         if not 0 <= disc <= 100:
             return jsonify(ok=False, error='割引は0〜100%で入力してください'), 400
@@ -1043,13 +1099,13 @@ def customer_order_save():
     db = get_db()
     with transaction(db) as cur:
         ids = [i for i, _ in items]
-        cur.execute("SELECT id, name, spec, price FROM price_items WHERE id = ANY(%s)", (ids,))
+        cur.execute("SELECT id, category, name, spec, price FROM price_items WHERE id = ANY(%s)", (ids,))
         snap = {r['id']: r for r in cur.fetchall()}
         if len(snap) != len(set(ids)):
             return jsonify(ok=False, error='価格表にない商品が含まれています。画面を読み込み直してください'), 400
         if oid:
-            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, updated_at=now()
-                           WHERE id=%s RETURNING id""", (customer, phone, memo, disc, oid))
+            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, campaign=%s, updated_at=now()
+                           WHERE id=%s RETURNING id""", (customer, phone, memo, disc, campaign, oid))
             if not cur.fetchone():
                 return jsonify(ok=False, error='注文が見つかりません'), 404
             cur.execute("DELETE FROM customer_order_items WHERE order_id=%s", (oid,))
@@ -1059,17 +1115,21 @@ def customer_order_save():
                 done = cur.fetchone()
                 if done:
                     return jsonify(ok=True, id=done['id'], repeated=True)
-            cur.execute("INSERT INTO customer_orders (customer, phone, memo, discount_pct, request_key) VALUES (%s,%s,%s,%s,%s) RETURNING id",
-                        (customer, phone, memo, disc, request_key))
+            cur.execute("INSERT INTO customer_orders (customer, phone, memo, discount_pct, campaign, request_key) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                        (customer, phone, memo, disc, campaign, request_key))
             oid = cur.fetchone()['id']
         # 価格表の並び順で、その時の商品名・規格・単価を控えとして残す
         order_of = {r['id']: n for n, r in enumerate(sorted(snap.values(), key=lambda r: r['id']))}
         # 「その他」（価格表にない商品）を先頭に、続けて価格表の商品
-        rows_ = [(oid, None, cn, None, cp, cq, n) for n, (cn, cp, cq) in enumerate(customs)]
-        rows_ += [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, len(customs) + n)
+        # キャンペーンの時は、商品の種類ごとに行の割引率を決める（「通常」の行は、入力された割引率）
+        def line_pct(kind):
+            return kind_rate(kind, disc) if campaign else None
+        rows_ = [(oid, None, cn, None, cp, cq, n, line_pct('n')) for n, (cn, cp, cq) in enumerate(customs)]
+        rows_ += [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, len(customs) + n,
+                   line_pct(price_kind(snap[pid]['category'], snap[pid]['name'])))
                   for n, (pid, q) in enumerate(items)]
         psycopg2.extras.execute_values(cur, """
-            INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order) VALUES %s
+            INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order, discount_pct) VALUES %s
         """, rows_)
     return jsonify(ok=True, id=oid)
 
@@ -1077,9 +1137,9 @@ def customer_order_save():
 @app.route('/customer-orders/<int:oid>')
 def customer_order_view(oid):
     order, items, total = load_customer_order(get_db().cursor(), oid)
-    disc, payable = calc_discount([i['amount'] for i in items], order['discount_pct'])
+    disc, payable, label = order_discount(order, items)
     return render_template('customer_order.html', order=order, items=items, subtotal=total, disc=disc, total=payable,
-                           pct=pct_fmt(order['discount_pct']), note=PRICE_NOTE)
+                           pct=label, note=PRICE_NOTE)
 
 
 @app.route('/customer-orders/<int:oid>/delete', methods=['POST'])
@@ -1091,7 +1151,7 @@ def customer_order_delete(oid):
 @app.route('/customer-orders/<int:oid>/pdf')
 def customer_order_pdf(oid):
     order, items, subtotal = load_customer_order(get_db().cursor(), oid)
-    disc, total = calc_discount([i['amount'] for i in items], order['discount_pct'])
+    disc, total, disc_label = order_discount(order, items)
     pdf = OrderPDF(orientation='P', unit='mm', format='A5')
     font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
     if os.path.exists(font_path):
@@ -1130,7 +1190,7 @@ def customer_order_pdf(oid):
     for it in items:
         pdf.set_font(f, '', 11)
         lines = pdf.multi_cell(name_w - 2, 5.6, it['name'], dry_run=True, output='LINES')
-        sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}"
+        sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}" + (f"　{pct_fmt(it['pct'])}%引" if order['campaign'] else '')
         h = len(lines) * 5.6 + 5 + 2
         if pdf.get_y() + h > bottom - 16:
             pdf.add_page()
@@ -1155,7 +1215,7 @@ def customer_order_pdf(oid):
         pdf.set_font(f, '', 12)
         pdf.cell(W - 62, 8, f"小計 {len(items)} 品")
         pdf.cell(62, 8, yen_fmt(subtotal), align='R', new_x='LMARGIN', new_y='NEXT')
-        pdf.cell(W - 62, 8, f"{pct_fmt(order['discount_pct'])}% 割引")
+        pdf.cell(W - 62, 8, disc_label)
         pdf.cell(62, 8, f"－{yen_fmt(disc)}", align='R', new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 12)
     pdf.cell(W - 62, 11, ("" if disc else f"合計 {len(items)} 品") + ("　" + PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''))
