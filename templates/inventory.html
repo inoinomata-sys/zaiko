@@ -19,6 +19,10 @@
 }
 
 .inv-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.ph-btn { flex: none; width: 44px; height: 44px; border-radius: 8px; border: 1px dashed var(--border); background: var(--bg); color: var(--fg2); font-size: 20px; padding: 0; overflow: hidden; cursor: pointer; }
+.ph-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#ph-modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; z-index: 50; padding: 16px; }
+#ph-modal img { max-width: 100%; max-height: 70vh; border-radius: 8px; }
 .inv-row:last-child { border-bottom: none; }
 .inv-info { flex: 1; min-width: 0; }
 .inv-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
@@ -110,6 +114,7 @@
   {% for p in prods %}
   <div class="inv-row" data-sup="{{ p.supplier or '' }}" data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-version="{{ p.version }}"
        data-unchecked="{{ 1 if p.unchecked else 0 }}" data-stale="{{ 1 if p.stale else 0 }}">
+    <button class="ph-btn" type="button" data-has="{{ 1 if p.id in photo_ids else 0 }}" aria-label="写真">{% if p.id in photo_ids %}<img src="/products/{{ p.id }}/photo" loading="lazy" alt="">{% else %}📷{% endif %}</button>
     <div class="inv-info">
       <div class="inv-name">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</div>
       <div class="inv-meta">
@@ -139,6 +144,16 @@
   {% endfor %}
 </div>
 {% endfor %}
+
+<div id="ph-modal">
+  <img id="ph-big" alt="">
+  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center">
+    <button class="btn" type="button" id="ph-change">撮りなおす・変更</button>
+    <button class="btn btn-ghost" type="button" id="ph-del">削除</button>
+    <button class="btn btn-ghost" type="button" id="ph-close">閉じる</button>
+  </div>
+</div>
+<input type="file" id="ph-file" accept="image/*" hidden>
 
 {% if not grouped %}
 <div style="text-align:center; padding:60px; color:var(--fg2)">
@@ -257,6 +272,43 @@ function setDirect(row) {
   s.queue.push({op: 'set', value: v, version: +row.dataset.version});
   next(row);
 }
+
+// ── 商品の写真 ──
+let phRow = null;
+const phFile = document.getElementById('ph-file'), phModal = document.getElementById('ph-modal');
+function phSet(row, on) {
+  const b = row.querySelector('.ph-btn'); b.dataset.has = on ? 1 : 0;
+  b.innerHTML = on ? `<img src="/products/${row.dataset.id}/photo?t=${Date.now()}" alt="">` : '📷';
+}
+document.querySelectorAll('.ph-btn').forEach(b => b.addEventListener('click', () => {
+  phRow = b.closest('.inv-row');
+  if (b.dataset.has === '1') {
+    document.getElementById('ph-big').src = `/products/${phRow.dataset.id}/photo`;
+    phModal.style.display = 'flex';
+  } else phFile.click();
+}));
+document.getElementById('ph-close').onclick = () => phModal.style.display = 'none';
+document.getElementById('ph-change').onclick = () => { phModal.style.display = 'none'; phFile.click(); };
+document.getElementById('ph-del').onclick = async () => {
+  phModal.style.display = 'none';
+  try { await fetch(`/products/${phRow.dataset.id}/photo/delete`, {method: 'POST'}); phSet(phRow, false); } catch (e) { alert('削除できませんでした'); }
+};
+phFile.addEventListener('change', async () => {
+  const f = phFile.files[0]; phFile.value = '';
+  if (!f || !phRow) return;
+  const row = phRow, btn = row.querySelector('.ph-btn'); btn.textContent = '…';
+  try {
+    const bmp = await createImageBitmap(f, {imageOrientation: 'from-image'});
+    const k = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+    const fd = new FormData(); fd.append('photo', blob, 'p.jpg');
+    const res = await fetch(`/products/${row.dataset.id}/photo`, {method: 'POST', body: fd});
+    if (!res.ok) throw 0;
+    phSet(row, true);
+  } catch (e) { alert('写真を保存できませんでした'); phSet(row, btn.dataset.has === '1'); }
+});
 
 document.querySelectorAll('.inv-row').forEach(row => {
   row.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => stepRow(row, +b.dataset.d)));

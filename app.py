@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -294,6 +294,10 @@ SCHEMA_SQL = [
     "CREATE INDEX IF NOT EXISTS customer_order_items_order ON customer_order_items (order_id)",
     # キャンペーン等の割引（注文ごとに％を入力）
     "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0",
+    # 商品の写真（在庫管理画面から登録。端末側で縮小したJPEGを保存）
+    """CREATE TABLE IF NOT EXISTS product_photos (
+        product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+        data BYTEA NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -434,8 +438,11 @@ def inventory():
     for r in all_rows:
         cat_sups.setdefault(r['category'] or '', set()).add(r['supplier'] or '')
     cat_sups = {c: sorted(v) for c, v in cat_sups.items()}
+    cur = get_db().cursor()
+    cur.execute("SELECT product_id FROM product_photos")
+    photo_ids = {r['product_id'] for r in cur.fetchall()}
     return render_template('inventory.html',
-        sups=sups, cat_sups=cat_sups,
+        photo_ids=photo_ids, sups=sups, cat_sups=cat_sups,
         store=store, cats=cats, current_cat=cat, grouped=grouped,
         counts=counts, stale_days=STALE_DAYS)
 
@@ -1447,6 +1454,41 @@ def products():
     categories = list(OrderedDict.fromkeys(r['category'] for r in rows if r['category']))
     return render_template('products.html', rows=rows, categories=categories,
                            current_supplier=supplier, counts=counts, total=len(all_rows))
+
+
+@app.route('/products/<int:pid>/photo')
+def product_photo(pid):
+    cur = get_db().cursor()
+    cur.execute("SELECT data, updated_at FROM product_photos WHERE product_id=%s", (pid,))
+    r = cur.fetchone()
+    if not r:
+        abort(404)
+    resp = make_response(bytes(r['data']))
+    resp.headers['Content-Type'] = 'image/jpeg'
+    resp.headers['Cache-Control'] = 'private, max-age=86400'
+    return resp
+
+
+@app.route('/products/<int:pid>/photo', methods=['POST'])
+def product_photo_save(pid):
+    f = request.files.get('photo')
+    data = f.read() if f else b''
+    if not data or len(data) > 1_500_000 or data[:3] != b'\xff\xd8\xff':
+        return jsonify(ok=False, error='写真を読み込めませんでした'), 400
+    db = get_db()
+    with transaction(db) as cur:
+        cur.execute("""INSERT INTO product_photos (product_id, data) VALUES (%s, %s)
+                       ON CONFLICT (product_id) DO UPDATE SET data=EXCLUDED.data, updated_at=now()""",
+                    (pid, psycopg2.Binary(data)))
+    return jsonify(ok=True)
+
+
+@app.route('/products/<int:pid>/photo/delete', methods=['POST'])
+def product_photo_delete(pid):
+    db = get_db()
+    with transaction(db) as cur:
+        cur.execute("DELETE FROM product_photos WHERE product_id=%s", (pid,))
+    return jsonify(ok=True)
 
 
 @app.route('/products/add', methods=['POST'])
