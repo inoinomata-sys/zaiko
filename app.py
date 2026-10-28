@@ -987,7 +987,7 @@ def calc_discount(amounts, pct):
 
 
 # ── 年末キャンペーン（割引率が商品ごとに違う） ──
-# 割引率は「通常の商品」の税込合計で決まる。画面の計算 prices.html と同じにする
+# 割引率は、全ての商品の税込合計で決まる。画面の計算 prices.html と同じにする
 CAMPAIGN_TIERS = [(15000, 8), (20000, 10), (30000, 12), (40000, 13), (80000, 14)]
 CAMPAIGN_TOP = 16
 
@@ -1002,7 +1002,7 @@ def campaign_tier(normal_total):
 
 
 def price_kind(category, name):
-    """n=通常 a=アルマダ(さらに5%) f5=一律5% f10=一律10%"""
+    """n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10%"""
     name = name or ''
     if 'ステラボーテ' in name:
         return 'f10'
@@ -1016,7 +1016,7 @@ def price_kind(category, name):
 def kind_rate(kind, tier):
     if kind == 'a':
         return round(100 - (100 - tier) * 0.95, 2)
-    return {'f5': 5, 'f10': 10}.get(kind, tier)
+    return min(tier, {'f5': 5, 'f10': 10}[kind]) if kind in ('f5', 'f10') else tier   # リファ等は「最大5%／10%」
 
 
 def pct_fmt(pct):
