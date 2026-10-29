@@ -1442,7 +1442,7 @@ def prices_pdf():
         pdf.add_font('NotoSans', '', font_path)
         pdf.font_name = 'NotoSans'
     f = pdf.font_name
-    pdf.title_text = f"{PRICE_TITLE}　{PRICE_SHOP}"
+    pdf.title_text = PRICE_TITLE
     pdf.set_margins(15, 12, 15)
     pdf.set_auto_page_break(auto=False)
     pdf.alias_nb_pages()
@@ -1453,7 +1453,7 @@ def prices_pdf():
     pdf.set_font(f, '', 24)
     pdf.cell(0, 13, PRICE_TITLE, new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 11)
-    pdf.cell(0, 6, f"{now.year}年{now.month}月{now.day}日現在　{PRICE_SHOP}", new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6, f"{now.year}年{now.month}月{now.day}日現在", new_x='LMARGIN', new_y='NEXT')
     pdf.cell(0, 6, PRICE_NOTE, new_x='LMARGIN', new_y='NEXT')
     pdf.ln(3)
 
