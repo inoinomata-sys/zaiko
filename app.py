@@ -656,20 +656,42 @@ def api_usage():
     store = data.get('store', 'イノ')
     if store not in STORES or delta == 0:
         return jsonify(ok=False, error='入力が不正です'), 400
-    db = get_db()
-    with transaction(db) as cur:
-        # 同じ商品への同時入力で数がずれないよう、商品の行をロックしてから計算する
-        cur.execute("SELECT id FROM products WHERE id=%s FOR UPDATE", (product_id,))
-        if not cur.fetchone():
-            return jsonify(ok=False, error='商品が見つかりません'), 404
-        cur_u = pending_usage(cur, store, product_id=product_id).get(product_id, {'pending': 0, 'today': 0})
-        if cur_u['pending'] + delta < 0:
-            return jsonify(ok=False, error='0より少なくはできません', **cur_u), 400
-        cur.execute("INSERT INTO usage_log (store, product_id, qty) VALUES (%s,%s,%s)",
-                    (store, product_id, delta))
-        add_to_stock(cur, store, {product_id: -delta})
-        cur_u = pending_usage(cur, store, product_id=product_id).get(product_id, {'pending': 0, 'today': 0})
-    return jsonify(ok=True, **cur_u)
+    # 1回の問い合わせで、確認・記録・在庫の加減をまとめて行う（DBとの往復が多いと、iPhoneで反応が遅くなるため）。
+    # 商品の行をロックしてから計算するので、同じ商品への同時入力でも在庫の数はずれない
+    now = now_jst()
+    cur = get_db().cursor()
+    cur.execute(f"""
+        WITH lk AS (SELECT id FROM products WHERE id=%(pid)s FOR UPDATE),
+        cu AS (
+            SELECT COALESCE(SUM(u.qty), 0) AS pending,
+                   COALESCE(SUM(CASE WHEN u.at >= %(ts)s THEN u.qty ELSE 0 END), 0) AS today
+            FROM usage_log u JOIN products p ON p.id = u.product_id
+            WHERE u.store = %(store)s AND u.product_id = %(pid)s
+              AND u.id > COALESCE((SELECT MAX(o.usage_upto) FROM orders o
+                                   WHERE o.store = u.store AND o.supplier = p.supplier), 0)
+        ),
+        ins AS (
+            INSERT INTO usage_log (store, product_id, qty)
+            SELECT %(store)s, %(pid)s, %(d)s FROM lk, cu WHERE cu.pending + %(d)s >= 0
+            RETURNING id
+        ),
+        st AS (
+            INSERT INTO stock (product_id, store, current_qty, version, changed_at, updated_at)
+            SELECT %(pid)s, %(store)s, %(neg)s, 1, %(now)s, %(nows)s FROM ins
+            ON CONFLICT (product_id, store) DO UPDATE
+            SET current_qty = stock.current_qty + EXCLUDED.current_qty,
+                version = stock.version + 1, changed_at = EXCLUDED.changed_at, updated_at = EXCLUDED.updated_at
+            RETURNING 1
+        )
+        SELECT (SELECT COUNT(*) FROM lk) AS found, (SELECT COUNT(*) FROM ins) AS inserted, cu.pending, cu.today FROM cu
+    """, {'pid': product_id, 'store': store, 'd': delta, 'neg': -delta, 'ts': today_start(),
+          'now': now.isoformat(), 'nows': now.strftime('%Y-%m-%d %H:%M')})
+    r = cur.fetchone()
+    if not r['found']:
+        return jsonify(ok=False, error='商品が見つかりません'), 404
+    if not r['inserted']:
+        return jsonify(ok=False, error='0より少なくはできません', pending=float(r['pending']), today=float(r['today'])), 400
+    return jsonify(ok=True, pending=float(r['pending']) + delta, today=float(r['today']) + delta)
 
 
 # ── 発注書 ───────────────────────────────────────────────────────────────────
