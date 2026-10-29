@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -297,6 +297,8 @@ SCHEMA_SQL = [
     # 割引率が商品ごとに違う注文（年末キャンペーン）。行ごとの割引率が空なら、注文全体の割引率を使う
     "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS campaign BOOLEAN NOT NULL DEFAULT false",
     "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(6,2)",
+    # お客様注文を仕入先へ発注したか（一覧で一目で分かるように）
+    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS ordered_at TIMESTAMPTZ",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -1062,7 +1064,7 @@ def order_discount(order, items):
 def customer_orders():
     cur = get_db().cursor()
     cur.execute("""
-        SELECT o.id, o.customer, o.phone, o.created_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+        SELECT o.id, o.customer, o.phone, o.created_at, o.ordered_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
     orders = cur.fetchall()
@@ -1152,6 +1154,17 @@ def customer_order_view(oid):
     disc, payable, label = order_discount(order, items)
     return render_template('customer_order.html', order=order, items=items, subtotal=total, disc=disc, total=payable,
                            pct=label, note=PRICE_NOTE)
+
+
+@app.route('/customer-orders/<int:oid>/ordered', methods=['POST'])
+def customer_order_ordered(oid):
+    """発注済みの印を付ける／外す"""
+    on = bool((request.get_json(silent=True) or {}).get('ordered'))
+    cur = get_db().cursor()
+    cur.execute("UPDATE customer_orders SET ordered_at = CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s RETURNING id", (on, oid))
+    if not cur.fetchone():
+        return jsonify(ok=False, error='注文が見つかりません'), 404
+    return jsonify(ok=True, ordered=on)
 
 
 @app.route('/customer-orders/<int:oid>/delete', methods=['POST'])

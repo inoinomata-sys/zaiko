@@ -8,6 +8,12 @@
 .o-row:hover { background: #fdf3f7; text-decoration: none; color: var(--fg); }
 .o-name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .o-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
+.o-row.done { background: #f1f8f2; }
+.o-done { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #2e8b57; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+.o-todo { display: inline-block; font-size: 12px; font-weight: 700; color: #b8531a; border: 1px solid #e0a070; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+.o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.o-tabs button { flex: 1; padding: 9px 0; font-size: 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); color: var(--fg); font-family: inherit; }
+.o-tabs button.on { background: var(--accent, #c2527a); color: #fff; border-color: transparent; font-weight: 700; }
 .o-total { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 </style>
 {% endblock %}
@@ -21,11 +27,16 @@
 {% if orders %}
 <input type="search" id="q" placeholder="お客様名で探す" autocomplete="off"
        style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:12px">
+<div class="o-tabs" id="o-tabs">
+  <button type="button" class="on" data-f="all">すべて</button>
+  <button type="button" data-f="todo">未発注</button>
+  <button type="button" data-f="done">発注済み</button>
+</div>
 <div class="card">
   {% for o in orders %}
-  <a class="o-row" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}">
+  <a class="o-row{% if o.ordered_at %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.ordered_at else 0 }}">
     <div>
-      <div class="o-name">{{ o.customer|sama }}</div>
+      <div class="o-name">{{ o.customer|sama }}{% if o.ordered_at %}<span class="o-done">発注済</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
     </div>
     <div class="o-total">{{ o.total|yen }}</div>
@@ -41,10 +52,20 @@
 
 {% block scripts %}
 <script>
+let ofilter = 'all';
+function applyO() {
+  const q = norm(document.getElementById('q')?.value || '');
+  document.querySelectorAll('.o-row').forEach(r => {
+    const okF = ofilter === 'all' || (ofilter === 'done') === (r.dataset.ordered === '1');
+    r.style.display = okF && (!q || norm(r.dataset.name).includes(q)) ? '' : 'none';
+  });
+}
+document.querySelectorAll('#o-tabs button').forEach(b => b.addEventListener('click', () => {
+  ofilter = b.dataset.f;
+  document.querySelectorAll('#o-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  applyO();
+}));
 const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
-document.getElementById('q')?.addEventListener('input', e => {
-  const q = norm(e.target.value);
-  document.querySelectorAll('.o-row').forEach(r => { r.style.display = !q || norm(r.dataset.name).includes(q) ? '' : 'none'; });
-});
+document.getElementById('q')?.addEventListener('input', applyO);
 </script>
 {% endblock %}

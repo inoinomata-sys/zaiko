@@ -46,6 +46,10 @@
   {% if order.memo %}<div class="meta" style="margin-top:10px">メモ: {{ order.memo }}</div>{% endif %}
 </div>
 
+<div class="card" id="ord-box" style="padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+  <span id="ord-state" style="font-weight:700; font-size:16px"></span>
+  <button class="btn btn-ghost btn-sm" type="button" id="ord-btn" style="margin-left:auto"></button>
+</div>
 <div class="act">
   <a class="btn btn-primary" id="pdf-btn" href="/customer-orders/{{ order.id }}/pdf" download>注文用紙 PDF</a>
   <a class="btn btn-ghost" href="/prices?order={{ order.id }}">直す</a>
@@ -55,6 +59,22 @@
 
 {% block scripts %}
 <script>
+let ordered = {{ 'true' if order.ordered_at else 'false' }};
+const orderedAt = {{ (order.ordered_at|jst if order.ordered_at else '')|tojson }};
+function showOrdered() {
+  const st = document.getElementById('ord-state');
+  st.textContent = ordered ? '✔ 発注済み' + (orderedAt ? '（' + orderedAt + '）' : '') : '未発注';
+  st.style.color = ordered ? '#2e8b57' : '#b8531a';
+  document.getElementById('ord-btn').textContent = ordered ? '未発注に戻す' : '発注済みにする';
+}
+showOrdered();
+document.getElementById('ord-btn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('/customer-orders/{{ order.id }}/ordered', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: !ordered})});
+    if (!res.ok) throw 0;
+    ordered = !ordered; if (ordered) location.reload(); else showOrdered();
+  } catch (e) { toast('保存できませんでした。もう一度お試しください'); }
+});
 document.getElementById('del-btn').addEventListener('click', async () => {
   if (!confirm({{ ('「' ~ (order.customer|sama) ~ '」の注文を削除しますか？（元に戻せません）')|tojson }})) return;
   try {
