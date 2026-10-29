@@ -459,8 +459,8 @@ def stock_payload(row):
 @app.route('/api/stock', methods=['POST'])
 def api_update_stock():
     """在庫数の保存。
-    op=delta: ＋／－（使用・補充など）。同時操作でも合算。確認日時は変えない
-    op=set:   数を直接入力。version不一致なら上書きせず409。確認日時は変えない
+    op=delta: ＋／－（使用・補充など）。同時操作でも合算。数が変わったら確認日時も更新する
+    op=set:   数を直接入力。version不一致なら上書きせず409。数が変わったら確認日時も更新する
     op=check: 実際に数えて確認した。value があればその数で保存し、確認日時を記録する
     """
     data = request.get_json() or {}
@@ -513,7 +513,7 @@ def api_update_stock():
                    updated_at=%s
             WHERE product_id=%s AND store=%s
             RETURNING current_qty, version, changed_at, checked_at
-        """, (new_qty, changed, now, op == 'check', now, now.strftime('%Y-%m-%d %H:%M'),
+        """, (new_qty, changed, now, op == 'check' or changed, now, now.strftime('%Y-%m-%d %H:%M'),
               product_id, store))
         result = cur.fetchone()
     return jsonify(ok=True, **stock_payload(result))
