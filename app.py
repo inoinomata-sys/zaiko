@@ -481,6 +481,34 @@ def api_update_stock():
 
     now = now_jst()
     db = get_db()
+    # 速い道：在庫の行がすでにあれば、1回の問い合わせで更新する（DBとの往復が多いと、iPhoneで反応が遅くなるため）。
+    # 行がない・他の端末で先に更新された（version不一致）時は、下の丁寧な手順にまわす
+    if op == 'delta':
+        new_sql, new_params = 'GREATEST(current_qty + %s, 0)', [value]
+    elif op == 'set':
+        new_sql, new_params = '%s::double precision', [value]
+    else:
+        new_sql, new_params = 'COALESCE(%s::double precision, current_qty)', [value]
+    expected = data.get('version')
+    ver_sql, ver_params = '', []
+    if op != 'delta' and value is not None and expected is not None:
+        try:
+            ver_sql, ver_params = ' AND version=%s', [int(expected)]
+        except (TypeError, ValueError):
+            return jsonify(ok=False, error='入力が不正です'), 400
+    cur = db.cursor()
+    cur.execute(f"""
+        UPDATE stock SET current_qty = {new_sql},
+               changed_at = CASE WHEN {new_sql} <> current_qty THEN %s ELSE changed_at END,
+               checked_at = CASE WHEN %s OR {new_sql} <> current_qty THEN %s ELSE checked_at END,
+               version = version + 1, updated_at = %s
+        WHERE product_id=%s AND store=%s{ver_sql}
+        RETURNING current_qty, version, changed_at, checked_at
+    """, new_params + new_params + [now, op == 'check'] + new_params + [now, now.strftime('%Y-%m-%d %H:%M'),
+                                                                          product_id, store] + ver_params)
+    fast = cur.fetchone()
+    if fast:
+        return jsonify(ok=True, **stock_payload(fast))
     with transaction(db) as cur:
         cur.execute("SELECT 1 FROM products WHERE id=%s", (product_id,))
         if not cur.fetchone():
