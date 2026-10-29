@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -299,6 +299,8 @@ SCHEMA_SQL = [
     "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS discount_pct NUMERIC(6,2)",
     # お客様注文を仕入先へ発注したか（一覧で一目で分かるように）
     "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS ordered_at TIMESTAMPTZ",
+    # 商品ごとの発注済み（仕入先がまちまちなので、注文の中で商品ごとに印を付ける）
+    "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ordered BOOLEAN NOT NULL DEFAULT false",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -1033,7 +1035,7 @@ def load_customer_order(cur, oid):
     order = cur.fetchone()
     if not order:
         abort(404)
-    cur.execute("""SELECT i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
+    cur.execute("""SELECT i.id, i.ordered, i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
                           COALESCE(i.discount_pct, %s) AS pct, p.category
                    FROM customer_order_items i LEFT JOIN price_items p ON p.id = i.price_id
                    WHERE i.order_id=%s ORDER BY i.sort_order, i.id""", (order['discount_pct'], oid))
@@ -1064,7 +1066,7 @@ def order_discount(order, items):
 def customer_orders():
     cur = get_db().cursor()
     cur.execute("""
-        SELECT o.id, o.customer, o.phone, o.created_at, o.ordered_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+        SELECT o.id, o.customer, o.phone, o.created_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.ordered::int), 0) AS n_ordered, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
     orders = cur.fetchall()
@@ -1117,11 +1119,15 @@ def customer_order_save():
         snap = {r['id']: r for r in cur.fetchall()}
         if len(snap) != len(set(ids)):
             return jsonify(ok=False, error='価格表にない商品が含まれています。画面を読み込み直してください'), 400
+        was_ordered = set()
         if oid:
             cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, campaign=%s, updated_at=now()
                            WHERE id=%s RETURNING id""", (customer, phone, memo, disc, campaign, oid))
             if not cur.fetchone():
                 return jsonify(ok=False, error='注文が見つかりません'), 404
+            # 直して保存しても、発注済みの印は残す（商品と、手書きの品名で照らし合わせる）
+            cur.execute("SELECT price_id, name FROM customer_order_items WHERE order_id=%s AND ordered", (oid,))
+            was_ordered = {(r['price_id'], r['name'] if r['price_id'] is None else None) for r in cur.fetchall()}
             cur.execute("DELETE FROM customer_order_items WHERE order_id=%s", (oid,))
         else:
             if request_key:
@@ -1138,12 +1144,12 @@ def customer_order_save():
         # キャンペーンの時は、商品の種類ごとに行の割引率を決める（「通常」の行は、入力された割引率）
         def line_pct(kind):
             return kind_rate(kind, disc) if campaign else None
-        rows_ = [(oid, None, cn, None, cp, cq, n, line_pct('n')) for n, (cn, cp, cq) in enumerate(customs)]
+        rows_ = [(oid, None, cn, None, cp, cq, n, line_pct('n'), (None, cn) in was_ordered) for n, (cn, cp, cq) in enumerate(customs)]
         rows_ += [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, len(customs) + n,
-                   line_pct(price_kind(snap[pid]['category'], snap[pid]['name'])))
+                   line_pct(price_kind(snap[pid]['category'], snap[pid]['name'])), (pid, None) in was_ordered)
                   for n, (pid, q) in enumerate(items)]
         psycopg2.extras.execute_values(cur, """
-            INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order, discount_pct) VALUES %s
+            INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order, discount_pct, ordered) VALUES %s
         """, rows_)
     return jsonify(ok=True, id=oid)
 
@@ -1158,12 +1164,21 @@ def customer_order_view(oid):
 
 @app.route('/customer-orders/<int:oid>/ordered', methods=['POST'])
 def customer_order_ordered(oid):
-    """発注済みの印を付ける／外す"""
+    """注文の全商品を、発注済みにする／未発注に戻す"""
     on = bool((request.get_json(silent=True) or {}).get('ordered'))
     cur = get_db().cursor()
-    cur.execute("UPDATE customer_orders SET ordered_at = CASE WHEN %s THEN now() ELSE NULL END WHERE id=%s RETURNING id", (on, oid))
+    cur.execute("UPDATE customer_order_items SET ordered=%s WHERE order_id=%s", (on, oid))
+    return jsonify(ok=True, ordered=on)
+
+
+@app.route('/customer-orders/<int:oid>/items/<int:iid>/ordered', methods=['POST'])
+def customer_order_item_ordered(oid, iid):
+    """商品1つの発注済みの印を付ける／外す"""
+    on = bool((request.get_json(silent=True) or {}).get('ordered'))
+    cur = get_db().cursor()
+    cur.execute("UPDATE customer_order_items SET ordered=%s WHERE id=%s AND order_id=%s RETURNING id", (on, iid, oid))
     if not cur.fetchone():
-        return jsonify(ok=False, error='注文が見つかりません'), 404
+        return jsonify(ok=False, error='商品が見つかりません'), 404
     return jsonify(ok=True, ordered=on)
 
 

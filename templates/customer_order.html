@@ -14,6 +14,8 @@
 .slip .sub { font-size: 12px; color: var(--fg2); }
 .slip .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; font-size: 14px; }
 .slip .sum strong { font-size: 26px; }
+.ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #e0a070; color: #b8531a; background: #fff; font-family: inherit; cursor: pointer; }
+.ord-chip.on { background: #2e8b57; border-color: #2e8b57; color: #fff; }
 .act { display: flex; gap: 8px; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
 .act .btn { flex: 1 1 140px; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
 </style>
@@ -31,7 +33,8 @@
     <tbody>
     {% for it in items %}
       <tr>
-        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div></td>
+        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div>
+          <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ '✔ 発注済' if it.ordered else '未発注' }}</button></td>
         <td class="q">{{ it.qty }}</td>
         <td class="a">{{ it.amount|yen }}</td>
       </tr>
@@ -59,22 +62,30 @@
 
 {% block scripts %}
 <script>
-let ordered = {{ 'true' if order.ordered_at else 'false' }};
-const orderedAt = {{ (order.ordered_at|jst if order.ordered_at else '')|tojson }};
+const chips = () => [...document.querySelectorAll('.ord-chip')];
 function showOrdered() {
+  const all = chips(), n = all.length, k = all.filter(c => c.classList.contains('on')).length;
   const st = document.getElementById('ord-state');
-  st.textContent = ordered ? '✔ 発注済み' + (orderedAt ? '（' + orderedAt + '）' : '') : '未発注';
-  st.style.color = ordered ? '#2e8b57' : '#b8531a';
-  document.getElementById('ord-btn').textContent = ordered ? '未発注に戻す' : '発注済みにする';
+  st.textContent = k === n ? '✔ 全部発注済み' : k ? '一部発注 ' + k + '／' + n + ' 品' : '未発注';
+  st.style.color = k === n ? '#2e8b57' : k ? '#7a5a00' : '#b8531a';
+  document.getElementById('ord-btn').textContent = k === n ? '全部を未発注に戻す' : '全部を発注済みにする';
 }
-showOrdered();
+function setChip(c, on) { c.classList.toggle('on', on); c.textContent = on ? '✔ 発注済' : '未発注'; }
+async function postOrdered(url, on) {
+  const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: on})});
+  if (!res.ok) throw 0;
+}
+chips().forEach(c => c.addEventListener('click', async () => {
+  const on = !c.classList.contains('on');
+  try { await postOrdered('/customer-orders/{{ order.id }}/items/' + c.dataset.id + '/ordered', on); setChip(c, on); showOrdered(); }
+  catch (e) { toast('保存できませんでした。もう一度お試しください'); }
+}));
 document.getElementById('ord-btn').addEventListener('click', async () => {
-  try {
-    const res = await fetch('/customer-orders/{{ order.id }}/ordered', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: !ordered})});
-    if (!res.ok) throw 0;
-    ordered = !ordered; if (ordered) location.reload(); else showOrdered();
-  } catch (e) { toast('保存できませんでした。もう一度お試しください'); }
+  const on = !chips().every(c => c.classList.contains('on'));
+  try { await postOrdered('/customer-orders/{{ order.id }}/ordered', on); chips().forEach(c => setChip(c, on)); showOrdered(); }
+  catch (e) { toast('保存できませんでした。もう一度お試しください'); }
 });
+showOrdered();
 document.getElementById('del-btn').addEventListener('click', async () => {
   if (!confirm({{ ('「' ~ (order.customer|sama) ~ '」の注文を削除しますか？（元に戻せません）')|tojson }})) return;
   try {

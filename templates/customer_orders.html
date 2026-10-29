@@ -11,6 +11,7 @@
 .o-row.done { background: #f1f8f2; }
 .o-done { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #2e8b57; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
 .o-todo { display: inline-block; font-size: 12px; font-weight: 700; color: #b8531a; border: 1px solid #e0a070; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+.o-part { display: inline-block; font-size: 12px; font-weight: 700; color: #7a5a00; background: #fff1c2; border: 1px solid #e3c66a; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
 .o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .o-tabs button { flex: 1; padding: 9px 0; font-size: 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); color: var(--fg); font-family: inherit; }
 .o-tabs button.on { background: var(--accent, #c2527a); color: #fff; border-color: transparent; font-weight: 700; }
@@ -34,9 +35,9 @@
 </div>
 <div class="card">
   {% for o in orders %}
-  <a class="o-row{% if o.ordered_at %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.ordered_at else 0 }}">
+  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}">
     <div>
-      <div class="o-name">{{ o.customer|sama }}{% if o.ordered_at %}<span class="o-done">発注済</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
+      <div class="o-name">{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
     </div>
     <div class="o-total">{{ o.total|yen }}</div>
