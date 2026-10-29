@@ -51,7 +51,10 @@
 .cart-fields .cphone { flex: 1 1 120px; }
 .cart-fields .cmemo { flex: 3 1 220px; }
 .cart-more { margin-top: 6px; font-size: 13px; color: var(--fg2); }
-.cart-more summary { cursor: pointer; padding: 2px 0; }
+.cart-more summary { cursor: pointer; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 15px; font-weight: 600; color: var(--acc); list-style: none; touch-action: manipulation; }
+.cart-more summary::-webkit-details-marker { display: none; }
+.cart-more summary::before { content: '＋ '; }
+.cart-more[open] summary::before { content: '－ '; }
 .cart-btns { display: flex; gap: 8px; margin-top: 8px; }
 .cart-btns .btn { flex: 1; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
 </style>
