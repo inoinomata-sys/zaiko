@@ -49,9 +49,9 @@
   {% if order.memo %}<div class="meta" style="margin-top:10px">メモ: {{ order.memo }}</div>{% endif %}
 </div>
 
-<div class="card" id="ord-box" style="padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-  <span id="ord-state" style="font-weight:700; font-size:16px"></span>
-  <button class="btn btn-ghost btn-sm" type="button" id="ord-btn" style="margin-left:auto"></button>
+<div class="card" id="ord-box" style="padding:12px 14px; margin-bottom:10px">
+  <div id="ord-state" style="font-weight:700; font-size:16px; margin-bottom:10px"></div>
+  <button class="btn btn-primary" type="button" id="ord-btn" style="width:100%; justify-content:center; padding:13px; font-size:17px"></button>
 </div>
 <div class="act" style="margin-bottom:8px">
   <button class="btn btn-ghost pdf-un" type="button" data-url="/customer-orders/unordered/pdf?order={{ order.id }}">この注文の未発注の商品をPDFに</button>
@@ -68,25 +68,33 @@
 const chips = () => [...document.querySelectorAll('.ord-chip')];
 function showOrdered() {
   const all = chips(), n = all.length, k = all.filter(c => c.classList.contains('on')).length;
-  const st = document.getElementById('ord-state');
-  st.textContent = k === n ? '✔ 全部発注済み' : k ? '一部発注 ' + k + '／' + n + ' 品' : '未発注';
+  const st = document.getElementById('ord-state'), btn = document.getElementById('ord-btn');
+  st.textContent = k === n ? '✔ 全部発注済み' : k ? '一部発注 ' + k + '／' + n + ' 品（残り ' + (n - k) + ' 品）' : '未発注（' + n + ' 品）';
   st.style.color = k === n ? '#2e8b57' : k ? '#7a5a00' : '#b8531a';
-  document.getElementById('ord-btn').textContent = k === n ? '全部を未発注に戻す' : '全部を発注済みにする';
+  btn.textContent = k === n ? '発注済みを取り消す（全部を未発注に戻す）' : '✔ 未発注の ' + (n - k) + ' 品を、発注済みに確定する';
+  btn.className = 'btn ' + (k === n ? 'btn-ghost' : 'btn-primary');
 }
 function setChip(c, on) { c.classList.toggle('on', on); c.textContent = on ? '✔ 発注済' : '未発注'; }
 async function postOrdered(url, on) {
-  const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: on})});
-  if (!res.ok) throw 0;
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: on}), signal: ctl.signal});
+    if (!res.ok) throw 0;
+  } finally { clearTimeout(to); }
 }
+// 画面は先に変えて（反応を速く）、保存に失敗した時だけ元に戻す
 chips().forEach(c => c.addEventListener('click', async () => {
   const on = !c.classList.contains('on');
-  try { await postOrdered('/customer-orders/{{ order.id }}/items/' + c.dataset.id + '/ordered', on); setChip(c, on); showOrdered(); }
-  catch (e) { toast('保存できませんでした。もう一度お試しください'); }
+  setChip(c, on); showOrdered();
+  try { await postOrdered('/customer-orders/{{ order.id }}/items/' + c.dataset.id + '/ordered', on); }
+  catch (e) { setChip(c, !on); showOrdered(); toast('保存できませんでした。もう一度お試しください'); }
 }));
 document.getElementById('ord-btn').addEventListener('click', async () => {
   const on = !chips().every(c => c.classList.contains('on'));
-  try { await postOrdered('/customer-orders/{{ order.id }}/ordered', on); chips().forEach(c => setChip(c, on)); showOrdered(); }
-  catch (e) { toast('保存できませんでした。もう一度お試しください'); }
+  const before = chips().map(c => c.classList.contains('on'));
+  chips().forEach(c => setChip(c, on)); showOrdered();
+  try { await postOrdered('/customer-orders/{{ order.id }}/ordered', on); }
+  catch (e) { chips().forEach((c, i) => setChip(c, before[i])); showOrdered(); toast('保存できませんでした。もう一度お試しください'); }
 });
 showOrdered();
 document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
