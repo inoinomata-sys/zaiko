@@ -53,6 +53,9 @@
   <span id="ord-state" style="font-weight:700; font-size:16px"></span>
   <button class="btn btn-ghost btn-sm" type="button" id="ord-btn" style="margin-left:auto"></button>
 </div>
+<div class="act" style="margin-bottom:8px">
+  <button class="btn btn-ghost pdf-un" type="button" data-url="/customer-orders/unordered/pdf?order={{ order.id }}">この注文の未発注の商品をPDFに</button>
+</div>
 <div class="act">
   <a class="btn btn-primary" id="pdf-btn" href="/customer-orders/{{ order.id }}/pdf" download>注文用紙 PDF</a>
   <a class="btn btn-ghost" href="/prices?order={{ order.id }}">直す</a>
@@ -86,6 +89,16 @@ document.getElementById('ord-btn').addEventListener('click', async () => {
   catch (e) { toast('保存できませんでした。もう一度お試しください'); }
 });
 showOrdered();
+document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
+  const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
+  try {
+    const r = await fetch(btn.dataset.url); if (!r.ok) throw 0;
+    const f = new File([await r.blob()], '未発注の商品.pdf', {type: 'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files: [f]})) { await navigator.share({files: [f]}).catch(() => {}); }
+    else { const u = URL.createObjectURL(f); const a = document.createElement('a'); a.href = u; a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 10000); }
+  } catch (e) { toast('PDFを作れませんでした。もう一度お試しください'); }
+  btn.disabled = false; btn.textContent = label;
+}));
 document.getElementById('del-btn').addEventListener('click', async () => {
   if (!confirm({{ ('「' ~ (order.customer|sama) ~ '」の注文を削除しますか？（元に戻せません）')|tojson }})) return;
   try {

@@ -22,7 +22,10 @@
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px">
   <h1 style="font-size:20px; font-weight:700">お客様注文</h1>
-  <a href="/prices" class="btn btn-primary">＋ 新しい注文</a>
+  <div style="display:flex; gap:8px; flex-wrap:wrap">
+    <button type="button" class="btn btn-ghost pdf-un" data-url="/customer-orders/unordered/pdf">未発注の商品をPDFに</button>
+    <a href="/prices" class="btn btn-primary">＋ 新しい注文</a>
+  </div>
 </div>
 
 {% if orders %}
@@ -53,6 +56,17 @@
 
 {% block scripts %}
 <script>
+// 未発注の商品のPDF。iPhoneのアプリでは共有メニュー、それ以外はそのまま開く
+document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
+  const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
+  try {
+    const r = await fetch(btn.dataset.url); if (!r.ok) throw 0;
+    const f = new File([await r.blob()], '未発注の商品.pdf', {type: 'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files: [f]})) { await navigator.share({files: [f]}).catch(() => {}); }
+    else { const u = URL.createObjectURL(f); const a = document.createElement('a'); a.href = u; a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 10000); }
+  } catch (e) { toast('PDFを作れませんでした。もう一度お試しください'); }
+  btn.disabled = false; btn.textContent = label;
+}));
 let ofilter = 'all';
 function applyO() {
   const q = norm(document.getElementById('q')?.value || '');

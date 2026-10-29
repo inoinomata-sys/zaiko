@@ -1182,6 +1182,79 @@ def customer_order_item_ordered(oid, iid):
     return jsonify(ok=True, ordered=on)
 
 
+@app.route('/customer-orders/unordered/pdf')
+def customer_orders_unordered_pdf():
+    """まだ発注していない商品の一覧（発注の作業用）。?order=ID でその注文だけ。商品ごとに数量を合計し、お客様名を添える"""
+    oid = request.args.get('order', type=int)
+    cur = get_db().cursor()
+    cur.execute("""SELECT i.price_id, i.name, i.spec, i.qty, o.customer, p.sort_order
+                   FROM customer_order_items i
+                   JOIN customer_orders o ON o.id = i.order_id
+                   LEFT JOIN price_items p ON p.id = i.price_id
+                   WHERE NOT i.ordered AND (%s::int IS NULL OR o.id = %s)
+                   ORDER BY p.sort_order NULLS LAST, i.name, o.created_at""", (oid, oid))
+    groups = OrderedDict()
+    for r in cur.fetchall():
+        g = groups.setdefault((r['price_id'], None if r['price_id'] else r['name']),
+                              {'name': r['name'], 'spec': r['spec'], 'qty': 0, 'who': []})
+        g['qty'] += r['qty']
+        g['who'].append((sama_fmt(r['customer']), r['qty']))
+    title = '未発注の商品'
+    if oid:
+        cur.execute("SELECT customer FROM customer_orders WHERE id=%s", (oid,))
+        o = cur.fetchone()
+        if not o:
+            abort(404)
+        title += f"　{sama_fmt(o['customer'])}"
+    pdf = OrderPDF(orientation='P', unit='mm', format='A4')
+    font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
+    if os.path.exists(font_path):
+        pdf.add_font('NotoSans', '', font_path)
+        pdf.font_name = 'NotoSans'
+    f = pdf.font_name
+    pdf.title_text = title
+    pdf.set_margins(12, 12, 12)
+    pdf.set_auto_page_break(auto=True, margin=16)
+    pdf.alias_nb_pages()
+    pdf.text_mode = 'FILL_STROKE'
+    pdf.set_line_width(0.25)
+    pdf.add_page()
+    pdf.set_font(f, '', 18)
+    pdf.cell(0, 10, title, new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 10)
+    pdf.cell(0, 6, f"{jst_fmt(now_jst())} 作成　{len(groups)} 品目", new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2)
+    if not groups:
+        pdf.set_font(f, '', 13)
+        pdf.cell(0, 10, '未発注の商品はありません。', new_x='LMARGIN', new_y='NEXT')
+    W = pdf.w - 24
+    for g in groups.values():
+        need = 8 + 6 * len(g['who']) + 2
+        if pdf.get_y() + need > pdf.h - 16:
+            pdf.add_page()
+        y = pdf.get_y()
+        pdf.rect(pdf.l_margin, y + 1.5, 4.5, 4.5)   # 発注したらチェックを入れる四角
+        pdf.set_xy(pdf.l_margin + 7, y)
+        pdf.set_font(f, '', 12)
+        pdf.cell(W - 7 - 24, 8, g['name'] + (f"　{g['spec']}" if g['spec'] else ''))
+        pdf.set_font(f, '', 14)
+        pdf.cell(24, 8, f"× {g['qty']}", align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(f, '', 10)
+        for who, q in g['who']:
+            pdf.set_x(pdf.l_margin + 7)
+            pdf.cell(W - 7 - 24, 6, who)
+            pdf.cell(24, 6, f"{q}", align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_draw_color(190, 190, 190)
+        pdf.line(pdf.l_margin, pdf.get_y() + 1, pdf.w - pdf.r_margin, pdf.get_y() + 1)
+        pdf.set_draw_color(0, 0, 0)
+        pdf.ln(3)
+    resp = make_response(bytes(pdf.output()))
+    resp.headers['Content-Type'] = 'application/pdf'
+    fn = urllib.parse.quote('未発注の商品.pdf')
+    resp.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{fn}"
+    return resp
+
+
 @app.route('/customer-orders/<int:oid>/delete', methods=['POST'])
 def customer_order_delete(oid):
     get_db().cursor().execute("DELETE FROM customer_orders WHERE id=%s", (oid,))
