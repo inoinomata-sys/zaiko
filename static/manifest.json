@@ -10,13 +10,13 @@
   "lang": "ja",
   "icons": [
     {
-      "src": "/static/icons/ino4-192.png",
+      "src": "/static/icons/ino5-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/static/icons/ino4-512.png",
+      "src": "/static/icons/ino5-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
