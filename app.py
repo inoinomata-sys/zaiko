@@ -35,10 +35,10 @@ def _get_pool():
     if _pool is None:
         with _pool_lock:
             if _pool is None:
-                # 最大数は gunicorn のスレッド数(4)に合わせる。4本とも使い終わっても閉じずに残す
-                # （同時に触られた時に、遠いDBへ新しく接続し直す待ちが出ないように）
+                # 最大数は gunicorn のスレッド数(4)に合わせる。2本は使い終わっても閉じずに残す
+                # （DB側の接続の枠は15本まで。残す本数を増やすと、再起動の時などに枠が足りなくなる）
                 _pool = psycopg2.pool.ThreadedConnectionPool(
-                    4, 4, DATABASE_URL, keepalives=1, keepalives_idle=30,
+                    2, 4, DATABASE_URL, keepalives=1, keepalives_idle=30,
                     keepalives_interval=10, keepalives_count=3)
     return _pool
 
