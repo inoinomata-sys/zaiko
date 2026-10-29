@@ -1064,7 +1064,7 @@ def price_kind(category, name):
         return 'f10'
     if category == 'リファ' or 'リファ' in name or 'オーガニックノート' in name:
         return 'f5'
-    if category == 'アルマダ' or 'アルマダ' in name or 'エグタム' in name or 'エグータム' in name:
+    if name.replace(' ', '') in ('アルマダ1000ml', 'エグータムプレミアム'):   # アルマダ特別割引はこの2品のみ
         return 'a'
     return 'n'
 
