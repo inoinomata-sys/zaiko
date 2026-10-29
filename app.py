@@ -1346,7 +1346,7 @@ def build_order_pdf(order, items, subtotal, disc, total, disc_label, k):
     pdf.set_font(f, '', 11 * k)
     if order['phone']:
         pdf.cell(0, 6 * k, f"TEL {order['phone']}", new_x='LMARGIN', new_y='NEXT')
-    pdf.cell(0, 6 * k, PRICE_SHOP, new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6 * k, order['store'], new_x='LMARGIN', new_y='NEXT')
     pdf.ln(2 * k)
 
     def head():

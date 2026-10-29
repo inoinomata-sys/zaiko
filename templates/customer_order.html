@@ -27,7 +27,7 @@
 <div class="slip">
   <div class="meta">ご注文用紙　受付 {{ order.created_at|jst }}</div>
   <h2>{{ order.customer|sama }}　<span style="font-size:13px; font-weight:700; color:var(--acc); border:1px solid var(--acc); border-radius:6px; padding:0 7px; vertical-align:3px">{{ order.store }}</span></h2>
-  <div class="meta">{% if order.phone %}TEL {{ order.phone }}　{% endif %}(有)イノ　TEL 072-999-6571</div>
+  <div class="meta">{% if order.phone %}TEL {{ order.phone }}{% endif %}</div>
   <table>
     <thead><tr><th>商品名</th><th class="q">数量</th><th class="a">金額</th></tr></thead>
     <tbody>
