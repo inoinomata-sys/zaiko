@@ -55,9 +55,9 @@
 {% endblock %}
 
 {% block content %}
+{% include '_order_tabs.html' %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px">
-  <h1 style="font-size:20px; font-weight:700">{% if editing %}注文を直す{% else %}{{ title }}{% endif %}</h1>
-  <a class="btn btn-ghost btn-sm" id="pdf-btn" href="/prices/pdf" download>価格表 PDF</a>
+  <h1 style="font-size:20px; font-weight:700">{% if editing %}注文を直す{% else %}お客様の注文を作る{% endif %}</h1>
 </div>
 <p style="font-size:13px; color:var(--fg2); margin-bottom:12px">
   {{ note }}　<span id="count">{{ total }}</span> 品　／　数量を入れると、下でお客様の注文用紙が作れます
@@ -318,21 +318,5 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
 restoreLocal();
 recalc();
 
-// ── 価格表PDF（iPhoneのホーム画面アプリでは共有メニューを使う） ──
-(function () {
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-  const btn = document.getElementById('pdf-btn');
-  if (!ios || !btn) return;
-  const url = btn.getAttribute('href'); let file = null;
-  btn.removeAttribute('download'); btn.style.pointerEvents = 'none'; btn.style.opacity = '.6'; btn.textContent = 'PDFを準備中…';
-  const fallback = () => { btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '価格表 PDF'; };
-  if (!navigator.canShare) { fallback(); return; }
-  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
-    const f = new File([b], '商品価格表.pdf', {type: 'application/pdf'});
-    if (!navigator.canShare({files: [f]})) return fallback();
-    file = f; btn.style.pointerEvents = ''; btn.style.opacity = ''; btn.textContent = '価格表PDFを保存・共有';
-  }).catch(fallback);
-  btn.addEventListener('click', e => { if (!file) return; e.preventDefault(); navigator.share({files: [file]}).catch(() => {}); });
-})();
 </script>
 {% endblock %}
