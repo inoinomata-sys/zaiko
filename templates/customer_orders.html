@@ -15,6 +15,7 @@
 .o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .o-tabs button { flex: 1; padding: 9px 0; font-size: 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); color: var(--fg); font-family: inherit; }
 .o-tabs button.on { background: var(--accent, #c2527a); color: #fff; border-color: transparent; font-weight: 700; }
+.o-store { display: inline-block; font-size: 12px; font-weight: 700; color: var(--acc); border: 1px solid var(--acc); border-radius: 6px; padding: 0 6px; margin-right: 6px; vertical-align: 2px; }
 .o-total { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 </style>
 {% endblock %}
@@ -24,7 +25,7 @@
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px">
   <h1 style="font-size:20px; font-weight:700">お客様注文の一覧</h1>
   <div style="display:flex; gap:8px; flex-wrap:wrap">
-    <button type="button" class="btn btn-ghost pdf-un" data-url="/customer-orders/unordered/pdf">未発注の商品をPDFに</button>
+    <button type="button" class="btn btn-ghost pdf-un" data-base="/customer-orders/unordered/pdf" data-url="/customer-orders/unordered/pdf">未発注の商品をPDFに</button>
     <button type="button" class="btn btn-ghost pdf-un" data-url="/prices/pdf" data-name="商品価格表.pdf">価格表PDFを保存・共有</button>
   </div>
 </div>
@@ -32,6 +33,11 @@
 {% if orders %}
 <input type="search" id="q" placeholder="お客様名で探す" autocomplete="off"
        style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:12px">
+<div class="o-tabs" id="s-tabs">
+  <button type="button" class="on" data-s="">全店舗</button>
+  <button type="button" data-s="イノ">イノ</button>
+  <button type="button" data-s="リッチ">リッチ</button>
+</div>
 <div class="o-tabs" id="o-tabs">
   <button type="button" class="on" data-f="all">すべて</button>
   <button type="button" data-f="todo">未発注</button>
@@ -39,9 +45,9 @@
 </div>
 <div class="card">
   {% for o in orders %}
-  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}">
+  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}" data-store="{{ o.store }}">
     <div>
-      <div class="o-name">{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
+      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
     </div>
     <div class="o-total">{{ o.total|yen }}</div>
@@ -68,14 +74,21 @@ document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click'
   } catch (e) { toast('PDFを作れませんでした。もう一度お試しください'); }
   btn.disabled = false; btn.textContent = label;
 }));
-let ofilter = 'all';
+let ofilter = 'all', sfilter = '';
 function applyO() {
   const q = norm(document.getElementById('q')?.value || '');
   document.querySelectorAll('.o-row').forEach(r => {
     const okF = ofilter === 'all' || (ofilter === 'done') === (r.dataset.ordered === '1');
-    r.style.display = okF && (!q || norm(r.dataset.name).includes(q)) ? '' : 'none';
+    const okS = !sfilter || r.dataset.store === sfilter;
+    r.style.display = okF && okS && (!q || norm(r.dataset.name).includes(q)) ? '' : 'none';
   });
 }
+document.querySelectorAll('#s-tabs button').forEach(b => b.addEventListener('click', () => {
+  sfilter = b.dataset.s;
+  document.querySelectorAll('#s-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pdf-un[data-base]').forEach(p => { p.dataset.url = p.dataset.base + (sfilter ? '?store=' + encodeURIComponent(sfilter) : ''); });
+  applyO();
+}));
 document.querySelectorAll('#o-tabs button').forEach(b => b.addEventListener('click', () => {
   ofilter = b.dataset.f;
   document.querySelectorAll('#o-tabs button').forEach(x => x.classList.toggle('on', x === b));

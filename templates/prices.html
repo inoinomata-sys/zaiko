@@ -31,6 +31,9 @@
 .c-row .c-n { flex: 1 1 160px; }
 .c-row .c-p { width: 96px; }
 .c-del { border: none; background: none; color: var(--danger); font-size: 22px; cursor: pointer; padding: 4px 8px; }
+.cart-store { display: flex; gap: 8px; margin-bottom: 8px; }
+.cart-store button { flex: 1; padding: 9px 0; font-size: 16px; font-weight: 700; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); font-family: inherit; }
+.cart-store button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
 .cart-disc { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; margin-bottom: 8px; }
 .cart-disc input { width: 70px; font-size: 18px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; text-align: right; font-family: inherit; }
 .cart-bar {
@@ -102,6 +105,9 @@
 
 <div class="cart-bar" id="cart-bar">
   <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　<span id="c-subline" hidden>小計 <span id="c-sub"></span>　</span>合計 <strong class="total" id="c-total">¥0</strong></div>
+  <div class="cart-store" id="c-store" role="group" aria-label="店">
+    <button type="button" data-store="イノ">イノ</button><button type="button" data-store="リッチ">リッチ</button>
+  </div>
   <div class="cart-disc"><label style="display:flex; align-items:center; gap:4px"><input type="checkbox" id="c-camp" style="width:auto" {% if not editing or editing.campaign %}checked{% endif %}>年末キャンペーン</label>　割引 <input type="number" id="c-disc" min="0" max="100" step="any" inputmode="decimal" placeholder="0" value="{{ editing.discount_pct if editing and editing.discount_pct != '0' else '' }}"> %
     <span id="c-discamt" style="color:var(--danger); font-weight:700"></span></div>
   <div class="cart-fields">
@@ -149,6 +155,9 @@ function calcDisc(amounts, pct) {   // レジ（POS）と同じ：行ごとに10
 const TIERS = [[15000, 8], [20000, 10], [30000, 12], [40000, 13], [80000, 14]];
 function tierPct(s) { if (s <= 0) return 0; for (const [m, p] of TIERS) if (s <= m) return p; return 16; }
 function kindRate(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : t; }
+let curStore = {{ (editing.store if editing else 'イノ')|tojson }};
+function showStore() { document.querySelectorAll('#c-store button').forEach(b => b.classList.toggle('on', b.dataset.store === curStore)); }
+document.querySelectorAll('#c-store button').forEach(b => b.addEventListener('click', () => { curStore = b.dataset.store; showStore(); saveLocal(); }));
 let discManual = false;   // 割引率を手で入れた時は、自動で書き換えない
 function addCustom(name, price, qty) {
   const d = document.createElement('div'); d.className = 'c-row';
@@ -249,7 +258,7 @@ function saveLocal() {
   try {
     const items = {};
     rows().forEach(r => { const q = readQty(r); if (q > 0) items[r.dataset.id] = q; });
-    localStorage.setItem(STORE_KEY, JSON.stringify({items, customs: customVals(), disc: document.getElementById('c-disc').value, manual: discManual, camp: document.getElementById('c-camp').checked, name: document.getElementById('c-name').value,
+    localStorage.setItem(STORE_KEY, JSON.stringify({items, customs: customVals(), disc: document.getElementById('c-disc').value, manual: discManual, store: curStore, camp: document.getElementById('c-camp').checked, name: document.getElementById('c-name').value,
       phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value}));
   } catch (e) {}
 }
@@ -262,6 +271,7 @@ function restoreLocal() {
     (d.customs || []).forEach(c => addCustom(c.name, c.price, c.qty));
     document.getElementById('c-disc').value = d.disc || '';
     discManual = !!d.manual;
+    if (d.store) { curStore = d.store; }
     if (d.camp !== undefined) document.getElementById('c-camp').checked = d.camp;
     document.getElementById('c-name').value = d.name || '';
     document.getElementById('c-phone').value = d.phone || '';
@@ -293,7 +303,7 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
   if (!items.length && !customs.length) { toast('商品の数量を入れてください'); return; }
   const btn = document.getElementById('c-save'); const label = btn.textContent;
   saving = true; btn.disabled = true; btn.textContent = '保存中…';
-  const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0, campaign: document.getElementById('c-camp').checked,
+  const body = JSON.stringify({id: EDIT_ID, request_key: EDIT_ID ? null : REQUEST_KEY, customer, items, customs, discount_pct: parseFloat(document.getElementById('c-disc').value) || 0, campaign: document.getElementById('c-camp').checked, store: curStore,
     phone: document.getElementById('c-phone').value, memo: document.getElementById('c-memo').value});
   try {
     // 12秒で応答がなければ中断して、自動でやり直す（電波の切れ目で応答だけ届かないことがあるため、短めに）（同じ注文が二重にならないよう request_key で守っている）
@@ -316,6 +326,7 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
 });
 
 restoreLocal();
+showStore();
 recalc();
 
 </script>

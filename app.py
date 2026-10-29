@@ -246,7 +246,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -301,6 +301,8 @@ SCHEMA_SQL = [
     "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS ordered_at TIMESTAMPTZ",
     # 商品ごとの発注済み（仕入先がまちまちなので、注文の中で商品ごとに印を付ける）
     "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ordered BOOLEAN NOT NULL DEFAULT false",
+    # お客様の注文が、どちらの店の注文か
+    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS store TEXT NOT NULL DEFAULT 'イノ'",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -1007,7 +1009,7 @@ def prices():
     if oid:
         # お客様の注文を直す時は、選んだ数量とお客様名を入れた状態で開く
         cur = get_db().cursor()
-        cur.execute("SELECT id, customer, phone, memo, discount_pct, campaign FROM customer_orders WHERE id=%s", (oid,))
+        cur.execute("SELECT id, customer, phone, memo, discount_pct, campaign, store FROM customer_orders WHERE id=%s", (oid,))
         editing = cur.fetchone()
         if editing:
             editing['discount_pct'] = pct_fmt(editing['discount_pct'])
@@ -1116,7 +1118,7 @@ def order_discount(order, items):
 def customer_orders():
     cur = get_db().cursor()
     cur.execute("""
-        SELECT o.id, o.customer, o.phone, o.created_at, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.ordered::int), 0) AS n_ordered, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+        SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, COUNT(i.id) AS n, COALESCE(SUM(i.ordered::int), 0) AS n_ordered, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300""")
     orders = cur.fetchall()
@@ -1152,6 +1154,9 @@ def customer_order_save():
                 return jsonify(ok=False, error='「その他」の品名・値段・数量を確認してください'), 400
             customs.append((cn, cp, cq))
         campaign = bool(data.get('campaign'))
+        store = data.get('store', 'イノ')
+        if store not in STORES:
+            return jsonify(ok=False, error='店を選んでください'), 400
         disc = round(float(data.get('discount_pct') or 0), 2)
         if not 0 <= disc <= 100:
             return jsonify(ok=False, error='割引は0〜100%で入力してください'), 400
@@ -1171,8 +1176,8 @@ def customer_order_save():
             return jsonify(ok=False, error='価格表にない商品が含まれています。画面を読み込み直してください'), 400
         was_ordered = set()
         if oid:
-            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, campaign=%s, updated_at=now()
-                           WHERE id=%s RETURNING id""", (customer, phone, memo, disc, campaign, oid))
+            cur.execute("""UPDATE customer_orders SET customer=%s, phone=%s, memo=%s, discount_pct=%s, campaign=%s, store=%s, updated_at=now()
+                           WHERE id=%s RETURNING id""", (customer, phone, memo, disc, campaign, store, oid))
             if not cur.fetchone():
                 return jsonify(ok=False, error='注文が見つかりません'), 404
             # 直して保存しても、発注済みの印は残す（商品と、手書きの品名で照らし合わせる）
@@ -1185,8 +1190,8 @@ def customer_order_save():
                 done = cur.fetchone()
                 if done:
                     return jsonify(ok=True, id=done['id'], repeated=True)
-            cur.execute("INSERT INTO customer_orders (customer, phone, memo, discount_pct, campaign, request_key) VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
-                        (customer, phone, memo, disc, campaign, request_key))
+            cur.execute("INSERT INTO customer_orders (customer, phone, memo, discount_pct, campaign, store, request_key) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                        (customer, phone, memo, disc, campaign, store, request_key))
             oid = cur.fetchone()['id']
         # 価格表の並び順で、その時の商品名・規格・単価を控えとして残す
         order_of = {r['id']: n for n, r in enumerate(sorted(snap.values(), key=lambda r: r['id']))}
@@ -1236,20 +1241,21 @@ def customer_order_item_ordered(oid, iid):
 def customer_orders_unordered_pdf():
     """まだ発注していない商品の一覧（発注の作業用）。?order=ID でその注文だけ。商品ごとに数量を合計し、お客様名を添える"""
     oid = request.args.get('order', type=int)
+    store = request.args.get('store') if request.args.get('store') in STORES else None
     cur = get_db().cursor()
     cur.execute("""SELECT i.price_id, i.name, i.spec, i.qty, o.customer, p.sort_order
                    FROM customer_order_items i
                    JOIN customer_orders o ON o.id = i.order_id
                    LEFT JOIN price_items p ON p.id = i.price_id
-                   WHERE NOT i.ordered AND (%s::int IS NULL OR o.id = %s)
-                   ORDER BY p.sort_order NULLS LAST, i.name, o.created_at""", (oid, oid))
+                   WHERE NOT i.ordered AND (%s::int IS NULL OR o.id = %s) AND (%s::text IS NULL OR o.store = %s)
+                   ORDER BY p.sort_order NULLS LAST, i.name, o.created_at""", (oid, oid, store, store))
     groups = OrderedDict()
     for r in cur.fetchall():
         g = groups.setdefault((r['price_id'], None if r['price_id'] else r['name']),
                               {'name': r['name'], 'spec': r['spec'], 'qty': 0, 'who': []})
         g['qty'] += r['qty']
         g['who'].append((sama_fmt(r['customer']), r['qty']))
-    title = '未発注の商品'
+    title = '未発注の商品' + (f'（{store}）' if store else '')
     if oid:
         cur.execute("SELECT customer FROM customer_orders WHERE id=%s", (oid,))
         o = cur.fetchone()
