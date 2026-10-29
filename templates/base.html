@@ -55,11 +55,16 @@ nav a.nav-link {
   transition: background .15s;
   white-space: nowrap;
 }
-@media (max-width: 500px) {
-  nav { padding: 0 10px; gap: 2px; overflow-x: auto; }
-  nav .brand { font-size: 14px; margin-right: 8px; }
-  nav a.nav-link { padding: 6px 8px; font-size: 13px; }
-  nav .store-badge { font-size: 12px; padding: 3px 8px; }
+nav a.nav-link .ico { font-size: 18px; line-height: 1; margin-right: 6px; }
+@media (max-width: 700px) {
+  /* スマホ・タブレット: 5つのボタンを横いっぱいに並べ、絵を上、文字を下にして、押す場所を大きくする */
+  :root { --nav-h: 64px; }
+  nav { padding: 4px 6px; gap: 4px; }
+  nav .brand, nav .spacer, nav .store-badge { display: none; }
+  nav a.nav-link { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                   gap: 3px; height: 100%; padding: 4px 1px; font-size: clamp(12px, 3.7vw, 16px); font-weight: 700; text-align: center; white-space: nowrap; }
+  nav a.nav-link .ico { margin: 0; font-size: 24px; }
+  nav a.nav-link.active { background: #fff; color: var(--acc); }
   main { padding: 12px; }
 }
 nav a.nav-link:hover { background: rgba(255,255,255,.15); text-decoration: none; color: #fff; }
@@ -191,11 +196,11 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
 <body>
 <nav>
   <span class="brand">在庫管理</span>
-  <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">在庫</a>
-  <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}">使用入力</a>
-  <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}">発注</a>
-  <a href="/customer-orders" class="nav-link {% if request.path.startswith('/customer-orders') or request.path.startswith('/prices') %}active{% endif %}">お客様注文</a>
-  <a href="/settings" class="nav-link {% if request.path.startswith('/settings') or request.path.startswith('/products') %}active{% endif %}">設定</a>
+  <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}"><span class="ico">📦</span><span>在庫</span></a>
+  <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}"><span class="ico">✏️</span><span>使用入力</span></a>
+  <a href="/order" class="nav-link {% if request.path.startswith('/order') %}active{% endif %}"><span class="ico">🛒</span><span>発注</span></a>
+  <a href="/customer-orders" class="nav-link {% if request.path.startswith('/customer-orders') or request.path.startswith('/prices') %}active{% endif %}"><span class="ico">🧾</span><span>お客様注文</span></a>
+  <a href="/settings" class="nav-link {% if request.path.startswith('/settings') or request.path.startswith('/products') %}active{% endif %}"><span class="ico">⚙️</span><span>設定</span></a>
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
 </nav>
