@@ -79,6 +79,8 @@
       <span class="order-meta">{{ o.item_count }} 品 &nbsp;/&nbsp; {{ o.total_qty|int }} 点</span>
       <div class="order-actions">
         <a href="/order/{{ o.id }}/print" class="btn btn-ghost btn-sm">表示</a>
+        <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+                onclick="delOrder({{ o.id }}, {{ (o.store ~ ' ' ~ o.supplier ~ '（' ~ o.item_count ~ '品 / ' ~ (o.total_qty|int) ~ '点）')|tojson|forceescape }}, this)">削除</button>
       </div>
     </div>
     {% endfor %}
@@ -104,6 +106,15 @@ function filterSup(btn, sup) {
   btn.classList.add('active');
   currentSup = sup;
   applyFilter();
+}
+async function delOrder(id, label, btn) {
+  if (!confirm(label + ' の発注を削除しますか？\n\n・在庫から、この発注で足した分を引きます\n・使用入力の数は、この発注の前の状態に戻ります\n（元に戻せません。試しの発注を消す時に使ってください）')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/order/' + id + '/delete', {method: 'POST'});
+    if (!res.ok) throw 0;
+    location.reload();
+  } catch (e) { btn.disabled = false; alert('削除できませんでした。もう一度お試しください'); }
 }
 function applyFilter() {
   document.querySelectorAll('.date-group').forEach(group => {

@@ -1597,6 +1597,27 @@ def order_history():
                            history_suppliers=[s for s in SUPPLIER_NAMES if s not in NO_HISTORY_SUPPLIERS])
 
 
+@app.route('/order/<int:order_id>/delete', methods=['POST'])
+def order_delete(order_id):
+    """発注の取り消し（試しの発注など）。確定した時に在庫へ足した分を引き、履歴から消す。
+    使用入力の「前回の発注から」の基準は、この発注より前の発注に戻る"""
+    db = get_db()
+    with transaction(db) as cur:
+        cur.execute("SELECT store FROM orders WHERE id=%s FOR UPDATE", (order_id,))
+        o = cur.fetchone()
+        if not o:
+            return jsonify(ok=False, error='発注が見つかりません'), 404
+        cur.execute("SELECT product_id, SUM(order_qty) AS q FROM order_items WHERE order_id=%s AND product_id IS NOT NULL GROUP BY product_id", (order_id,))
+        amounts = {r['product_id']: -float(r['q']) for r in cur.fetchall()}
+        add_to_stock(cur, o['store'], amounts)
+        if amounts:
+            cur.execute("UPDATE stock SET current_qty = GREATEST(current_qty, 0) WHERE store=%s AND product_id = ANY(%s)",
+                        (o['store'], list(amounts)))
+        cur.execute("DELETE FROM order_items WHERE order_id=%s", (order_id,))
+        cur.execute("DELETE FROM orders WHERE id=%s", (order_id,))
+    return jsonify(ok=True)
+
+
 # ── 商品マスター管理 ──────────────────────────────────────────────────────────
 
 @app.route('/products')
