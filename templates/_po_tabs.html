@@ -1,0 +1,9 @@
+<style>
+.ot { display: flex; gap: 8px; margin-bottom: 14px; }
+.ot a { flex: 1; text-align: center; padding: 12px 0; font-size: 16px; font-weight: 700; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); text-decoration: none; }
+.ot a.on { background: var(--accent, #c2527a); border-color: transparent; color: #fff; }
+</style>
+<div class="ot">
+  <a href="/order" class="{% if request.path != '/order/history' %}on{% endif %}">発注書を作る</a>
+  <a href="/order/history" class="{% if request.path == '/order/history' %}on{% endif %}">発注の履歴</a>
+</div>

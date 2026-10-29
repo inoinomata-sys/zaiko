@@ -1849,6 +1849,11 @@ def product_supplier(pid):
 
 # ── 担当者管理 ────────────────────────────────────────────────────────────────
 
+@app.route('/settings')
+def settings_top():
+    return render_template('settings.html')
+
+
 @app.route('/settings/contacts')
 def contacts_settings():
     return render_template('contacts.html', suppliers=get_suppliers_with_contacts())
