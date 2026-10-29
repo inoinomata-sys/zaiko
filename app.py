@@ -1311,10 +1311,8 @@ def customer_order_delete(oid):
     return jsonify(ok=True)
 
 
-@app.route('/customer-orders/<int:oid>/pdf')
-def customer_order_pdf(oid):
-    order, items, subtotal = load_customer_order(get_db().cursor(), oid)
-    disc, total, disc_label = order_discount(order, items)
+def build_order_pdf(order, items, subtotal, disc, total, disc_label, k):
+    """A5の注文用紙。k は文字と行の大きさの倍率（1.0 が標準）"""
     pdf = OrderPDF(orientation='P', unit='mm', format='A5')
     font_path = os.path.join(os.path.dirname(__file__), 'static', 'NotoSansJP-Regular.ttf')
     if os.path.exists(font_path):
@@ -1322,49 +1320,53 @@ def customer_order_pdf(oid):
         pdf.font_name = 'NotoSans'
     f = pdf.font_name
     pdf.title_text = f"ご注文用紙　{sama_fmt(order['customer'])}"
-    pdf.set_margins(8, 8, 8)
+    M = 6   # 余白（用紙をできるだけ使う）
+    pdf.set_margins(M, M, M)
     pdf.set_auto_page_break(auto=False)
     pdf.alias_nb_pages()
     pdf.text_mode = 'FILL_STROKE'   # 同梱フォントが極細のため、輪郭線で太く見せる
     pdf.set_line_width(0.25)
     pdf.add_page()
-    W = pdf.w - 16
-    name_w, qty_w = W - 14 - 32, 14
-    amt_w = 32
-    bottom = pdf.h - 14
+    W = pdf.w - 2 * M
+    qty_w, amt_w = max(14, 8 * k), max(32, 20 * k)
+    name_w = W - qty_w - amt_w
+    bottom = pdf.h - 12
+    sum_w = max(62, 36 * k)
 
-    pdf.set_font(f, '', 11)
-    pdf.cell(0, 6, f"ご注文用紙　受付 {jst_fmt(order['created_at'])}", new_x='LMARGIN', new_y='NEXT')
-    pdf.set_font(f, '', 22)
-    pdf.multi_cell(0, 11, sama_fmt(order['customer']), new_x='LMARGIN', new_y='NEXT')
-    pdf.set_font(f, '', 11)
+    pdf.set_font(f, '', 11 * k)
+    pdf.cell(0, 6 * k, f"ご注文用紙　受付 {jst_fmt(order['created_at'])}", new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 22 * k)
+    pdf.multi_cell(0, 11 * k, sama_fmt(order['customer']), new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 11 * k)
     if order['phone']:
-        pdf.cell(0, 6, f"TEL {order['phone']}", new_x='LMARGIN', new_y='NEXT')
-    pdf.cell(0, 6, PRICE_SHOP, new_x='LMARGIN', new_y='NEXT')
-    pdf.ln(2)
+        pdf.cell(0, 6 * k, f"TEL {order['phone']}", new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 6 * k, PRICE_SHOP, new_x='LMARGIN', new_y='NEXT')
+    pdf.ln(2 * k)
 
     def head():
-        pdf.set_font(f, '', 10)
+        pdf.set_font(f, '', 10 * k)
         pdf.set_fill_color(225, 225, 225)
-        pdf.cell(name_w, 7, ' 商品名', fill=True)
-        pdf.cell(qty_w, 7, '数量', fill=True, align='C')
-        pdf.cell(amt_w, 7, '金額 ', fill=True, align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(name_w, 7 * k, ' 商品名', fill=True)
+        pdf.cell(qty_w, 7 * k, '数量', fill=True, align='C')
+        pdf.cell(amt_w, 7 * k, '金額 ', fill=True, align='R', new_x='LMARGIN', new_y='NEXT')
     head()
     for it in items:
-        pdf.set_font(f, '', 11)
-        lines = pdf.multi_cell(name_w - 2, 5.6, it['name'], dry_run=True, output='LINES')
+        pdf.set_font(f, '', 11 * k)
+        lines = pdf.multi_cell(name_w - 2, 5.6 * k, it['name'], dry_run=True, output='LINES')
         sub = (f"{it['spec']}　" if it['spec'] else '') + f"{yen_fmt(it['unit_price'])}" + (f"　{it['label']}" if it['label'] else '')
-        h = len(lines) * 5.6 + 5 + 2
-        if pdf.get_y() + h > bottom - 16:
+        pdf.set_font(f, '', 8.5 * k)
+        sub_lines = pdf.multi_cell(name_w - 2, 4.5 * k, sub, dry_run=True, output='LINES')
+        h = len(lines) * 5.6 * k + len(sub_lines) * 4.5 * k + 3
+        if pdf.get_y() + h > bottom - (24 * k if it is items[-1] else 0):
             pdf.add_page()
             head()
         y = pdf.get_y()
         pdf.set_xy(pdf.l_margin + 1, y + 1)
-        pdf.multi_cell(name_w - 2, 5.6, it['name'])
-        pdf.set_font(f, '', 8.5)
+        pdf.multi_cell(name_w - 2, 5.6 * k, it['name'])
+        pdf.set_font(f, '', 8.5 * k)
         pdf.set_x(pdf.l_margin + 1)
-        pdf.cell(name_w - 2, 4.5, sub)
-        pdf.set_font(f, '', 13)
+        pdf.multi_cell(name_w - 2, 4.5 * k, sub)
+        pdf.set_font(f, '', 13 * k)
         pdf.set_xy(pdf.l_margin + name_w, y)
         pdf.cell(qty_w, h, str(it['qty']), align='C')
         pdf.cell(amt_w - 1, h, yen_fmt(it['amount']), align='R')
@@ -1373,22 +1375,38 @@ def customer_order_pdf(oid):
         pdf.line(pdf.l_margin, y + h, pdf.w - pdf.r_margin, y + h)
         pdf.set_draw_color(0, 0, 0)
         pdf.set_xy(pdf.l_margin, y + h)
-    pdf.ln(2)
+    pdf.ln(2 * k)
     if disc:
-        pdf.set_font(f, '', 12)
-        pdf.cell(W - 62, 8, f"小計 {len(items)} 品")
-        pdf.cell(62, 8, yen_fmt(subtotal), align='R', new_x='LMARGIN', new_y='NEXT')
-        pdf.cell(W - 62, 8, disc_label)
-        pdf.cell(62, 8, f"－{yen_fmt(disc)}", align='R', new_x='LMARGIN', new_y='NEXT')
-    pdf.set_font(f, '', 12)
-    pdf.cell(W - 62, 11, ("" if disc else f"合計 {len(items)} 品") + ("　" + PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''))
-    pdf.set_font(f, '', 18)
-    pdf.cell(62, 11, f"合計 {yen_fmt(total)}", align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(f, '', 12 * k)
+        pdf.cell(W - sum_w, 8 * k, f"小計 {len(items)} 品")
+        pdf.cell(sum_w, 8 * k, yen_fmt(subtotal), align='R', new_x='LMARGIN', new_y='NEXT')
+        pdf.cell(W - sum_w, 8 * k, disc_label)
+        pdf.cell(sum_w, 8 * k, f"－{yen_fmt(disc)}", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 18 * k)
+    pdf.cell(0, 12 * k, f"合計 {yen_fmt(total)}", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.set_font(f, '', 9 * k)
+    pdf.cell(0, 5 * k, ("" if disc else f"{len(items)} 品　") + (PRICE_NOTE.rstrip('。') if PRICE_NOTE else ''), align='R', new_x='LMARGIN', new_y='NEXT')
     if order['memo']:
-        pdf.ln(2)
-        pdf.set_font(f, '', 10)
-        pdf.multi_cell(0, 5.5, f"メモ: {order['memo']}")
+        pdf.ln(2 * k)
+        pdf.set_font(f, '', 10 * k)
+        pdf.multi_cell(0, 5.5 * k, f"メモ: {order['memo']}")
+    return pdf
 
+
+ORDER_PDF_MAX_SCALE = 1.6   # 品数が少ない時に、文字を大きくする上限
+
+
+@app.route('/customer-orders/<int:oid>/pdf')
+def customer_order_pdf(oid):
+    order, items, subtotal = load_customer_order(get_db().cursor(), oid)
+    disc, total, disc_label = order_discount(order, items)
+    # A5の1枚に収まる範囲で、いちばん大きい倍率を使う（品数が多くて収まらない時は、標準の大きさで複数ページ）
+    pdf = None
+    for step in range(int(ORDER_PDF_MAX_SCALE * 10), 9, -1):
+        cand = build_order_pdf(order, items, subtotal, disc, total, disc_label, step / 10)
+        if cand.page_no() == 1 or step == 10:
+            pdf = cand
+            break
     response = make_response(bytes(pdf.output()))
     response.headers['Content-Type'] = 'application/pdf'
     fn = urllib.parse.quote(f"注文用紙_{sama_fmt(order['customer']).replace(' ', '')}.pdf")
