@@ -223,6 +223,20 @@ def release_db(conn):
     _checkin(conn)
 
 
+@app.before_request
+def _timing_start():
+    g._t0 = time.perf_counter()
+
+
+@app.after_request
+def _timing_end(resp):
+    # 遅さの調査用。サーバー側で処理に何ミリ秒かかったかを返す（個人情報は含まない）
+    t0 = g.get('_t0')
+    if t0 is not None:
+        resp.headers['Server-Timing'] = 'app;dur=%d' % ((time.perf_counter() - t0) * 1000)
+    return resp
+
+
 @app.teardown_request
 def _release_request_db(exc):
     conn = g.pop('db', None)
