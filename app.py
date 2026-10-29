@@ -983,7 +983,7 @@ PRICE_NOTE = '表示の価格は税込です。'
 PRICE_SHOP = '(有)イノ　TEL 072-999-6571'
 
 
-PRICE_FIRST_CATEGORIES = ['コアミー シャンプー', 'コアミー ケア用品']
+PRICE_FIRST_CATEGORIES = []   # 並びはレジの店販中分類の表示順（sort_order）どおり
 
 
 def load_prices():
@@ -1062,7 +1062,7 @@ def price_kind(category, name):
     name = name or ''
     if 'ステラボーテ' in name:
         return 'f10'
-    if category == 'リファ' or 'リファ' in name or 'オーガニックノート' in name:
+    if (category or '').startswith('リファ') or 'リファ' in name or 'オーガニックノート' in name:
         return 'f5'
     if name.replace(' ', '') in ('アルマダ1000ml', 'エグータムプレミアム'):   # アルマダ特別割引はこの2品のみ
         return 'a'
