@@ -114,7 +114,11 @@ async function delOrder(id, label, btn) {
   try {
     const res = await fetch('/order/' + id + '/delete', {method: 'POST'});
     if (!res.ok) throw 0;
-    location.reload();
+    // 画面を読み込み直さず、その行だけ消す
+    const card = btn.closest('.order-card'), group = btn.closest('.date-group');
+    card.remove();
+    if (group && !group.querySelector('.order-card')) group.remove();
+    toast('削除しました');
   } catch (e) { btn.disabled = false; alert('削除できませんでした。もう一度お試しください'); }
 }
 function applyFilter() {
