@@ -1686,6 +1686,24 @@ def order_history():
                            history_suppliers=[s for s in SUPPLIER_NAMES if s not in NO_HISTORY_SUPPLIERS])
 
 
+@app.route('/settings/orders')
+def settings_orders():
+    """発注の取り消し（設定の中）。試しの発注を消す人だけが触るよう、発注履歴の画面からは分けてある"""
+    cur = get_db().cursor()
+    cur.execute("""
+        SELECT o.id, o.store, o.supplier, o.order_month, o.order_day,
+               COUNT(oi.id) AS item_count, COALESCE(SUM(oi.order_qty), 0) AS total_qty
+        FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id
+        GROUP BY o.id
+        ORDER BY o.order_month DESC, o.order_day DESC, o.created_at DESC
+        LIMIT 100
+    """)
+    grouped = OrderedDict()
+    for o in cur.fetchall():
+        grouped.setdefault((o['order_month'], o['order_day']), []).append(o)
+    return render_template('settings_orders.html', grouped=grouped)
+
+
 @app.route('/order/<int:order_id>/delete', methods=['POST'])
 def order_delete(order_id):
     """発注の取り消し（試しの発注など）。確定した時に在庫へ足した分を引き、履歴から消す。
