@@ -189,3 +189,9 @@ function h_shift_staff_toggle(int $id): void
     run('UPDATE shift_staff SET is_active = 1 - is_active WHERE id = ?', [$id]);
     redirect_to('/shift/staff');
 }
+
+/** ログインのあとに開く、在庫管理とシフトの選び場所 */
+function h_menu(): void
+{
+    render('menu');
+}

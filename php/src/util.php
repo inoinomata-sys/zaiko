@@ -337,7 +337,7 @@ function require_basic_auth(): void
     }
     if (login_cookie_ok($cfg, (string)($_COOKIE['zlogin'] ?? ''))) {
         if ($path === '/login') {
-            header('Location: /');
+            header('Location: /menu');
             exit;
         }
         return;
@@ -353,7 +353,7 @@ function require_basic_auth(): void
             setcookie('zlogin', login_cookie_value($cfg, $exp), [
                 'expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax',
             ]);
-            header('Location: /');
+            header('Location: /menu');
             exit;
         }
         sleep(1);

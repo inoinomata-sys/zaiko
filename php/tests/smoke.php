@@ -294,7 +294,8 @@ if ($failures) {
     }
 }
 
-// ── シフト（新しい表だけを使う。在庫・発注には触らない） ──
+// ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
+page_ok('/menu', 'シフト');
 page_ok('/shift');
 page_ok('/shift/staff');
 page_ok('/shift/edit');

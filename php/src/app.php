@@ -102,6 +102,7 @@ function routes(): array
         ['POST', '/settings/contacts/add', 'h_contact_add'],
         ['POST', '/settings/contacts/<int:id>/update', 'h_contact_update'],
         ['POST', '/settings/contacts/<int:id>/delete', 'h_contact_delete'],
+        ['GET', '/menu', 'h_menu'],
         ['GET', '/shift', 'h_shift'],
         ['GET', '/shift/edit', 'h_shift_edit'],
         ['POST', '/api/shift', 'h_api_shift'],

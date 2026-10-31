@@ -1,0 +1,16 @@
+{% extends 'base.twig' %}
+{% block title %}メニュー{% endblock %}
+{% block head %}
+<style>
+.mn-wrap { max-width: 480px; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; }
+.mn-card { display: block; padding: 26px 20px; background: #fff; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: var(--fg); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+.mn-card b { display: block; font-size: 22px; margin-bottom: 6px; color: var(--acc); }
+.mn-card span { font-size: 14px; color: var(--fg2); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="mn-wrap">
+  <a class="mn-card" href="/"><b>在庫管理</b><span>在庫・使用入力・発注・お客様注文</span></a>
+  <a class="mn-card" href="/shift"><b>シフト</b><span>イノ・リッチの出勤（ヘルプの日も見えます）</span></a>
+</div>
+{% endblock %}
