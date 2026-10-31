@@ -157,7 +157,7 @@ function calcDisc(amounts, pct) {   // レジ（POS）と同じ：行ごとに10
 // ── 年末キャンペーン：割引率は全ての商品の税込合計で決まる（サーバーの campaign_tier と同じ）──
 const TIERS = [[15000, 8], [20000, 10], [30000, 12], [40000, 13], [80000, 14]];
 function tierPct(s) { if (s <= 0) return 0; for (const [m, p] of TIERS) if (s <= m) return p; return 16; }
-function kindRate(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : t; }
+function kindRate(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : k === 'z' ? 0 : t; }
 let curStore = {{ (editing.store if editing else 'イノ')|tojson }};
 function showStore() { document.querySelectorAll('#c-store button').forEach(b => b.classList.toggle('on', b.dataset.store === curStore)); }
 document.querySelectorAll('#c-store button').forEach(b => b.addEventListener('click', () => { curStore = b.dataset.store; showStore(); saveLocal(); }));

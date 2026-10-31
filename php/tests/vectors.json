@@ -8061,6 +8061,41 @@
    "kind": "f10",
    "tier": 16,
    "rate": 10
+  },
+  {
+   "kind": "z",
+   "tier": 0,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 8,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 10,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 12,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 13,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 14,
+   "rate": 0
+  },
+  {
+   "kind": "z",
+   "tier": 16,
+   "rate": 0
   }
  ],
  "campaign_tier": [
@@ -8203,6 +8238,61 @@
   {
    "category": "",
    "name": "",
+   "kind": "n"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "モイストシトラス250ml",
+   "kind": "f5"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "スムースサクラ250ml",
+   "kind": "f5"
+  },
+  {
+   "category": "トリートメントその他",
+   "name": "CMCパックハーバル1リットル",
+   "kind": "f5"
+  },
+  {
+   "category": "トリートメントその他",
+   "name": "CMCマスク180g",
+   "kind": "f5"
+  },
+  {
+   "category": "トリートメントその他",
+   "name": "ホワイトオーキット詰替",
+   "kind": "f5"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "トライアルセット",
+   "kind": "f5"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "詰替えホルダー",
+   "kind": "z"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "ホーユーシャンプー",
+   "kind": "n"
+  },
+  {
+   "category": "シャンプーその他",
+   "name": "新ミントマイルド250ml",
+   "kind": "n"
+  },
+  {
+   "category": "トリートメントその他",
+   "name": "ラメラメトリートメント 1Kg",
+   "kind": "n"
+  },
+  {
+   "category": "トリートメントその他",
+   "name": "ケアテクトしっとりtr1200g",
    "kind": "n"
   }
  ],

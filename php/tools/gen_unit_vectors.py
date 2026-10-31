@@ -16,7 +16,7 @@ import unicodedata
 _src = open(os.path.join(ROOT, 'app.py'), encoding='utf-8').read()
 _tree = ast.parse(_src)
 _need_funcs = {'calc_discount_lines', 'campaign_tier', 'price_kind', 'kind_rate', 'pct_fmt', 'sama_fmt', 'yen_fmt', 'num_fmt', 'nfkc'}
-_need_consts = {'DISCOUNT_ROUND', 'CAMPAIGN_TIERS', 'CAMPAIGN_TOP'}
+_need_consts = {'DISCOUNT_ROUND', 'CAMPAIGN_TIERS', 'CAMPAIGN_TOP', 'ORGANIC_NOTE_PREFIXES', 'ORGANIC_NOTE_NAMES'}
 _keep = []
 for node in _tree.body:
     if isinstance(node, ast.FunctionDef) and node.name in _need_funcs:
@@ -52,12 +52,16 @@ for _ in range(400):
     cases.append({'pairs': pairs, 'disc': d, 'pay': p})
 v['discount'] = cases
 
-v['kind_rate'] = [{'kind': k, 'tier': t, 'rate': app.kind_rate(k, t)} for k in ('n', 'a', 'f5', 'f10') for t in (0, 8, 10, 12, 13, 14, 16)]
+v['kind_rate'] = [{'kind': k, 'tier': t, 'rate': app.kind_rate(k, t)} for k in ('n', 'a', 'f5', 'f10', 'z') for t in (0, 8, 10, 12, 13, 14, 16)]
 v['campaign_tier'] = [{'total': t, 'tier': app.campaign_tier(t)} for t in (-5, 0, 1, 14999, 15000, 15001, 20000, 20001, 29999, 30000, 40000, 40001, 79999, 80000, 80001, 163490)]
 names = [('アリミノ シャンプー', '新コアミーシャンプーS 250ml'), ('アルマダシリーズ', 'アルマダ1000ml'), ('アルマダシリーズ', 'アルマダ 1000ml'),
          ('アルマダシリーズ', 'アルマダ200ml'), ('アルマダシリーズ', 'エグータムプレミアム'), ('アルマダシリーズ', 'ピーダ'),
          ('リファシリーズ', 'MTGパワーガン'), ('リファシリーズ', 'リファドライヤー'), ('その他商品', 'リファカールアイロン'), ('ステラボーテシリーズ', 'ステラボーテブラシ'),
-         ('シャンプーその他', 'N.オーガニックノート シャンプー'), ('シャンプーその他', 'オーガニックノートバーム'), ('コタ', 'コタ3キロトリートメント'), (None, None), ('', '')]
+         ('シャンプーその他', 'N.オーガニックノート シャンプー'), ('シャンプーその他', 'オーガニックノートバーム'), ('コタ', 'コタ3キロトリートメント'), (None, None), ('', ''),
+         ('シャンプーその他', 'モイストシトラス250ml'), ('シャンプーその他', 'スムースサクラ250ml'), ('トリートメントその他', 'CMCパックハーバル1リットル'),
+         ('トリートメントその他', 'CMCマスク180g'), ('トリートメントその他', 'ホワイトオーキット詰替'), ('シャンプーその他', 'トライアルセット'),
+         ('シャンプーその他', '詰替えホルダー'), ('シャンプーその他', 'ホーユーシャンプー'), ('シャンプーその他', '新ミントマイルド250ml'),
+         ('トリートメントその他', 'ラメラメトリートメント 1Kg'), ('トリートメントその他', 'ケアテクトしっとりtr1200g')]
 v['price_kind'] = [{'category': c, 'name': n, 'kind': app.price_kind(c, n)} for c, n in names]
 v['num_fmt'] = [{'in': x, 'out': app.num_fmt(x)} for x in (None, 0, 1, 3.0, 2.5, 0.1, 0.25, 12.75, 100, 1234567.0, 0.3333333, 10.5, 7.0)]
 v['pct_fmt'] = [{'in': x, 'out': app.pct_fmt(x)} for x in (None, 0, 16, 16.0, 20.2, 14.5, 17.35, 12.6, '16.00', '20.20', 3.33)]

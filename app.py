@@ -1072,12 +1072,20 @@ def campaign_tier(normal_total):
     return CAMPAIGN_TOP
 
 
+# オーガニックノート（キャンペーンでも最大5%まで）の商品名。レジの商品名には「オーガニックノート」の文字が入らない
+ORGANIC_NOTE_PREFIXES = ('モイスト', 'スムース', 'CMC')
+ORGANIC_NOTE_NAMES = ('ホワイトオーキット詰替', 'トライアルセット')
+
+
 def price_kind(category, name):
-    """n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10%"""
+    """n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% z=割引なし"""
     name = name or ''
+    if '詰替えホルダー' in name:
+        return 'z'
     if 'ステラボーテ' in name:
         return 'f10'
-    if (category or '').startswith('リファ') or 'リファ' in name or 'オーガニックノート' in name:
+    if ((category or '').startswith('リファ') or 'リファ' in name or 'オーガニックノート' in name
+            or name.startswith(ORGANIC_NOTE_PREFIXES) or name.replace(' ', '') in ORGANIC_NOTE_NAMES):
         return 'f5'
     if name.replace(' ', '') in ('アルマダ1000ml', 'エグータムプレミアム'):   # アルマダ特別割引はこの2品のみ
         return 'a'
@@ -1087,7 +1095,9 @@ def price_kind(category, name):
 def kind_rate(kind, tier):
     if kind == 'a':
         return round(100 - (100 - tier) * 0.95, 2)
-    return min(tier, {'f5': 5, 'f10': 10}[kind]) if kind in ('f5', 'f10') else tier   # リファ等は「最大5%／10%」
+    if kind == 'z':
+        return 0
+    return min(tier, {'f5': 5, 'f10': 10}[kind]) if kind in ('f5', 'f10') else tier   # リファ・オーガニックノート等は「最大5%／10%」
 
 
 def pct_fmt(pct):

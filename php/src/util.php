@@ -146,17 +146,31 @@ function campaign_tier(int $normalTotal): int
     return CAMPAIGN_TOP;
 }
 
-/** n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% */
+/** オーガニックノート（キャンペーンでも最大5%まで）の商品名。レジの商品名には「オーガニックノート」の文字が入らない */
+const ORGANIC_NOTE_PREFIXES = ['モイスト', 'スムース', 'CMC'];
+const ORGANIC_NOTE_NAMES = ['ホワイトオーキット詰替', 'トライアルセット'];
+
+/** n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% z=割引なし */
 function price_kind(?string $category, ?string $name): string
 {
     $name = $name ?? '';
+    if (str_contains($name, '詰替えホルダー')) {
+        return 'z';
+    }
     if (str_contains($name, 'ステラボーテ')) {
         return 'f10';
     }
-    if (str_starts_with((string)$category, 'リファ') || str_contains($name, 'リファ') || str_contains($name, 'オーガニックノート')) {
+    $compact = str_replace(' ', '', $name);
+    $organic = in_array($compact, ORGANIC_NOTE_NAMES, true);
+    foreach (ORGANIC_NOTE_PREFIXES as $pre) {
+        if (str_starts_with($name, $pre)) {
+            $organic = true;
+        }
+    }
+    if (str_starts_with((string)$category, 'リファ') || str_contains($name, 'リファ') || str_contains($name, 'オーガニックノート') || $organic) {
         return 'f5';
     }
-    if (in_array(str_replace(' ', '', $name), ['アルマダ1000ml', 'エグータムプレミアム'], true)) {
+    if (in_array($compact, ['アルマダ1000ml', 'エグータムプレミアム'], true)) {
         return 'a';
     }
     return 'n';
@@ -166,6 +180,9 @@ function kind_rate(string $kind, float|int $tier): float
 {
     if ($kind === 'a') {
         return round(100 - (100 - $tier) * 0.95, 2);
+    }
+    if ($kind === 'z') {
+        return 0.0;
     }
     if ($kind === 'f5') {
         return (float)min($tier, 5);
