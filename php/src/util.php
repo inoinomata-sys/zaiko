@@ -232,12 +232,6 @@ function respond_pdf(string $data, string $filename, bool $inline = false): neve
     exit;
 }
 
-/** 空のカテゴリ名なども、そのままキーにして並びを保つ連想配列に足す */
-function push_group(array &$groups, string|int|null $key, mixed $item): void
-{
-    $groups[(string)$key][] = $item;
-}
-
 /** 返事を先に返してから、続きの処理（PDFの事前作成など）をする。できない環境ではふつうに最後まで処理する */
 function respond_json_after(array $data, int $status, callable $after): never
 {
