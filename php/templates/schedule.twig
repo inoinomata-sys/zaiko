@@ -1,0 +1,28 @@
+{% extends 'base.twig' %}
+{% block title %}予定{% endblock %}
+{% block head %}
+<style>
+.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sc-top h1 { font-size: 20px; font-weight: 700; }
+.sh-nav { display: flex; align-items: center; gap: 6px; }
+.sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
+.sc-day { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 12px; }
+.sc-day.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
+.sc-date { flex: 0 0 64px; font-weight: 700; }
+.sc-date .sun { color: #c0392b; } .sc-date .sat { color: #2c6fb7; }
+.sc-ev { font-size: 16px; padding: 1px 0; }
+.sc-ev small { font-size: 11px; color: #fff; background: var(--acc); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:8px"><a href="/menu">← 総合管理にもどる</a></p>
+<div class="sc-top"><h1>予定</h1>
+  <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}">›</a></div></div>
+{% for day in days %}{% if day.events %}
+<div class="sc-day{% if day.today %} today{% endif %}">
+  <div class="sc-date">{{ day.d }}日<span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span></div>
+  <div>{% for e in day.events %}<div class="sc-ev">{{ e.title }}{% if e.store %}<small>{{ e.store }}</small>{% endif %}</div>{% endfor %}</div>
+</div>
+{% endif %}{% endfor %}
+<p style="margin:16px 0 30px"><a class="btn" href="/schedule/rules" style="display:block;text-align:center">予定を足す・直す</a></p>
+{% endblock %}

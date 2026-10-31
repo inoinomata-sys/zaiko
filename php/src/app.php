@@ -10,6 +10,7 @@ require __DIR__ . '/orders.php';
 require __DIR__ . '/customer.php';
 require __DIR__ . '/products.php';
 require __DIR__ . '/shift.php';
+require __DIR__ . '/schedule.php';
 
 // ── 画面（Twig）の準備 ─────────────────────────────────────────────────────────
 
@@ -103,6 +104,11 @@ function routes(): array
         ['POST', '/settings/contacts/<int:id>/update', 'h_contact_update'],
         ['POST', '/settings/contacts/<int:id>/delete', 'h_contact_delete'],
         ['GET', '/menu', 'h_menu'],
+        ['GET', '/schedule', 'h_schedule'],
+        ['GET', '/schedule/rules', 'h_schedule_rules'],
+        ['POST', '/schedule/rules/add', 'h_schedule_add'],
+        ['POST', '/schedule/rules/<int:id>/toggle', 'h_schedule_toggle'],
+        ['POST', '/schedule/rules/<int:id>/delete', 'h_schedule_delete'],
         ['GET', '/shift', 'h_shift'],
         ['GET', '/shift/edit', 'h_shift_edit'],
         ['POST', '/api/shift', 'h_api_shift'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 define('BASE_DIR', dirname(__DIR__));
 require BASE_DIR . '/src/util.php';
+require BASE_DIR . '/src/schedule.php';
 
 // 正解データが読めない・空の時は、何も確かめないまま成功にせず、失敗にする
 $raw = @file_get_contents(__DIR__ . '/vectors.json');
@@ -76,6 +77,17 @@ check('cookie 期限切れ', login_cookie_ok($cfg, login_cookie_value($cfg, time
 check('cookie 改ざん', login_cookie_ok($cfg, preg_replace('/^\d+/', (string)(time() + 999999), $ck)), false);
 check('cookie 別のパスワード', login_cookie_ok(['user' => 'u1', 'pass' => 'zz'], $ck), false);
 check('cookie 空', login_cookie_ok($cfg, ''), false);
+// 予定のくり返し（2026-10-31 は土曜日）
+$tzj = new DateTimeZone('Asia/Tokyo');
+$dd = static fn(string $s) => new DateTimeImmutable($s, $tzj);
+check('予定 毎週(土)', schedule_matches(['kind' => 'weekly', 'weekday' => 6], $dd('2026-10-31')), true);
+check('予定 毎週(日)は土曜に出ない', schedule_matches(['kind' => 'weekly', 'weekday' => 0], $dd('2026-10-31')), false);
+check('予定 第2水曜(10/14)', schedule_matches(['kind' => 'nth', 'weekday' => 3, 'nth' => 2], $dd('2026-10-14')), true);
+check('予定 第2水曜(10/7は第1)', schedule_matches(['kind' => 'nth', 'weekday' => 3, 'nth' => 2], $dd('2026-10-07')), false);
+check('予定 毎月25日', schedule_matches(['kind' => 'monthly', 'day_of_month' => 25], $dd('2026-11-25')), true);
+check('予定 毎月31日は30日の月に出ない', schedule_matches(['kind' => 'monthly', 'day_of_month' => 31], $dd('2026-11-30')), false);
+check('予定 1回だけ', schedule_matches(['kind' => 'once', 'once_date' => '2026-12-24'], $dd('2026-12-24')), true);
+check('予定 1回だけ(別の日)', schedule_matches(['kind' => 'once', 'once_date' => '2026-12-24'], $dd('2026-12-25')), false);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

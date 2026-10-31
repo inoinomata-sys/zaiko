@@ -2,16 +2,28 @@
 {% block title %}総合管理{% endblock %}
 {% block head %}
 <style>
-.mn-wrap { max-width: 480px; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; }
-.mn-card { display: block; padding: 26px 20px; background: #fff; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: var(--fg); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+.mn-wrap { max-width: 480px; margin: 18px auto; display: flex; flex-direction: column; gap: 14px; }
+.mn-card { display: block; padding: 22px 20px; background: #fff; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: var(--fg); box-shadow: 0 2px 10px rgba(0,0,0,.05); }
 .mn-card b { display: block; font-size: 22px; margin-bottom: 6px; color: var(--acc); }
 .mn-card span { font-size: 14px; color: var(--fg2); }
+.mn-today { background: #fff8e1; border: 1px solid #f0d49a; border-radius: 16px; padding: 14px 16px; }
+.mn-today h2 { font-size: 15px; margin: 0 0 6px; }
+.mn-today .sub { font-size: 13px; color: var(--fg2); margin-top: 8px; }
+.mn-ev { font-size: 17px; font-weight: 600; padding: 2px 0; }
+.mn-ev small { font-size: 11px; font-weight: 400; color: #fff; background: var(--acc); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
+.mn-none { font-size: 14px; color: var(--fg2); }
 </style>
 {% endblock %}
 {% block content %}
 <div class="mn-wrap">
   <h1 style="font-size:20px;font-weight:700;margin-bottom:2px">総合管理</h1>
+  <div class="mn-today">
+    <h2>今日の予定</h2>
+    {% for e in today %}<div class="mn-ev">{{ e.title }}{% if e.store %}<small>{{ e.store }}</small>{% endif %}</div>{% else %}<div class="mn-none">ありません</div>{% endfor %}
+    <div class="sub"><b>明日</b>：{% for e in tomorrow %}{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}{% if not loop.last %}、{% endif %}{% else %}ありません{% endfor %}</div>
+  </div>
   <a class="mn-card" href="/"><b>在庫管理</b><span>在庫・使用入力・発注・お客様注文</span></a>
+  <a class="mn-card" href="/schedule"><b>予定</b><span>発注日の前日・清掃・ゴミ出しなど</span></a>
   <a class="mn-card" href="/shift"><b>シフト</b><span>イノ・リッチの出勤（ヘルプの日も見えます）</span></a>
 </div>
 {% endblock %}

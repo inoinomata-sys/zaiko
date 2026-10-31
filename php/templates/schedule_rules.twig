@@ -1,0 +1,51 @@
+{% extends 'base.twig' %}
+{% block title %}予定を足す・直す{% endblock %}
+{% block head %}
+<style>
+.rl { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.rl.off { opacity: .5; }
+.rl .t { flex: 1; min-width: 150px; font-weight: 600; }
+.rl .t small { display: block; font-weight: 400; color: var(--fg2); font-size: 12px; }
+.rl form { margin: 0; }
+.rf { display: grid; gap: 8px; background: #fdf8fa; border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 12px 0 20px; }
+.rf input, .rf select { font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; width: 100%; box-sizing: border-box; }
+.rf .opt { display: none; gap: 8px; }
+.rf .opt.on { display: grid; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:8px"><a href="/schedule">← 予定にもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:8px">予定を足す・直す</h1>
+<form class="rf" method="post" action="/schedule/rules/add">
+  <input name="title" placeholder="予定の名前（例：大掃除）" required maxlength="80">
+  <select name="store"><option value="">両方の店</option><option>イノ</option><option>リッチ</option></select>
+  <select name="kind" id="kind">
+    <option value="weekly">毎週</option><option value="nth">第○週</option><option value="monthly">毎月</option><option value="once">1回だけ</option>
+  </select>
+  <div class="opt on" id="o-w"><select name="weekday">{% for w in week %}<option value="{{ loop.index0 }}">{{ w }}曜日</option>{% endfor %}</select></div>
+  <div class="opt" id="o-n"><select name="nth"><option value="1">第1</option><option value="2">第2</option><option value="3">第3</option><option value="4">第4</option><option value="5">第5</option></select></div>
+  <div class="opt" id="o-m"><input type="number" name="day_of_month" min="1" max="31" placeholder="日（1〜31）"></div>
+  <div class="opt" id="o-d"><input type="date" name="once_date"></div>
+  <button class="btn" type="submit">足す</button>
+</form>
+{% for r in rules %}
+<div class="rl{% if not r.is_active %} off{% endif %}">
+  <div class="t">{{ r.title }}<small>{{ r.text }}{% if r.store %}・{{ r.store }}{% else %}・両方の店{% endif %}</small></div>
+  <form method="post" action="/schedule/rules/{{ r.id }}/toggle"><button class="btn btn-ghost btn-sm" type="submit">{{ r.is_active ? '止める' : '戻す' }}</button></form>
+  <form method="post" action="/schedule/rules/{{ r.id }}/delete" onsubmit="return confirm('「{{ r.title|e('js') }}」を消しますか？')"><button class="btn btn-ghost btn-sm" style="color:var(--danger)" type="submit">消す</button></form>
+</div>
+{% endfor %}
+{% endblock %}
+{% block scripts %}
+<script>
+const kind = document.getElementById('kind');
+function sync() {
+  const k = kind.value;
+  document.getElementById('o-w').classList.toggle('on', k === 'weekly' || k === 'nth');
+  document.getElementById('o-n').classList.toggle('on', k === 'nth');
+  document.getElementById('o-m').classList.toggle('on', k === 'monthly');
+  document.getElementById('o-d').classList.toggle('on', k === 'once');
+}
+kind.addEventListener('change', sync); sync();
+</script>
+{% endblock %}

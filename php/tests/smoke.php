@@ -296,6 +296,20 @@ if ($failures) {
 
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/menu', 'シフト');
+page_ok('/schedule');
+page_ok('/schedule/rules', 'ゴミ出し');
+ok((int)db_val("SELECT COUNT(*) FROM schedule_rules") === 6, '予定: 最初の6件が入っている');
+[$st] = http('POST', '/schedule/rules/add', null, ['title' => 'テスト大掃除', 'store' => 'イノ', 'kind' => 'nth', 'weekday' => 3, 'nth' => 2]);
+ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM schedule_rules WHERE title='テスト大掃除'") === 1, '予定: 足せる（第2水曜）');
+[$st] = http('POST', '/schedule/rules/add', null, ['title' => '', 'kind' => 'weekly', 'weekday' => 1]);
+ok($st === 400, '予定: 名前なしは断る');
+[$st] = http('POST', '/schedule/rules/add', null, ['title' => 'x', 'kind' => 'monthly', 'day_of_month' => 40]);
+ok($st === 400, '予定: 変な日は断る');
+$rid = (int)db_val("SELECT id FROM schedule_rules WHERE title='テスト大掃除'");
+http('POST', "/schedule/rules/{$rid}/toggle", null, []);
+ok((int)db_val("SELECT is_active FROM schedule_rules WHERE id={$rid}") === 0, '予定: 止められる');
+http('POST', "/schedule/rules/{$rid}/delete", null, []);
+ok((int)db_val("SELECT COUNT(*) FROM schedule_rules WHERE id={$rid}") === 0, '予定: 消せる');
 page_ok('/shift');
 page_ok('/shift/staff');
 page_ok('/shift/edit');
