@@ -17,8 +17,8 @@ function admin_cookie_ok(string $pass, string $value): bool
     return (int)$m[1] > time() && hash_equals(admin_cookie_value($pass, (int)$m[1]), $value);
 }
 
-const ADMIN_MAX_FAILS = 3;       // この回数まちがえたら、しばらく入れない
-const ADMIN_FAIL_MINUTES = 10;   // 数える時間・入れない時間
+const ADMIN_MAX_FAILS = 3;       // この回数まちがえたら、鍵が開く（オーナーの指定）
+const ADMIN_FAIL_MINUTES = 10;   // まちがいを数える時間
 
 function ensure_admin_fail_table(): void
 {
@@ -60,18 +60,18 @@ function h_admin_unlock(): void
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $pass !== '') {
         ensure_admin_fail_table();
         $since = now_jst()->modify('-' . ADMIN_FAIL_MINUTES . ' minutes')->format('Y-m-d H:i:s');
-        if ((int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]) >= ADMIN_MAX_FAILS) {
-            $error = 'まちがいが続いたので、' . ADMIN_FAIL_MINUTES . '分ほど、入れません。あとでお試しください';
-        } elseif (hash_equals($pass, (string)($_POST['pass'] ?? ''))) {
+        $right = hash_equals($pass, (string)($_POST['pass'] ?? ''));
+        if (!$right) {
+            run('INSERT INTO admin_fail (at) VALUES (?)', [now_jst()->format('Y-m-d H:i:s')]);
+        }
+        // オーナーの指定：正しい番号、または、番号を3回まちがえた時（10分のうちに）、鍵が開く
+        if ($right || (int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]) >= ADMIN_MAX_FAILS) {
             run('DELETE FROM admin_fail');
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
             redirect_to($next);
-        } else {
-            run('INSERT INTO admin_fail (at) VALUES (?)', [now_jst()->format('Y-m-d H:i:s')]);
-            sleep(1);
-            $error = '番号が違います';
         }
+        $error = '番号が違います';
     }
     render('admin_unlock', ['next' => $next, 'error' => $error, 'unset' => $pass === ''], $error !== '' ? 401 : 200);
 }

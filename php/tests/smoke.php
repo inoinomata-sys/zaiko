@@ -379,4 +379,19 @@ ok($st === 404, 'シフト: いないスタッフは断る');
 http('POST', "/shift/staff/{$sid}/toggle", null, []);
 ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
 
+// 暗証番号を、3回まちがえると、鍵が開く（オーナーの指定）
+$NO_ADMIN = true;
+[$st1] = http('POST', '/admin/unlock', null, ['pass' => 'x1', 'next' => '/settings']);
+[$st2] = http('POST', '/admin/unlock', null, ['pass' => 'x2', 'next' => '/settings']);
+ok($st1 === 401 && $st2 === 401, '暗証番号: 1〜2回のまちがいでは、開かない', "{$st1},{$st2}");
+[$st3, , $h3] = http('POST', '/admin/unlock', null, ['pass' => 'x3', 'next' => '/settings']);
+$opened = false;
+foreach ($h3 as $h) {
+    if (preg_match('/^Set-Cookie:\s*zadmin=/i', $h)) {
+        $opened = true;
+    }
+}
+ok($st3 === 302 && $opened, '暗証番号: 3回まちがえると、開く', "status={$st3}");
+$NO_ADMIN = false;
+
 exit($fail ? 1 : 0);
