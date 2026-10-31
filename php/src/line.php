@@ -236,7 +236,7 @@ function h_order_line_send(int $id): void
     // 宛名：仕入先の担当者（設定の「仕入先の担当者」）。なければ「○○ご担当者様」
     $contact = trim((string)val('SELECT contact_name FROM supplier_contacts WHERE supplier_name = ? AND contact_name <> \'\' ORDER BY sort_order, id LIMIT 1', [$order['supplier']]));
     $atena = $contact !== '' ? $contact . '様' : $order['supplier'] . 'ご担当者様';
-    $text = "【発注書】\n{$atena}\nいつもありがとうございます。\n有限会社イノです。\n"
+    $text = "【発注書】\n{$atena}\nいつもありがとうございます。\n有限会社イノ {$order['store']}店です。\n"
         . "{$order['order_month']}月{$order['order_day']}日の発注書をお送りします。\n"
         . "下のリンクから、PDFをご確認ください。\n"
         . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
