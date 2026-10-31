@@ -61,5 +61,12 @@ check('basic_auth 空', basic_auth_ok($cfg, '', ''), false);
 check('basic_auth 設定が空なら通さない', basic_auth_ok(['user' => '', 'pass' => ''], '', ''), false);
 $_SERVER['HTTP_AUTHORIZATION'] = 'Basic ' . base64_encode('u1:p:1');
 check('basic_auth 取り出し(コロン入りパスワード)', basic_auth_credentials(), ['u1', 'p:1']);
+// ログインの印（Cookie）
+$ck = login_cookie_value($cfg, time() + 3600);
+check('cookie 正しい', login_cookie_ok($cfg, $ck), true);
+check('cookie 期限切れ', login_cookie_ok($cfg, login_cookie_value($cfg, time() - 10)), false);
+check('cookie 改ざん', login_cookie_ok($cfg, preg_replace('/^\d+/', (string)(time() + 999999), $ck)), false);
+check('cookie 別のパスワード', login_cookie_ok(['user' => 'u1', 'pass' => 'zz'], $ck), false);
+check('cookie 空', login_cookie_ok($cfg, ''), false);
 echo "{$n} 件を確認、失敗 {$fail} 件\n";
 exit($fail ? 1 : 0);

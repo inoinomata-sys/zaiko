@@ -292,23 +292,86 @@ function basic_auth_ok(array $cfg, string $user, string $pass): bool
     return $okUser && $okPass && ($cfg['user'] ?? '') !== '' && ($cfg['pass'] ?? '') !== '';
 }
 
-/** 設定があれば、ID・パスワードを聞く。/ping（生きているかの確認）だけは、聞かない */
+/** ログインしたことを覚えておく印（Cookie）。期限と署名だけで、パスワードそのものは入れない */
+function login_cookie_value(array $cfg, int $expires): string
+{
+    $secret = hash('sha256', 'zaiko|' . ($cfg['user'] ?? '') . '|' . ($cfg['pass'] ?? ''));
+    return $expires . '.' . hash_hmac('sha256', (string)$expires, $secret);
+}
+
+function login_cookie_ok(array $cfg, string $value): bool
+{
+    if (!preg_match('/^(\d{9,12})\.([0-9a-f]{64})$/', $value, $m)) {
+        return false;
+    }
+    return (int)$m[1] > time() && hash_equals(login_cookie_value($cfg, (int)$m[1]), $value);
+}
+
+function login_page(string $user, string $error = ''): void
+{
+    http_response_code($error === '' ? 200 : 401);
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-store');
+    $u = htmlspecialchars($user, ENT_QUOTES, 'UTF-8');
+    $e = $error === '' ? '' : '<p class="e">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</p>';
+    echo '<!doctype html><html lang="ja"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+        . '<meta name="robots" content="noindex"><title>ログイン</title>'
+        . '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#faf0f4;font-family:-apple-system,"Hiragino Sans",sans-serif;color:#2a1f24}'
+        . 'form{width:min(88vw,360px);background:#fff;border-radius:14px;padding:24px 20px;box-shadow:0 2px 14px rgba(0,0,0,.08)}'
+        . 'h1{font-size:18px;margin:0 0 16px}input{width:100%;box-sizing:border-box;font-size:17px;padding:12px;margin:0 0 12px;border:1px solid #ddd;border-radius:10px}'
+        . 'button{width:100%;font-size:17px;font-weight:700;padding:13px;border:0;border-radius:10px;background:#c2547a;color:#fff}'
+        . '.e{color:#b3261e;font-size:14px;margin:0 0 12px}</style></head><body>'
+        . '<form method="post" action="/login"><h1>INO.inc 在庫管理</h1>' . $e
+        . '<input name="user" value="' . $u . '" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="ID" required>'
+        . '<input name="pass" type="password" autocomplete="current-password" placeholder="パスワード" required>'
+        . '<button type="submit">ログイン</button></form></body></html>';
+    exit;
+}
+
+/** 設定があれば、ログインを求める（ログイン画面とCookie。ID・パスワードのヘッダでも通す）。/ping だけは聞かない */
 function require_basic_auth(): void
 {
     $cfg = $GLOBALS['CONFIG']['basic_auth'] ?? null;
     if (!is_array($cfg) || ($cfg['user'] ?? '') === '') {
         return;
     }
-    if ((parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/') === '/ping') {
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    if ($path === '/ping') {
+        return;
+    }
+    if (login_cookie_ok($cfg, (string)($_COOKIE['zlogin'] ?? ''))) {
+        if ($path === '/login') {
+            header('Location: /');
+            exit;
+        }
         return;
     }
     [$u, $pw] = basic_auth_credentials();
     if (basic_auth_ok($cfg, $u, $pw)) {
         return;
     }
+    if ($path === '/login' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        $pu = (string)($_POST['user'] ?? '');
+        if (basic_auth_ok($cfg, $pu, (string)($_POST['pass'] ?? ''))) {
+            $exp = time() + 180 * 86400;
+            setcookie('zlogin', login_cookie_value($cfg, $exp), [
+                'expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax',
+            ]);
+            header('Location: /');
+            exit;
+        }
+        sleep(1);
+        login_page($pu, 'IDかパスワードが違います');
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && $path !== '/login' && !str_starts_with($path, '/api')) {
+        header('Location: /login');
+        exit;
+    }
+    if ($path === '/login') {
+        login_page((string)($cfg['user'] ?? ''));
+    }
     http_response_code(401);
-    header('WWW-Authenticate: Basic realm="sougoukanri", charset="UTF-8"');
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'IDとパスワードが必要です。';
+    echo 'ログインが必要です。';
     exit;
 }
