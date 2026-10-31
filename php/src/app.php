@@ -105,7 +105,8 @@ function routes(): array
         ['POST', '/settings/contacts/add', 'h_contact_add'],
         ['POST', '/settings/contacts/<int:id>/update', 'h_contact_update'],
         ['POST', '/settings/contacts/<int:id>/delete', 'h_contact_delete'],
-        ['GET', '/menu', 'h_menu'],
+        ['GET', '/menu', 'h_menu_redirect'],
+        ['GET', '/portal', 'h_menu'],
         ['GET', '/schedule', 'h_schedule'],
         ['GET', '/schedule/rules', 'h_schedule_rules'],
         ['POST', '/schedule/rules/add', 'h_schedule_add'],
@@ -128,6 +129,12 @@ function routes(): array
         ['GET', '/ping', 'h_ping'],
         ['GET', '/health', 'h_health'],
     ];
+}
+
+/** 総合管理のメニューは、いったん使わない。古いホーム画面のアイコンが /menu を開くので、在庫の画面に移す（メニューそのものは /portal に残してある） */
+function h_menu_redirect(): void
+{
+    redirect_to('/');
 }
 
 function run_app(): void

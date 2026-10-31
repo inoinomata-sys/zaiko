@@ -317,7 +317,9 @@ if ($failures) {
 }
 
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
-page_ok('/menu', 'シフト');
+page_ok('/portal', 'シフト');
+[$st] = http('GET', '/menu');
+ok($st === 302, '/menu は、在庫の画面に移す', "status={$st}");
 page_ok('/schedule');
 $NO_ADMIN = true;
 [$st] = http('GET', '/settings/line');
