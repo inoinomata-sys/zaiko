@@ -35,6 +35,7 @@ $cfgPath = dirname(__DIR__) . '/config.php';
 $cfgSrc = is_file($cfgPath) ? (string)file_get_contents($cfgPath) : '';
 if ($cfgSrc !== '' && !str_contains($cfgSrc, "'admin_pass'")) {
     file_put_contents($cfgPath, preg_replace('/return \[/', "return [\n    'admin_pass' => 'ci-admin-pass',", $cfgSrc, 1));
+    sleep(4);   // サーバーが、書き換えた設定を読み直すまで待つ（PHP の読み込みの保存が、数秒残るため）
 }
 $ADMIN_COOKIE = '';
 $NO_ADMIN = true;
