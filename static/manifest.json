@@ -2,7 +2,7 @@
   "name": "INO.inc 総合管理",
   "short_name": "総合管理",
   "description": "美容室の総合管理（在庫・発注・予定・シフト）",
-  "start_url": "/menu",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#fdf0f4",
   "theme_color": "#c2547a",
