@@ -10,16 +10,16 @@
   "lang": "ja",
   "icons": [
     {
-      "src": "/static/icons/ino5-192.png",
+      "src": "/static/icons/ino6-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/static/icons/ino5-512.png",
+      "src": "/static/icons/ino6-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "shortcuts": [
