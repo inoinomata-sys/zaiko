@@ -147,6 +147,7 @@ function campaign_tier(int $normalTotal): int
 }
 
 /** オーガニックノート（キャンペーンでも最大5%まで）の商品名。レジの商品名には「オーガニックノート」の文字が入らない */
+const NO_DISCOUNT_NAMES = ['コアミー1ヶ月S', 'コアミー1ヶ月M', 'コアミー1ヶ月EX', 'コアミー1ヶ月RP', 'コアミー1ヶ月ER', 'トラックオイルno.3'];
 const ORGANIC_NOTE_PREFIXES = ['モイスト', 'スムース', 'CMC'];
 const ORGANIC_NOTE_NAMES = ['ホワイトオーキット詰替', 'トライアルセット'];
 
@@ -154,7 +155,7 @@ const ORGANIC_NOTE_NAMES = ['ホワイトオーキット詰替', 'トライア�
 function price_kind(?string $category, ?string $name): string
 {
     $name = $name ?? '';
-    if (str_contains($name, '詰替えホルダー')) {
+    if (str_contains($name, '詰替えホルダー') || in_array(str_replace(' ', '', $name), NO_DISCOUNT_NAMES, true)) {
         return 'z';
     }
     if (str_contains($name, 'ステラボーテ')) {

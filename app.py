@@ -1073,6 +1073,7 @@ def campaign_tier(normal_total):
 
 
 # オーガニックノート（キャンペーンでも最大5%まで）の商品名。レジの商品名には「オーガニックノート」の文字が入らない
+NO_DISCOUNT_NAMES = ('コアミー1ヶ月S', 'コアミー1ヶ月M', 'コアミー1ヶ月EX', 'コアミー1ヶ月RP', 'コアミー1ヶ月ER', 'トラックオイルno.3')   # 割引対象外
 ORGANIC_NOTE_PREFIXES = ('モイスト', 'スムース', 'CMC')
 ORGANIC_NOTE_NAMES = ('ホワイトオーキット詰替', 'トライアルセット')
 
@@ -1080,7 +1081,7 @@ ORGANIC_NOTE_NAMES = ('ホワイトオーキット詰替', 'トライアルセ�
 def price_kind(category, name):
     """n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% z=割引なし"""
     name = name or ''
-    if '詰替えホルダー' in name:
+    if '詰替えホルダー' in name or name.replace(' ', '') in NO_DISCOUNT_NAMES:
         return 'z'
     if 'ステラボーテ' in name:
         return 'f10'

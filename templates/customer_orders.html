@@ -36,6 +36,7 @@
 <div class="o-tabs" id="s-tabs">
   <button type="button" data-s="イノ">イノ</button>
   <button type="button" data-s="リッチ">リッチ</button>
+  <button type="button" data-s="" style="flex:0 0 auto;padding-left:14px;padding-right:14px;font-size:13px">全店舗</button>
 </div>
 <div class="o-tabs" id="o-tabs">
   <button type="button" class="on" data-f="all">すべて</button>
@@ -74,7 +75,7 @@ document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click'
   btn.disabled = false; btn.textContent = label;
 }));
 let ofilter = 'all', sfilter = 'イノ';
-try { const sv = localStorage.getItem('co:store'); if (sv === 'イノ' || sv === 'リッチ') sfilter = sv; } catch (e) {}
+try { const sv = localStorage.getItem('co:store'); if (sv === 'イノ' || sv === 'リッチ' || sv === '') sfilter = sv; } catch (e) {}
 function applyO() {
   const q = norm(document.getElementById('q')?.value || '');
   document.querySelectorAll('.o-row').forEach(r => {

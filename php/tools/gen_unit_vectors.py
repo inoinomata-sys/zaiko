@@ -16,7 +16,7 @@ import unicodedata
 _src = open(os.path.join(ROOT, 'app.py'), encoding='utf-8').read()
 _tree = ast.parse(_src)
 _need_funcs = {'calc_discount_lines', 'campaign_tier', 'price_kind', 'kind_rate', 'pct_fmt', 'sama_fmt', 'yen_fmt', 'num_fmt', 'nfkc'}
-_need_consts = {'DISCOUNT_ROUND', 'CAMPAIGN_TIERS', 'CAMPAIGN_TOP', 'ORGANIC_NOTE_PREFIXES', 'ORGANIC_NOTE_NAMES'}
+_need_consts = {'DISCOUNT_ROUND', 'CAMPAIGN_TIERS', 'CAMPAIGN_TOP', 'ORGANIC_NOTE_PREFIXES', 'ORGANIC_NOTE_NAMES', 'NO_DISCOUNT_NAMES'}
 _keep = []
 for node in _tree.body:
     if isinstance(node, ast.FunctionDef) and node.name in _need_funcs:
@@ -60,7 +60,7 @@ names = [('アリミノ シャンプー', '新コアミーシャンプーS 250ml
          ('シャンプーその他', 'N.オーガニックノート シャンプー'), ('シャンプーその他', 'オーガニックノートバーム'), ('コタ', 'コタ3キロトリートメント'), (None, None), ('', ''),
          ('シャンプーその他', 'モイストシトラス250ml'), ('シャンプーその他', 'スムースサクラ250ml'), ('トリートメントその他', 'CMCパックハーバル1リットル'),
          ('トリートメントその他', 'CMCマスク180g'), ('トリートメントその他', 'ホワイトオーキット詰替'), ('シャンプーその他', 'トライアルセット'),
-         ('シャンプーその他', '詰替えホルダー'), ('シャンプーその他', 'ホーユーシャンプー'), ('シャンプーその他', '新ミントマイルド250ml'),
+         ('シャンプーその他', '詰替えホルダー'), ('アリミノ 1ヶ月ケア・アウトバス・ローション', 'コアミー1ヶ月S'), ('アリミノ 1ヶ月ケア・アウトバス・ローション', 'コアミー1ヶ月ER'), ('スタイリング剤・スタイリングオイル', 'トラックオイル no.3'), ('スタイリング剤・スタイリングオイル', 'トラックオイル フタ'), ('シャンプーその他', 'ホーユーシャンプー'), ('シャンプーその他', '新ミントマイルド250ml'),
          ('トリートメントその他', 'ラメラメトリートメント 1Kg'), ('トリートメントその他', 'ケアテクトしっとりtr1200g')]
 v['price_kind'] = [{'category': c, 'name': n, 'kind': app.price_kind(c, n)} for c, n in names]
 v['num_fmt'] = [{'in': x, 'out': app.num_fmt(x)} for x in (None, 0, 1, 3.0, 2.5, 0.1, 0.25, 12.75, 100, 1234567.0, 0.3333333, 10.5, 7.0)]
