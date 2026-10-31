@@ -8,6 +8,11 @@ RewriteRule ^ index.php [L]
 # 文字コード
 AddDefaultCharset UTF-8
 
+# 検索エンジンに載せない（社内用の画面のため）
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
+
 # サービスワーカー（ホーム画面アプリ）は、ルート直下から全体に効かせる
 <Files "sw.js">
   Header set Service-Worker-Allowed "/"
