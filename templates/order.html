@@ -581,5 +581,7 @@ DRAFT_CUSTOM.forEach(c => {
 });
 onOrderChange();
 draftLoading = false;
+// 印刷画面から「戻る」で戻ると、ブラウザが古い画面（ボタンが「保存中…」のまま）を復元する。読み直して、最新の状態にする
+window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 </script>
 {% endblock %}

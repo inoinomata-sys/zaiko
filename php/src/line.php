@@ -153,7 +153,12 @@ function h_pub_order(): void
 function line_contact_for_order(int $orderId): ?array
 {
     ensure_line_tables();
-    return row('SELECT c.user_id, c.display_name FROM orders o JOIN line_contacts c ON c.supplier = o.supplier WHERE o.id = ?', [$orderId]);
+    // 表どうしを結合すると、文字の照合順序が違って失敗することがあるので、仕入先名を取り出してから探す
+    $sup = val('SELECT supplier FROM orders WHERE id = ?', [$orderId]);
+    if ($sup === null || $sup === '') {
+        return null;
+    }
+    return row('SELECT user_id, display_name FROM line_contacts WHERE supplier = ?', [$sup]);
 }
 
 function h_order_line_send(int $id): void
