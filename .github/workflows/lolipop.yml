@@ -1,3 +1,8 @@
+# 【この2つのファイルの関係】
+#  実際に動くのは .github/workflows/lolipop.yml。この php/ci/lolipop.yml は、その「元の控え」。
+#  GitHub に push する道具には、workflows の中を書き換える権限がないので、直す時は
+#  GitHub のサイトの「Add file > Upload files」で、この控えを .github/workflows/ に上げて置き換える。
+#  どちらかを直したら、もう一方も同じ中身にそろえること。
 name: ロリポップ版（PHP）の確認と自動アップロード
 
 # 画面(templates/)・画像(static/)・PHP版(php/)を変えて main に push すると、
@@ -119,8 +124,12 @@ jobs:
             exit 1
           fi
 
-      - name: 試験用の設定を消す（ロリポップには送らない）
-        run: rm -f php/config.php server.log
+      - name: 試験用の設定と、作業場所の道が入った控えを消す（ロリポップには送らない）
+        run: |
+          rm -f php/config.php server.log
+          # フォントの情報の控え（.mtx.php など）には「作った場所の道」が書かれる。ロリポップでは使えないので、送らずに、向こうで作り直す
+          rm -f php/storage/pdffont/unifont/*.mtx.php php/storage/pdffont/unifont/*.cw127.php php/storage/pdffont/unifont/*.cw.dat
+          rm -rf php/storage/cache/* php/storage/twig_cache/*
 
       - name: ロリポップへアップロード
         if: >-
