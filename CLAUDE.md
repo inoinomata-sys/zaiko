@@ -1,24 +1,20 @@
 # 美容室 在庫・発注管理システム
 
-Flask + PostgreSQL (Supabase)。本番は Render (https://zaiko-sg.onrender.com、シンガポール。DB の Supabase と同じ地域にして速くした)。
-旧サービス zaiko（アメリカ東海岸、zaiko-unug.onrender.com）は 2026-10-30 に一時停止（削除はしていない）。
+本番は **ロリポップ**（https://sougoukanri.ino-vifare.com、PHP 8 + MySQL、`php/` 配下）。ID・パスワード（Basic認証）は `php/config.php`（サーバー上のみ・git管理外）。
+旧 Flask 版（`app.py`）は Render（zaiko-sg）で動いていたが、2026-10-31 に切り替えて **Render は停止済み**（削除はしていない）。Render へのデプロイはもう行わない。
 
 ## 変更後は自動で反映する
 
 コードや仕様を変更したら、ユーザーに確認せずに以下まで行う：
 
-1. 動作確認（ローカルで `python3 app.py` → http://localhost:5001）
+1. `php/` の変更が本番。テンプレートは Flask 版 `templates/*.html` から `python3 php/tools/convert_templates.py` で生成する（両方コミット）
 2. `git add <変更したファイル>` → `git commit`（日本語で変更内容を要約）
-3. `git push origin main`
-4. Render へデプロイ（新サービス zaiko-sg、service id srv-dbhoilt9el5s73ael8b0）: push だけでは自動デプロイされない。
-   Chrome で https://dashboard.render.com/web/srv-dbhoilt9el5s73ael8b0 を開き、Manual Deploy → Deploy latest commit を押す。
-   （.env の RENDER_DEPLOY_HOOK は旧サービスのもの。新サービスのフックを .env に入れれば `curl -fsS -X POST "$RENDER_DEPLOY_HOOK"` で済む）
-5. デプロイ完了後、本番 URL で表示を確認
+3. `git push origin main` → GitHub Actions がテスト後にロリポップへ自動デプロイ
+4. 反映後、本番 URL で確認（Basic認証あり。`/ping` は認証なしで 200）
 
 `.env` は絶対にコミットしない（DB パスワードとデプロイフックを含む）。
 
 ## 注意
 
-- Supabase のセッション用接続は同時15本まで。常に持つ接続は各プロセス2本（app.py の接続プール）。新旧サービスを同時に動かすと枠が足りず起動に失敗した。
-- Render からの DB 接続は Supabase の Session pooler (IPv4) を使う。Direct 接続 (db.*.supabase.co) は IPv6 専用で Render から繋がらない。
+- 旧 Supabase（Render 版が使っていた DB）は残っている。Render を再開する時は Supabase の接続上限（セッション15本）に注意。
 - DB スキーマを変える場合は `init_db.py` も合わせて更新し、本番 DB にも反映する。
