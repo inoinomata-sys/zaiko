@@ -297,7 +297,11 @@ if ($failures) {
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/menu', 'シフト');
 page_ok('/schedule');
-page_ok('/settings/line', 'LINE');
+[$st, $body] = http('GET', '/settings/line');
+ok($st === 302, 'LINE設定: 鍵がかかっている（合言葉の画面へ）', "status={$st}");
+page_ok('/admin/unlock', '合言葉');
+[$st] = http('POST', '/settings/line/assign', null, ['user_id' => 'U' . str_repeat('0', 32), 'supplier' => 'コタ']);
+ok($st === 302, 'LINE設定: 鍵なしでは、ひも付けできない', "status={$st}");
 [$st] = http('POST', '/line/webhook', null, []);
 ok($st === 403, 'LINE: 署名がない知らせは断る');
 [$st] = http('GET', '/pub/order?id=1&exp=2000000000&sig=00000000000000000000000000000000');

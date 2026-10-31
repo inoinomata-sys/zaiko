@@ -75,6 +75,7 @@ function line_profile_name(string $uid, string $token): string
 
 function h_settings_line(): void
 {
+    require_admin();
     ensure_line_tables();
     $cfg = line_config();
     render('settings_line', [
@@ -87,6 +88,7 @@ function h_settings_line(): void
 /** 友だちの一覧を LINE に聞いて取り込む（認証済みアカウントなどでないと、LINE が断る） */
 function h_settings_line_import(): void
 {
+    require_admin();
     ensure_line_tables();
     $token = (string)(line_config()['token'] ?? '');
     if ($token === '') {
@@ -132,6 +134,7 @@ function h_settings_line_import(): void
 
 function h_settings_line_assign(): void
 {
+    require_admin();
     ensure_line_tables();
     $uid = (string)($_POST['user_id'] ?? '');
     $sup = (string)($_POST['supplier'] ?? '');

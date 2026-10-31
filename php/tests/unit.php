@@ -6,6 +6,7 @@ define('BASE_DIR', dirname(__DIR__));
 require BASE_DIR . '/src/util.php';
 require BASE_DIR . '/src/schedule.php';
 require BASE_DIR . '/src/line.php';
+require BASE_DIR . '/src/admin.php';
 
 // 正解データが読めない・空の時は、何も確かめないまま成功にせず、失敗にする
 $raw = @file_get_contents(__DIR__ . '/vectors.json');
@@ -105,6 +106,14 @@ check('リンク署名 期限が違えば別', line_order_sig(12, 2000000001, 's
 check('リンク署名 シークレットが違えば別', line_order_sig(12, 2000000000, 'secretY') !== $sg, true);
 check('リンク署名 長さ', strlen($sg), 32);
 check('UUID の形', (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', line_uuid4()), true);
+// 管理者の鍵
+$ac = admin_cookie_value('pw1', time() + 600);
+check('管理者鍵 正しい', admin_cookie_ok('pw1', $ac), true);
+check('管理者鍵 別の合言葉', admin_cookie_ok('pw2', $ac), false);
+check('管理者鍵 期限切れ', admin_cookie_ok('pw1', admin_cookie_value('pw1', time() - 5)), false);
+check('管理者鍵 合言葉が未設定なら開かない', admin_cookie_ok('', admin_cookie_value('', time() + 600)), false);
+check('管理者鍵 次の画面は、自分のサイトの中だけ', admin_next('//evil.example.com'), '/settings');
+check('管理者鍵 次の画面(正常)', admin_next('/settings/line'), '/settings/line');
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
