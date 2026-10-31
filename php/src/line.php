@@ -80,7 +80,54 @@ function h_settings_line(): void
     render('settings_line', [
         'contacts' => rows('SELECT user_id, display_name, supplier, last_text, last_at FROM line_contacts ORDER BY last_at DESC'),
         'ready' => ($cfg['secret'] ?? '') !== '' && ($cfg['token'] ?? '') !== '',
+        'msg' => mb_substr((string)($_GET['msg'] ?? ''), 0, 200),
     ]);
+}
+
+/** 友だちの一覧を LINE に聞いて取り込む（認証済みアカウントなどでないと、LINE が断る） */
+function h_settings_line_import(): void
+{
+    ensure_line_tables();
+    $token = (string)(line_config()['token'] ?? '');
+    if ($token === '') {
+        throw new HttpError(400);
+    }
+    $ids = [];
+    $start = '';
+    $ctx = stream_context_create(['http' => ['header' => "Authorization: Bearer {$token}\r\n", 'timeout' => 10, 'ignore_errors' => true]]);
+    for ($page = 0; $page < 10; $page++) {
+        $r = @file_get_contents('https://api.line.me/v2/bot/followers/ids?limit=300' . ($start !== '' ? '&start=' . urlencode($start) : ''), false, $ctx);
+        $code = 0;
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+ (\d+)#', $h, $m)) {
+                $code = (int)$m[1];
+            }
+        }
+        $j = is_string($r) ? json_decode($r, true) : null;
+        if ($code !== 200 || !is_array($j)) {
+            $msg = $code === 403 ? 'このアカウントでは、友だちの一覧を取り込めません（LINE が許可していません）。大橋さんなどに、一言送ってもらってください。' : "取り込めませんでした（{$code}）";
+            redirect_to('/settings/line?msg=' . urlencode($msg));
+        }
+        foreach ((array)($j['userIds'] ?? []) as $u) {
+            $ids[] = (string)$u;
+        }
+        $start = (string)($j['next'] ?? '');
+        if ($start === '') {
+            break;
+        }
+    }
+    $now = now_jst()->format('Y-m-d H:i:s');
+    $n = 0;
+    foreach (array_slice($ids, 0, 300) as $uid) {
+        if (!preg_match('/^U[0-9a-f]{32}$/', $uid)) {
+            continue;
+        }
+        run('INSERT INTO line_contacts (user_id, display_name, last_text, last_at) VALUES (?,?,?,?)
+             ON DUPLICATE KEY UPDATE display_name = IF(VALUES(display_name) = \'\', display_name, VALUES(display_name))',
+            [$uid, line_profile_name($uid, $token), '（友だちの一覧から）', $now]);
+        $n++;
+    }
+    redirect_to('/settings/line?msg=' . urlencode("友だち {$n} 人を取り込みました"));
 }
 
 function h_settings_line_assign(): void

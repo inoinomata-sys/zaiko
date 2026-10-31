@@ -13,6 +13,10 @@
 {% block content %}
 <p style="margin-bottom:10px"><a href="/settings">← 設定にもどる</a></p>
 <h1 style="font-size:20px;font-weight:700;margin-bottom:8px">LINE（業者さん）</h1>
+{% if msg %}<div class="warn" style="background:#eef6ff;border-color:#b9cdf5;color:#1a3d7a">{{ msg }}</div>{% endif %}
+{% if ready %}
+<form method="post" action="/settings/line/import" style="margin-bottom:12px"><button class="btn btn-ghost" type="submit">友だちを取り込む</button></form>
+{% endif %}
 {% if not ready %}
 <div class="warn">まだ、LINE とつながっていません。公式LINEで Messaging API を使えるようにして、シークレットとトークンを、サーバーの設定（config.php）に入れると、つながります。</div>
 {% endif %}

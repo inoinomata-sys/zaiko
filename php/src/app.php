@@ -121,6 +121,7 @@ function routes(): array
         ['POST', '/order/<int:id>/line', 'h_order_line_send'],
         ['GET', '/settings/line', 'h_settings_line'],
         ['POST', '/settings/line/assign', 'h_settings_line_assign'],
+        ['POST', '/settings/line/import', 'h_settings_line_import'],
         ['GET', '/ping', 'h_ping'],
         ['GET', '/health', 'h_health'],
     ];
