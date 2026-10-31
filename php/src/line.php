@@ -233,9 +233,12 @@ function h_order_line_send(int $id): void
     }
     ensure_line_send_table();
     $exp = time() + LINE_LINK_DAYS * 86400;
-    $text = "【発注書】いつもありがとうございます。\n有限会社イノです。\n"
+    // 宛名：仕入先の担当者（設定の「仕入先の担当者」）。なければ「○○ご担当者様」
+    $contact = trim((string)val('SELECT contact_name FROM supplier_contacts WHERE supplier_name = ? AND contact_name <> \'\' ORDER BY sort_order, id LIMIT 1', [$order['supplier']]));
+    $atena = $contact !== '' ? $contact . '様' : $order['supplier'] . 'ご担当者様';
+    $text = "【発注書】\n{$atena}\nいつもありがとうございます。\n有限会社イノです。\n"
         . "{$order['order_month']}月{$order['order_day']}日の発注書をお送りします。\n"
-        . "下のリンクから、PDFをご確認ください（" . LINE_LINK_DAYS . "日間有効）。\n"
+        . "下のリンクから、PDFをご確認ください。\n"
         . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
     $ctx = stream_context_create(['http' => [
         'method' => 'POST', 'timeout' => 10, 'ignore_errors' => true,
