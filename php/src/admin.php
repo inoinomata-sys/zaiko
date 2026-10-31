@@ -17,7 +17,7 @@ function admin_cookie_ok(string $pass, string $value): bool
     return (int)$m[1] > time() && hash_equals(admin_cookie_value($pass, (int)$m[1]), $value);
 }
 
-const ADMIN_MAX_FAILS = 5;       // この回数まちがえたら、しばらく入れない
+const ADMIN_MAX_FAILS = 3;       // この回数まちがえたら、しばらく入れない
 const ADMIN_FAIL_MINUTES = 10;   // 数える時間・入れない時間
 
 function ensure_admin_fail_table(): void

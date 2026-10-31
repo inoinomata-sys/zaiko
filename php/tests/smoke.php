@@ -118,6 +118,7 @@ foreach ($hdr as $h) {
 }
 ok($ADMIN_COOKIE !== '', '管理者の鍵: 暗証番号で開けられる', 'status=' . $st . ' / config に admin_pass が入っているか: ' . (str_contains((string)@file_get_contents(dirname(__DIR__) . '/config.php'), 'admin_pass') ? 'はい' : 'いいえ'));
 $NO_ADMIN = false;
+$GLOBALS['UNLOCK_DEBUG'] = 'unlock status=' . $st . ' cookie=' . ($ADMIN_COOKIE !== '' ? 'あり' : 'なし') . ' config先頭=' . substr(str_replace("\n", ' ', (string)@file_get_contents(dirname(__DIR__) . '/config.php')), 0, 120) . ' headers=' . implode(' | ', array_map(static fn($h) => substr($h, 0, 60), $hdr));
 
 echo "== 画面 ==\n";
 ok(trim(http('GET', '/ping')[1]) === 'ok', '/ping');
@@ -378,4 +379,7 @@ ok($st === 404, 'シフト: いないスタッフは断る');
 http('POST', "/shift/staff/{$sid}/toggle", null, []);
 ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
 
+if ($fail) {
+    echo "=== 鍵の調査 ===\n" . ($GLOBALS['UNLOCK_DEBUG'] ?? '(なし)') . "\n";
+}
 exit($fail ? 1 : 0);
