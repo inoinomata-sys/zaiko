@@ -16,5 +16,8 @@
 
 ## 注意
 
+- 自動デプロイの設定は `.github/workflows/lolipop.yml`（実際に動く）と `php/ci/lolipop.yml`（控え）の2つ。push では workflows を書き換えられないので、直す時は GitHub のサイトで控えを上げて置き換え、2つを同じ中身にそろえる。
+- 旧 `app.py` と `templates/*.html` は本番では動かないが、PHP の画面（`php/templates/*.twig`）の生成元と、計算テストの正解データ（`php/tests/vectors.json`）の生成元なので、消さない。
+
 - 旧 Supabase（Render 版が使っていた DB）は残っている。Render を再開する時は Supabase の接続上限（セッション15本）に注意。
 - DB スキーマを変える場合は `init_db.py` も合わせて更新し、本番 DB にも反映する。
