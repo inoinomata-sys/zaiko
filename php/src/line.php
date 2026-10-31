@@ -122,6 +122,16 @@ function ensure_line_send_table(): void
     $done = true;
 }
 
+/** 重複して送らないための印（LINE の決まりで、UUID の形にする） */
+function line_uuid4(): string
+{
+    $b = random_bytes(16);
+    $b[6] = chr((ord($b[6]) & 0x0f) | 0x40);
+    $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);
+    $h = bin2hex($b);
+    return substr($h, 0, 8) . '-' . substr($h, 8, 4) . '-' . substr($h, 12, 4) . '-' . substr($h, 16, 4) . '-' . substr($h, 20);
+}
+
 function line_order_sig(int $orderId, int $exp, string $secret): string
 {
     return substr(hash_hmac('sha256', "order|{$orderId}|{$exp}", hash('sha256', 'link|' . $secret)), 0, 32);
@@ -181,10 +191,10 @@ function h_order_line_send(int $id): void
         . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
     $ctx = stream_context_create(['http' => [
         'method' => 'POST', 'timeout' => 10, 'ignore_errors' => true,
-        'header' => "Authorization: Bearer {$token}\r\nContent-Type: application/json\r\nX-Line-Retry-Key: " . bin2hex(random_bytes(8)) . '-' . bin2hex(random_bytes(2)) . "\r\n",
+        'header' => "Authorization: Bearer {$token}\r\nContent-Type: application/json\r\nX-Line-Retry-Key: " . line_uuid4() . "\r\n",
         'content' => json_encode(['to' => $to['user_id'], 'messages' => [['type' => 'text', 'text' => $text]]], JSON_UNESCAPED_UNICODE),
     ]]);
-    @file_get_contents('https://api.line.me/v2/bot/message/push', false, $ctx);
+    $resp = @file_get_contents('https://api.line.me/v2/bot/message/push', false, $ctx);
     $status = 0;
     foreach ($http_response_header ?? [] as $h) {
         if (preg_match('#^HTTP/\S+ (\d+)#', $h, $m)) {
@@ -193,7 +203,8 @@ function h_order_line_send(int $id): void
     }
     run('INSERT INTO line_sends (order_id, user_id, status, sent_at) VALUES (?,?,?,?)', [$id, $to['user_id'], $status, now_jst()->format('Y-m-d H:i:s')]);
     if ($status !== 200) {
-        respond_json(['ok' => false, 'error' => "LINE に送れませんでした（{$status}）。もう一度お試しください"], 502);
+        $why = is_string($resp) ? (string)(json_decode($resp, true)['message'] ?? '') : '';
+        respond_json(['ok' => false, 'error' => "LINE に送れませんでした（{$status}）" . ($why !== '' ? "：{$why}" : '。もう一度お試しください')], 502);
     }
     respond_json(['ok' => true, 'to' => $to['display_name']]);
 }

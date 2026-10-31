@@ -104,6 +104,7 @@ check('リンク署名 発注番号が違えば別', line_order_sig(13, 20000000
 check('リンク署名 期限が違えば別', line_order_sig(12, 2000000001, 'secretX') !== $sg, true);
 check('リンク署名 シークレットが違えば別', line_order_sig(12, 2000000000, 'secretY') !== $sg, true);
 check('リンク署名 長さ', strlen($sg), 32);
+check('UUID の形', (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', line_uuid4()), true);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
