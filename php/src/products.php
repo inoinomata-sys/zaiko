@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 function h_products(): void
 {
+    require_admin();
     $supplier = $_GET['supplier'] ?? SUPPLIER_NAMES[0];
     $all = rows('SELECT * FROM products ORDER BY col_group, sort_order, id');
     $perStore = [];
@@ -39,6 +40,7 @@ function wants_json(): bool
 
 function h_product_add(): void
 {
+    require_admin();
     $category = nfkc($_POST['category'] ?? '') ?? '';
     $name = nfkc($_POST['name'] ?? '');
     $note = nfkc($_POST['note'] ?? null) ?: null;
@@ -106,6 +108,7 @@ function h_product_add(): void
 /** 同じ仕入先・同じカテゴリの中で、1つ上(up)または下(down)の商品と並び順を入れ替える */
 function h_product_move(int $id): void
 {
+    require_admin();
     $direction = (req_json() ?? [])['dir'] ?? null;
     if (!in_array($direction, ['up', 'down'], true)) {
         respond_json(['ok' => false], 400);
@@ -139,12 +142,14 @@ function h_product_move(int $id): void
 
 function h_product_toggle(int $id): void
 {
+    require_admin();
     run('UPDATE products SET is_active = NOT is_active WHERE id = ?', [$id]);
     redirect_to(($_SERVER['HTTP_REFERER'] ?? '') ?: '/products');
 }
 
 function h_product_base(int $id): void
 {
+    require_admin();
     $store = $_POST['store'] ?? '';
     if (!in_array($store, STORES, true)) {
         respond_json(['ok' => false, 'error' => '店舗が不正です'], 400);
@@ -167,6 +172,7 @@ function h_product_base(int $id): void
 
 function h_product_supplier(int $id): void
 {
+    require_admin();
     if (!isset($_POST['supplier'])) {
         throw new HttpError(400);
     }
@@ -178,16 +184,19 @@ function h_product_supplier(int $id): void
 
 function h_settings_top(): void
 {
+    require_admin();
     render('settings');
 }
 
 function h_contacts_settings(): void
 {
+    require_admin();
     render('contacts', ['suppliers' => get_suppliers_with_contacts()]);
 }
 
 function h_contact_add(): void
 {
+    require_admin();
     if (!isset($_POST['supplier_name'])) {
         throw new HttpError(400);
     }
@@ -200,12 +209,14 @@ function h_contact_add(): void
 
 function h_contact_update(int $id): void
 {
+    require_admin();
     run('UPDATE supplier_contacts SET contact_name = ?, fax = ? WHERE id = ?', [$_POST['contact_name'] ?? '', $_POST['fax'] ?? '', $id]);
     redirect_to('/settings/contacts');
 }
 
 function h_contact_delete(int $id): void
 {
+    require_admin();
     run('DELETE FROM supplier_contacts WHERE id = ?', [$id]);
     redirect_to('/settings/contacts');
 }

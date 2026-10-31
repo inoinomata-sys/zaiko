@@ -29,8 +29,8 @@ function require_admin(): void
     if (admin_cookie_ok($pass, (string)($_COOKIE['zadmin'] ?? ''))) {
         return;
     }
-    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-        redirect_to('/admin/unlock?next=' . urlencode('/settings/line'));
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {   // 画面の操作（ボタン）は、開いている間だけ。切れていたら、断る
+        respond_json(['ok' => false, 'error' => '管理者の合言葉の時間が切れました。設定を開き直してください'], 403);
     }
     redirect_to('/admin/unlock?next=' . urlencode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/'));
 }

@@ -29,10 +29,20 @@ function ok(bool $cond, string $label, string $detail = ''): void
 }
 
 /** [状態コード, 本文, 見出し] */
+// 管理者の鍵：試験用の設定（この場だけの、使い捨ての config.php）に合言葉を足し、鍵を開けた印（Cookie）で試す
+require_once dirname(__DIR__) . '/src/admin.php';
+$cfgPath = dirname(__DIR__) . '/config.php';
+$cfgSrc = is_file($cfgPath) ? (string)file_get_contents($cfgPath) : '';
+if ($cfgSrc !== '' && !str_contains($cfgSrc, "'admin_pass'")) {
+    file_put_contents($cfgPath, preg_replace('/return \[/', "return [\n    'admin_pass' => 'ci-admin-pass',", $cfgSrc, 1));
+}
+$ADMIN_COOKIE = 'zadmin=' . admin_cookie_value('ci-admin-pass', time() + 3600);
+$NO_ADMIN = false;
+
 function http(string $method, string $path, ?array $json = null, ?array $form = null, string $accept = 'text/html'): array
 {
-    global $BASE;
-    $header = "Accept: {$accept}\r\n";
+    global $BASE, $ADMIN_COOKIE, $NO_ADMIN;
+    $header = "Accept: {$accept}\r\n" . ($NO_ADMIN ? '' : "Cookie: {$ADMIN_COOKIE}\r\n");
     $opts = ['http' => ['method' => $method, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 180]];
     if ($json !== null) {
         $header .= "Content-Type: application/json\r\n";
@@ -297,11 +307,20 @@ if ($failures) {
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/menu', 'シフト');
 page_ok('/schedule');
-[$st, $body] = http('GET', '/settings/line');
+$NO_ADMIN = true;
+[$st] = http('GET', '/settings/line');
 ok($st === 302, 'LINE設定: 鍵がかかっている（合言葉の画面へ）', "status={$st}");
+[$st] = http('GET', '/settings');
+ok($st === 302, '設定: 鍵がかかっている');
+[$st] = http('GET', '/products');
+ok($st === 302, '商品マスター: 鍵がかかっている');
+[$st] = http('POST', '/order/1/delete', null, []);
+ok($st === 403, '発注の取り消し: 鍵なしでは断る', "status={$st}");
 page_ok('/admin/unlock', '合言葉');
 [$st] = http('POST', '/settings/line/assign', null, ['user_id' => 'U' . str_repeat('0', 32), 'supplier' => 'コタ']);
-ok($st === 302, 'LINE設定: 鍵なしでは、ひも付けできない', "status={$st}");
+ok($st === 403, 'LINE設定: 鍵なしでは、ひも付けできない', "status={$st}");
+$NO_ADMIN = false;
+page_ok('/settings/line', 'LINE');
 [$st] = http('POST', '/line/webhook', null, []);
 ok($st === 403, 'LINE: 署名がない知らせは断る');
 [$st] = http('GET', '/pub/order?id=1&exp=2000000000&sig=00000000000000000000000000000000');

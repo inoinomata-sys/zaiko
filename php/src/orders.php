@@ -346,6 +346,7 @@ function h_order_history(): void
 /** 発注の取り消し（設定の中）。発注履歴の画面からは分けてある */
 function h_settings_orders(): void
 {
+    require_admin();
     $orders = rows('
         SELECT o.id, o.store, o.supplier, o.order_month, o.order_day,
                COUNT(oi.id) AS item_count, COALESCE(SUM(oi.order_qty), 0) AS total_qty
@@ -359,6 +360,7 @@ function h_settings_orders(): void
 /** 発注の取り消し。確定した時に在庫へ足した分を引き、履歴から消す。使用入力の基準は、この発注より前の発注に戻る */
 function h_order_delete(int $id): void
 {
+    require_admin();
     $now = now_jst();
     [$data, $status] = transaction(function () use ($id, $now) {
         $o = row('SELECT store FROM orders WHERE id = ? FOR UPDATE', [$id]);
