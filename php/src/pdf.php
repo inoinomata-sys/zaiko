@@ -47,6 +47,27 @@ class ZPdf extends tFPDF
         $this->Cell(0, 6, $this->PageNo() . ' / {nb} ページ', 0, 0, 'C');
     }
 
+    // tFPDF の用紙の幅・高さ・余白は外から読めないので、読むための窓口を用意する
+    public function pageW(): float
+    {
+        return (float)$this->w;
+    }
+
+    public function pageH(): float
+    {
+        return (float)$this->h;
+    }
+
+    public function leftM(): float
+    {
+        return (float)$this->lMargin;
+    }
+
+    public function rightM(): float
+    {
+        return (float)$this->rMargin;
+    }
+
     private function charWidth(string $ch): float
     {
         $key = $this->FontSizePt . '|' . $ch;
@@ -135,18 +156,18 @@ function build_order_pdf_file(int $orderId): string
     $pdf->Ln(2);
 
     $gap = 3;
-    $colW = ($pdf->w - $pdf->lMargin - $pdf->rMargin - $gap * (PDF_COLS - 1)) / PDF_COLS;
+    $colW = ($pdf->pageW() - $pdf->leftM() - $pdf->rightM() - $gap * (PDF_COLS - 1)) / PDF_COLS;
     $qtyW = 13;
     $nameW = $colW - $qtyW;
     $FS = 13;
     $rowH = 7.5;
     $lineH = 6;
     $headH = 7.5;
-    $bottom = $pdf->h - 16;
+    $bottom = $pdf->pageH() - 16;
     $pos = ['col' => 0, 'top' => $pdf->GetY(), 'y' => $pdf->GetY()];
 
     $x0 = static function () use (&$pos, $pdf, $colW, $gap): float {
-        return $pdf->lMargin + $pos['col'] * ($colW + $gap);
+        return $pdf->leftM() + $pos['col'] * ($colW + $gap);
     };
     $colHead = static function () use (&$pos, $pdf, $x0, $nameW, $qtyW, $headH, $FS): void {
         $pdf->SetFont(PDF_FONT, '', $FS);
@@ -207,7 +228,7 @@ function build_order_pdf_file(int $orderId): string
     }
     if (!$blocks) {
         $pdf->SetFont(PDF_FONT, '', 13);
-        $pdf->SetXY($pdf->lMargin, $pos['y'] + 4);
+        $pdf->SetXY($pdf->leftM(), $pos['y'] + 4);
         $pdf->Cell(0, 10, '発注品はありません');
     }
     return $pdf->Output('S');
@@ -224,11 +245,11 @@ function build_customer_order_pdf(array $order, array $items, int $subtotal, int
     $pdf->SetMargins($M, $M, $M);
     $pdf->SetAutoPageBreak(false);
     $pdf->AddPage();
-    $W = $pdf->w - 2 * $M;
+    $W = $pdf->pageW() - 2 * $M;
     $qtyW = max(14.0, 8 * $k);
     $amtW = max(32.0, 20 * $k);
     $nameW = $W - $qtyW - $amtW;
-    $bottom = $pdf->h - 12;
+    $bottom = $pdf->pageH() - 12;
     $sumW = max(62.0, 36 * $k);
     $f = PDF_FONT;
 
@@ -236,7 +257,7 @@ function build_customer_order_pdf(array $order, array $items, int $subtotal, int
     pdf_nl($pdf, 0, 6 * $k, 'ご注文用紙　受付 ' . jst_fmt($order['created_at']));
     $pdf->SetFont($f, '', 22 * $k);
     $pdf->ml(0, 11 * $k, sama_fmt($order['customer']));
-    $pdf->SetX($pdf->lMargin);
+    $pdf->SetX($pdf->leftM());
     $pdf->SetFont($f, '', 11 * $k);
     if ($order['phone']) {
         pdf_nl($pdf, 0, 6 * $k, "TEL {$order['phone']}");
@@ -265,20 +286,20 @@ function build_customer_order_pdf(array $order, array $items, int $subtotal, int
             $head();
         }
         $y = $pdf->GetY();
-        $pdf->SetXY($pdf->lMargin + 1, $y + 1);
+        $pdf->SetXY($pdf->leftM() + 1, $y + 1);
         $pdf->ml($nameW - 2, 5.6 * $k, (string)$it['name']);
         $pdf->SetFont($f, '', 8.5 * $k);
-        $pdf->SetX($pdf->lMargin + 1);
+        $pdf->SetX($pdf->leftM() + 1);
         $pdf->ml($nameW - 2, 4.5 * $k, $sub);
         $pdf->SetFont($f, '', 13 * $k);
-        $pdf->SetXY($pdf->lMargin + $nameW, $y);
+        $pdf->SetXY($pdf->leftM() + $nameW, $y);
         $pdf->Cell($qtyW, $h, (string)$it['qty'], 0, 0, 'C');
         $pdf->Cell($amtW - 1, $h, yen_fmt($it['amount']), 0, 0, 'R');
         // 区切り線だけ灰色にして、すぐ黒に戻す（文字の輪郭も同じ「線の色」を使うため、戻さないと文字が薄くなる）
         $pdf->SetDrawColor(190, 190, 190);
-        $pdf->Line($pdf->lMargin, $y + $h, $pdf->w - $pdf->rMargin, $y + $h);
+        $pdf->Line($pdf->leftM(), $y + $h, $pdf->pageW() - $pdf->rightM(), $y + $h);
         $pdf->SetDrawColor(0, 0, 0);
-        $pdf->SetXY($pdf->lMargin, $y + $h);
+        $pdf->SetXY($pdf->leftM(), $y + $h);
     }
     $pdf->Ln(2 * $k);
     if ($disc) {
@@ -319,27 +340,27 @@ function build_unordered_pdf(array $groups, string $title): string
         $pdf->SetFont($f, '', 13);
         pdf_nl($pdf, 0, 10, '未発注の商品はありません。');
     }
-    $W = $pdf->w - 24;
+    $W = $pdf->pageW() - 24;
     foreach ($groups as $g) {
         $need = 8 + 6 * count($g['who']) + 2;
-        if ($pdf->GetY() + $need > $pdf->h - 16) {
+        if ($pdf->GetY() + $need > $pdf->pageH() - 16) {
             $pdf->AddPage();
         }
         $y = $pdf->GetY();
-        $pdf->Rect($pdf->lMargin, $y + 1.5, 4.5, 4.5);   // 発注したらチェックを入れる四角
-        $pdf->SetXY($pdf->lMargin + 7, $y);
+        $pdf->Rect($pdf->leftM(), $y + 1.5, 4.5, 4.5);   // 発注したらチェックを入れる四角
+        $pdf->SetXY($pdf->leftM() + 7, $y);
         $pdf->SetFont($f, '', 12);
         $pdf->Cell($W - 7 - 24, 8, $g['name'] . ($g['spec'] ? "　{$g['spec']}" : ''));
         $pdf->SetFont($f, '', 14);
         pdf_nl($pdf, 24, 8, '× ' . $g['qty'], 'R');
         $pdf->SetFont($f, '', 10);
         foreach ($g['who'] as [$who, $q]) {
-            $pdf->SetX($pdf->lMargin + 7);
+            $pdf->SetX($pdf->leftM() + 7);
             $pdf->Cell($W - 7 - 24, 6, $who);
             pdf_nl($pdf, 24, 6, (string)$q, 'R');
         }
         $pdf->SetDrawColor(190, 190, 190);
-        $pdf->Line($pdf->lMargin, $pdf->GetY() + 1, $pdf->w - $pdf->rMargin, $pdf->GetY() + 1);
+        $pdf->Line($pdf->leftM(), $pdf->GetY() + 1, $pdf->pageW() - $pdf->rightM(), $pdf->GetY() + 1);
         $pdf->SetDrawColor(0, 0, 0);
         $pdf->Ln(3);
     }
@@ -369,12 +390,12 @@ function build_prices_pdf(array $groups, DateTimeImmutable $now): string
     $priceW = 38;
     $lineH = 6.5;
     $FS = 12;
-    $bottom = $pdf->h - 16;
+    $bottom = $pdf->pageH() - 16;
 
     $catBar = static function (string $text) use ($pdf, $f, $nameW, $specW, $priceW): void {
         $pdf->SetFont($f, '', 12);
         $pdf->SetFillColor(215, 215, 215);
-        $pdf->SetX($pdf->lMargin);
+        $pdf->SetX($pdf->leftM());
         $pdf->Cell($nameW + $specW + $priceW, 8, ' ' . $text, 0, 1, 'L', true);
     };
     if (!$groups) {
@@ -400,19 +421,19 @@ function build_prices_pdf(array $groups, DateTimeImmutable $now): string
             }
             $y = $pdf->GetY();
             $pdf->SetFont($f, '', $FS);
-            $pdf->SetXY($pdf->lMargin + 1, $y + 1.5);
+            $pdf->SetXY($pdf->leftM() + 1, $y + 1.5);
             $pdf->ml($nameW - 2, $lineH, $name);
             if ($spec !== '') {
-                $pdf->SetXY($pdf->lMargin + $nameW + 1, $y + 1.5);
+                $pdf->SetXY($pdf->leftM() + $nameW + 1, $y + 1.5);
                 $pdf->ml($specW - 2, $lineH, $spec);
             }
             $pdf->SetFont($f, '', 14);
-            $pdf->SetXY($pdf->lMargin + $nameW + $specW, $y);
+            $pdf->SetXY($pdf->leftM() + $nameW + $specW, $y);
             $pdf->Cell($priceW - 2, $h, yen_fmt($it['price']), 0, 0, 'R');
             $pdf->SetDrawColor(190, 190, 190);   // 区切り線だけ灰色。文字の輪郭に使う線の色は、すぐ黒に戻す
-            $pdf->Line($pdf->lMargin, $y + $h, $pdf->w - $pdf->rMargin, $y + $h);
+            $pdf->Line($pdf->leftM(), $y + $h, $pdf->pageW() - $pdf->rightM(), $y + $h);
             $pdf->SetDrawColor(0, 0, 0);
-            $pdf->SetXY($pdf->lMargin, $y + $h);
+            $pdf->SetXY($pdf->leftM(), $y + $h);
         }
         $pdf->Ln(3);
     }
