@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}管理者の合言葉{% endblock %}
+{% block title %}管理者の暗証番号{% endblock %}
 {% block head %}
 <style>
 .ad { max-width: 420px; margin: 30px auto; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 22px 18px; }
@@ -11,16 +11,16 @@
 {% endblock %}
 {% block content %}
 <div class="ad">
-  <h1>🔒 管理者の合言葉</h1>
+  <h1>🔒 管理者の暗証番号</h1>
   {% if unset %}
-  <p>合言葉が、まだ決まっていません。サーバーの設定（config.php）に、管理者の合言葉を入れると、この画面が開けるようになります。</p>
+  <p>暗証番号が、まだ決まっていません。サーバーの設定（config.php）に、管理者の暗証番号（数字）を入れると、この画面が開けるようになります。</p>
   {% else %}
-  <p>お店の管理をする人だけが、開ける画面です。合言葉を入れてください（開いたあと、{{ 60 }}分間は、そのまま使えます）。</p>
+  <p>お店の管理をする人だけが、開ける画面です。暗証番号を入れてください（開いたあと、{{ 60 }}分間は、そのまま使えます）。</p>
   {% if error %}<div class="e">{{ error }}</div>{% endif %}
   <form method="post" action="/admin/unlock">
     <input type="hidden" name="next" value="{{ next }}">
     <input type="text" name="user" value="admin" autocomplete="username" style="display:none" tabindex="-1" aria-hidden="true">
-    <input type="password" name="pass" autocomplete="current-password" placeholder="合言葉" required autofocus>
+    <input type="password" name="pass" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" placeholder="暗証番号" required autofocus>
     <button class="btn" type="submit" style="width:100%">開く</button>
   </form>
   {% endif %}

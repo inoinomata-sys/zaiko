@@ -17,6 +17,18 @@ function admin_cookie_ok(string $pass, string $value): bool
     return (int)$m[1] > time() && hash_equals(admin_cookie_value($pass, (int)$m[1]), $value);
 }
 
+const ADMIN_MAX_FAILS = 5;       // この回数まちがえたら、しばらく入れない
+const ADMIN_FAIL_MINUTES = 10;   // 数える時間・入れない時間
+
+function ensure_admin_fail_table(): void
+{
+    static $done = false;
+    if (!$done) {
+        run('CREATE TABLE IF NOT EXISTS admin_fail (id INT AUTO_INCREMENT PRIMARY KEY, at DATETIME NOT NULL, KEY idx_admin_fail_at (at)) DEFAULT CHARSET=utf8mb4');
+        $done = true;
+    }
+}
+
 function admin_pass(): string
 {
     return (string)($GLOBALS['CONFIG']['admin_pass'] ?? '');
@@ -46,13 +58,20 @@ function h_admin_unlock(): void
     $next = admin_next((string)($_GET['next'] ?? $_POST['next'] ?? '/settings'));
     $error = '';
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $pass !== '') {
-        if (hash_equals($pass, (string)($_POST['pass'] ?? ''))) {
+        ensure_admin_fail_table();
+        $since = now_jst()->modify('-' . ADMIN_FAIL_MINUTES . ' minutes')->format('Y-m-d H:i:s');
+        if ((int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]) >= ADMIN_MAX_FAILS) {
+            $error = 'まちがいが続いたので、' . ADMIN_FAIL_MINUTES . '分ほど、入れません。あとでお試しください';
+        } elseif (hash_equals($pass, (string)($_POST['pass'] ?? ''))) {
+            run('DELETE FROM admin_fail');
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
             redirect_to($next);
+        } else {
+            run('INSERT INTO admin_fail (at) VALUES (?)', [now_jst()->format('Y-m-d H:i:s')]);
+            sleep(1);
+            $error = '番号が違います';
         }
-        sleep(1);
-        $error = '合言葉が違います';
     }
     render('admin_unlock', ['next' => $next, 'error' => $error, 'unset' => $pass === ''], $error !== '' ? 401 : 200);
 }

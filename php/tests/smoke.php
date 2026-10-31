@@ -36,8 +36,8 @@ $cfgSrc = is_file($cfgPath) ? (string)file_get_contents($cfgPath) : '';
 if ($cfgSrc !== '' && !str_contains($cfgSrc, "'admin_pass'")) {
     file_put_contents($cfgPath, preg_replace('/return \[/', "return [\n    'admin_pass' => 'ci-admin-pass',", $cfgSrc, 1));
 }
-$ADMIN_COOKIE = 'zadmin=' . admin_cookie_value('ci-admin-pass', time() + 3600);
-$NO_ADMIN = false;
+$ADMIN_COOKIE = '';
+$NO_ADMIN = true;
 
 function http(string $method, string $path, ?array $json = null, ?array $form = null, string $accept = 'text/html'): array
 {
@@ -107,6 +107,17 @@ function db_val(string $sql): mixed
     $r = $pdo->query($sql)->fetch(PDO::FETCH_NUM);
     return $r ? $r[0] : null;
 }
+
+// 本物の流れで、鍵を開ける（暗証番号を送り、返ってきた印を、以降の試験で使う）
+$NO_ADMIN = true;
+[$st, , $hdr] = http('POST', '/admin/unlock', null, ['pass' => 'ci-admin-pass', 'next' => '/settings']);
+foreach ($hdr as $h) {
+    if (preg_match('/^Set-Cookie:\s*(zadmin=[^;]+)/i', $h, $m)) {
+        $ADMIN_COOKIE = $m[1];
+    }
+}
+ok($ADMIN_COOKIE !== '', '管理者の鍵: 暗証番号で開けられる', 'status=' . $st . ' / config に admin_pass が入っているか: ' . (str_contains((string)@file_get_contents(dirname(__DIR__) . '/config.php'), 'admin_pass') ? 'はい' : 'いいえ'));
+$NO_ADMIN = false;
 
 echo "== 画面 ==\n";
 ok(trim(http('GET', '/ping')[1]) === 'ok', '/ping');
