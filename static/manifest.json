@@ -2,7 +2,7 @@
   "name": "INO.inc 在庫管理",
   "short_name": "在庫管理",
   "description": "美容室の在庫・発注管理システム",
-  "start_url": "/",
+  "start_url": "/menu",
   "display": "standalone",
   "background_color": "#fdf0f4",
   "theme_color": "#c2547a",

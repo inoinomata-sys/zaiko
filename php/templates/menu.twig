@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}メニュー{% endblock %}
+{% block title %}総合管理{% endblock %}
 {% block head %}
 <style>
 .mn-wrap { max-width: 480px; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; }
@@ -10,6 +10,7 @@
 {% endblock %}
 {% block content %}
 <div class="mn-wrap">
+  <h1 style="font-size:20px;font-weight:700;margin-bottom:2px">総合管理</h1>
   <a class="mn-card" href="/"><b>在庫管理</b><span>在庫・使用入力・発注・お客様注文</span></a>
   <a class="mn-card" href="/shift"><b>シフト</b><span>イノ・リッチの出勤（ヘルプの日も見えます）</span></a>
 </div>
