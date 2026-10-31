@@ -6,14 +6,25 @@ declare(strict_types=1);
 $BASE = rtrim($argv[1] ?? 'http://127.0.0.1:8080', '/');
 $fail = 0;
 $count = 0;
+$failures = [];
+
+/** 失敗の説明を短くする（500 のエラー画面なら、PHP のエラー文の部分を取り出す） */
+function brief(string $detail): string
+{
+    if (($p = strpos($detail, '<pre')) !== false) {
+        $detail = html_entity_decode(strip_tags(substr($detail, $p)));
+    }
+    return substr(preg_replace('/\s+/', ' ', $detail), 0, 700);
+}
 
 function ok(bool $cond, string $label, string $detail = ''): void
 {
-    global $fail, $count;
+    global $fail, $count, $failures;
     $count++;
     if (!$cond) {
         $fail++;
-        echo "NG  {$label}" . ($detail !== '' ? "\n      {$detail}" : '') . "\n";
+        $failures[] = ['label' => $label, 'detail' => $detail];
+        echo "NG  {$label}" . ($detail !== '' ? "\n      " . brief($detail) : '') . "\n";
     }
 }
 
@@ -65,7 +76,7 @@ function page_ok(string $path, string $mustContain = ''): string
 function pdf_ok(string $path, array $mustContainText = []): string
 {
     [$st, $body] = http('GET', $path);
-    ok($st === 200 && str_starts_with($body, '%PDF') && strlen($body) > 1500, "PDF {$path}", "status={$st} bytes=" . strlen($body) . ' ' . substr($body, 0, 200));
+    ok($st === 200 && str_starts_with($body, '%PDF') && strlen($body) > 1500, "PDF {$path}", "status={$st} bytes=" . strlen($body) . ' ' . (str_contains($body, '<pre') ? $body : substr($body, 0, 200)));
     if ($mustContainText && str_starts_with($body, '%PDF') && trim((string)shell_exec('command -v pdftotext')) !== '') {
         $f = tempnam(sys_get_temp_dir(), 'pdf');
         file_put_contents($f, $body);
@@ -268,4 +279,17 @@ page_ok('/settings/contacts', '鈴木二郎');
 ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM supplier_contacts WHERE id={$cidc}") === 0, '担当者を消す');
 
 echo "\n{$count} 件を確認、失敗 {$fail} 件\n";
+if ($failures) {
+    echo "=== 失敗の一覧 ===\n";
+    $seen = [];
+    foreach ($failures as $f) {
+        $b = brief($f['detail']);
+        $key = md5($f['label'] . $b);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        echo "NG {$f['label']} :: " . substr($b, 0, 600) . "\n";
+    }
+}
 exit($fail ? 1 : 0);
