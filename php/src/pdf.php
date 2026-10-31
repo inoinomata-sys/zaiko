@@ -22,6 +22,7 @@ class ZPdf extends tFPDF
 
     public function __construct(string $format = 'A4')
     {
+        self::dropForeignFontCache();
         parent::__construct('P', 'mm', $format);
         $this->AddFont(PDF_FONT, '', 'NotoSansJP-Regular.ttf', true);
         $this->SetFont(PDF_FONT, '', 12);
@@ -45,6 +46,23 @@ class ZPdf extends tFPDF
         $this->SetY(-12);
         $this->SetFont(PDF_FONT, '', 10);
         $this->Cell(0, 6, $this->PageNo() . ' / {nb} ページ', 0, 0, 'C');
+    }
+
+    /**
+     * フォントの情報の控え（.mtx.php など）には、作った場所の道が書かれる。自動テストの場所（/home/runner/…）で
+     * 作られた控えがロリポップに置かれると、フォントが見つからないエラーになるので、見つけたら消して作り直させる
+     */
+    private static function dropForeignFontCache(): void
+    {
+        $dir = BASE_DIR . '/storage/pdffont/unifont/';
+        $mtx = $dir . 'notosansjp-regular.mtx.php';
+        if (is_file($mtx) && str_contains((string)@file_get_contents($mtx), '/home/runner/')) {
+            foreach (glob($dir . 'notosansjp-regular.*') ?: [] as $f) {
+                if (!str_ends_with($f, '.ttf')) {
+                    @unlink($f);
+                }
+            }
+        }
     }
 
     // tFPDF の用紙の幅・高さ・余白は外から読めないので、読むための窓口を用意する
