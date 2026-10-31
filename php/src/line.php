@@ -233,7 +233,8 @@ function h_order_line_send(int $id): void
     }
     ensure_line_send_table();
     $exp = time() + LINE_LINK_DAYS * 86400;
-    $text = "【発注書】有限会社イノ（{$order['store']}）\n{$order['order_month']}月{$order['order_day']}日の発注です。\n"
+    $text = "いつもありがとうございます。\n有限会社イノ（{$order['store']}）です。\n"
+        . "{$order['order_month']}月{$order['order_day']}日の発注書をお送りします。\n"
         . "下のリンクから、PDFをご確認ください（" . LINE_LINK_DAYS . "日間有効）。\n"
         . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
     $ctx = stream_context_create(['http' => [
