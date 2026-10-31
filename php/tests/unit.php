@@ -5,6 +5,7 @@ declare(strict_types=1);
 define('BASE_DIR', dirname(__DIR__));
 require BASE_DIR . '/src/util.php';
 require BASE_DIR . '/src/schedule.php';
+require BASE_DIR . '/src/line.php';
 
 // 正解データが読めない・空の時は、何も確かめないまま成功にせず、失敗にする
 $raw = @file_get_contents(__DIR__ . '/vectors.json');
@@ -88,6 +89,14 @@ check('予定 毎月25日', schedule_matches(['kind' => 'monthly', 'day_of_month
 check('予定 毎月31日は30日の月に出ない', schedule_matches(['kind' => 'monthly', 'day_of_month' => 31], $dd('2026-11-30')), false);
 check('予定 1回だけ', schedule_matches(['kind' => 'once', 'once_date' => '2026-12-24'], $dd('2026-12-24')), true);
 check('予定 1回だけ(別の日)', schedule_matches(['kind' => 'once', 'once_date' => '2026-12-24'], $dd('2026-12-25')), false);
+// LINE の署名の確認
+$lineBody = '{"events":[]}';
+$lineSig = base64_encode(hash_hmac('sha256', $lineBody, 'secret1', true));
+check('LINE署名 正しい', line_signature_ok($lineBody, 'secret1', $lineSig), true);
+check('LINE署名 本文が違う', line_signature_ok($lineBody . ' ', 'secret1', $lineSig), false);
+check('LINE署名 シークレットが違う', line_signature_ok($lineBody, 'secret2', $lineSig), false);
+check('LINE署名 ヘッダーなし', line_signature_ok($lineBody, 'secret1', ''), false);
+check('LINE署名 シークレット未設定', line_signature_ok($lineBody, '', $lineSig), false);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

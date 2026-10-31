@@ -11,6 +11,7 @@ require __DIR__ . '/customer.php';
 require __DIR__ . '/products.php';
 require __DIR__ . '/shift.php';
 require __DIR__ . '/schedule.php';
+require __DIR__ . '/line.php';
 
 // ── 画面（Twig）の準備 ─────────────────────────────────────────────────────────
 
@@ -115,6 +116,9 @@ function routes(): array
         ['GET', '/shift/staff', 'h_shift_staff'],
         ['POST', '/shift/staff/add', 'h_shift_staff_add'],
         ['POST', '/shift/staff/<int:id>/toggle', 'h_shift_staff_toggle'],
+        ['POST', '/line/webhook', 'h_line_webhook'],
+        ['GET', '/settings/line', 'h_settings_line'],
+        ['POST', '/settings/line/assign', 'h_settings_line_assign'],
         ['GET', '/ping', 'h_ping'],
         ['GET', '/health', 'h_health'],
     ];

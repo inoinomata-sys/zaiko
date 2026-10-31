@@ -1,0 +1,36 @@
+{% extends 'base.twig' %}
+{% block title %}LINE（業者さん）{% endblock %}
+{% block head %}
+<style>
+.ln { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.ln .n { font-weight: 700; font-size: 16px; }
+.ln .m { font-size: 12px; color: var(--fg2); margin: 2px 0 8px; word-break: break-all; }
+.ln form { display: flex; gap: 8px; }
+.ln select { flex: 1; font-size: 16px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
+.warn { background: #fff6e5; border: 1px solid #f0d49a; color: #7a5200; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:10px"><a href="/settings">← 設定にもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:8px">LINE（業者さん）</h1>
+{% if not ready %}
+<div class="warn">まだ、LINE とつながっていません。公式LINEで Messaging API を使えるようにして、シークレットとトークンを、サーバーの設定（config.php）に入れると、つながります。</div>
+{% endif %}
+<p style="font-size:13px;color:var(--fg2);margin-bottom:12px">業者さんが、発注専用LINEに、一言送ると、ここに出ます。仕入先を選ぶと、発注書の送り先になります（1つの仕入先に、1人だけ）。</p>
+{% for c in contacts %}
+<div class="ln">
+  <div class="n">{{ c.display_name ?: '（名前なし）' }}</div>
+  <div class="m">最後の発言：{{ c.last_text ?: '—' }}（{{ c.last_at }}）</div>
+  <form method="post" action="/settings/line/assign">
+    <input type="hidden" name="user_id" value="{{ c.user_id }}">
+    <select name="supplier">
+      <option value="">仕入先を選ぶ</option>
+      {% for s in supplier_names %}<option value="{{ s }}"{% if c.supplier == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+    <button class="btn" type="submit">決める</button>
+  </form>
+</div>
+{% else %}
+<p style="color:var(--fg2);margin:20px 0">まだ誰も出ていません。</p>
+{% endfor %}
+{% endblock %}

@@ -297,6 +297,9 @@ if ($failures) {
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/menu', 'シフト');
 page_ok('/schedule');
+page_ok('/settings/line', 'LINE');
+[$st] = http('POST', '/line/webhook', null, []);
+ok($st === 403, 'LINE: 署名がない知らせは断る');
 page_ok('/schedule/rules', 'ゴミ出し');
 ok((int)db_val("SELECT COUNT(*) FROM schedule_rules") === 6, '予定: 最初の6件が入っている');
 [$st] = http('POST', '/schedule/rules/add', null, ['title' => 'テスト大掃除', 'store' => 'イノ', 'kind' => 'nth', 'weekday' => 3, 'nth' => 2]);

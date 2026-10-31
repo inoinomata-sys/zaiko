@@ -335,6 +335,9 @@ function require_basic_auth(): void
     if ($path === '/ping') {
         return;
     }
+    if ($path === '/line/webhook' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        return;   // LINE からの知らせ。ログインはなく、署名で確認する（line.php）
+    }
     if (login_cookie_ok($cfg, (string)($_COOKIE['zlogin'] ?? ''))) {
         if ($path === '/login') {
             header('Location: /menu');
