@@ -16,6 +16,8 @@
 
 ## 注意
 
+- シフト管理（`/shift`）は PHP 版だけの機能。画面は `php/templates/shift*.twig` に直接書いてある（Flask 版の元ファイルはない。convert_templates.py は触らない）。表は初回アクセスで自動作成（`ensure_shift_tables`）。
+
 - 自動デプロイの設定は `.github/workflows/lolipop.yml`（実際に動く）と `php/ci/lolipop.yml`（控え）の2つ。push では workflows を書き換えられないので、直す時は GitHub のサイトで控えを上げて置き換え、2つを同じ中身にそろえる。
 - 旧 `app.py` と `templates/*.html` は本番では動かないが、PHP の画面（`php/templates/*.twig`）の生成元と、計算テストの正解データ（`php/tests/vectors.json`）の生成元なので、消さない。
 

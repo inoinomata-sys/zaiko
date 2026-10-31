@@ -1,0 +1,82 @@
+{% extends 'base.twig' %}
+{% block title %}シフト{% endblock %}
+{% block head %}
+<style>
+.sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sh-top h1 { font-size: 20px; font-weight: 700; }
+.sh-nav { display: flex; align-items: center; gap: 6px; }
+.sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
+.sh-me { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fff; font-family: inherit; }
+.sh-day { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.sh-day.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
+.sh-day.empty { opacity: .55; }
+.sh-date { font-weight: 700; margin-bottom: 6px; }
+.sh-date .sun { color: #c0392b; } .sh-date .sat { color: #2c6fb7; }
+.sh-row { display: flex; gap: 8px; padding: 3px 0; align-items: baseline; }
+.sh-store { flex: 0 0 52px; font-size: 12px; font-weight: 700; color: #fff; background: var(--acc); border-radius: 6px; text-align: center; padding: 2px 0; }
+.sh-store.off { background: #9a9a9a; }
+.sh-people { flex: 1; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.sh-p { font-size: 15px; }
+.sh-p.me { background: #fff3a8; border-radius: 6px; padding: 0 5px; font-weight: 700; }
+.sh-tag { font-size: 11px; border-radius: 5px; padding: 0 5px; margin-left: 3px; vertical-align: 1px; }
+.sh-tag.help { background: #e8f0fe; color: #1a56b0; border: 1px solid #b9cdf5; }
+.sh-tag.chg { background: #fde8e8; color: #b3261e; border: 1px solid #f2b8b5; }
+.sh-foot { display: flex; gap: 10px; margin: 14px 0 30px; }
+.sh-foot a { flex: 1; text-align: center; padding: 12px; border: 1px solid var(--acc); border-radius: 10px; color: var(--acc); text-decoration: none; font-weight: 600; background: #fff; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="sh-top">
+  <h1>シフト</h1>
+  <div class="sh-nav">
+    <a href="/shift?month={{ nav.prev }}">‹</a>
+    <b>{{ nav.label }}</b>
+    <a href="/shift?month={{ nav.next }}">›</a>
+  </div>
+</div>
+{% if staff %}
+<select id="me" class="sh-me">
+  <option value="">自分の名前を選ぶ（色が付きます）</option>
+  {% for s in staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+</select>
+{% else %}
+<p style="color:var(--fg2);margin:14px 0">まだスタッフがいません。下の「スタッフ」から入れてください。</p>
+{% endif %}
+{% for day in days %}
+<div class="sh-day{% if day.today %} today{% endif %}{% if not day.any %} empty{% endif %}" id="d{{ day.d }}">
+  <div class="sh-date">{{ day.d }}日 <span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span></div>
+  {% for store, people in day.groups %}
+    {% if people %}
+    <div class="sh-row">
+      <span class="sh-store{% if store == '休' %} off{% endif %}">{{ store }}</span>
+      <span class="sh-people">
+        {% for p in people %}
+        <span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>
+        {% endfor %}
+      </span>
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endfor %}
+<div class="sh-foot">
+  <a href="/shift/edit?month={{ nav.month }}">シフトを入れる</a>
+  <a href="/shift/staff">スタッフ</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const sel = document.getElementById('me');
+  if (!sel) return;
+  try { const v = localStorage.getItem('shift:me'); if (v && [...sel.options].some(o => o.value === v)) sel.value = v; } catch (e) {}
+  function paint() {
+    document.querySelectorAll('.sh-p').forEach(p => p.classList.toggle('me', sel.value !== '' && p.dataset.sid === sel.value));
+  }
+  sel.addEventListener('change', () => { try { localStorage.setItem('shift:me', sel.value); } catch (e) {} paint(); });
+  paint();
+  const t = document.querySelector('.sh-day.today');
+  if (t && location.hash === '') t.scrollIntoView({block: 'center'});
+})();
+</script>
+{% endblock %}

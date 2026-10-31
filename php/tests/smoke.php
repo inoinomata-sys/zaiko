@@ -293,4 +293,33 @@ if ($failures) {
         echo "NG {$f['label']} :: " . substr($b, 0, 600) . "\n";
     }
 }
+
+// ── シフト（新しい表だけを使う。在庫・発注には触らない） ──
+page_ok('/shift');
+page_ok('/shift/staff');
+page_ok('/shift/edit');
+[$st] = http('POST', '/shift/staff/add', null, ['name' => 'テスト太郎', 'home_store' => 'イノ']);
+ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM shift_staff WHERE name='テスト太郎'") === 1, 'シフト: スタッフを足せる');
+http('POST', '/shift/staff/add', null, ['name' => 'テスト花子', 'home_store' => 'リッチ']);
+page_ok('/shift/staff', 'テスト太郎');
+$sid = (int)db_val("SELECT id FROM shift_staff WHERE name='テスト太郎'");
+$m = date('Y-m');
+page_ok('/shift/edit?month=' . $m, 'テスト花子');
+[$st, $j] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => 'リッチ']);
+ok($st === 200 && ($j['ok'] ?? false), 'シフト: 入れられる（イノの人がリッチへ）', json_encode($j, JSON_UNESCAPED_UNICODE));
+page_ok('/shift?month=' . $m, 'イノから');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => 'イノ']);
+ok($st === 200 && db_val("SELECT prev_store FROM shift_entries WHERE staff_id={$sid}") === 'リッチ', 'シフト: 変えると、前の店が残る');
+page_ok('/shift?month=' . $m, '変更');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => '']);
+ok($st === 200 && (int)db_val("SELECT COUNT(*) FROM shift_entries WHERE staff_id={$sid}") === 0, 'シフト: 消せる');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => '2025-13-40', 'store' => 'イノ']);
+ok($st === 400, 'シフト: 変な日付は断る');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => 'ほか']);
+ok($st === 400, 'シフト: 変な店名は断る');
+[$st] = api('/api/shift', ['staff_id' => 999999, 'date' => $m . '-10', 'store' => 'イノ']);
+ok($st === 404, 'シフト: いないスタッフは断る');
+http('POST', "/shift/staff/{$sid}/toggle", null, []);
+ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
+
 exit($fail ? 1 : 0);

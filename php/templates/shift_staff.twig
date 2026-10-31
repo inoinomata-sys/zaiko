@@ -1,0 +1,30 @@
+{% extends 'base.twig' %}
+{% block title %}シフトのスタッフ{% endblock %}
+{% block head %}
+<style>
+.st-card { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.st-card.off { opacity: .55; }
+.st-name { flex: 1; font-size: 16px; font-weight: 600; }
+.st-home { font-size: 12px; color: #fff; background: var(--acc); border-radius: 6px; padding: 2px 8px; }
+.st-add { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.st-add input, .st-add select { font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
+.st-add input { flex: 1; min-width: 140px; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:10px"><a href="/shift">← シフトにもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:6px">スタッフ</h1>
+<p style="font-size:13px;color:var(--fg2);margin-bottom:12px">「本店」は、ふだん入る店です。別の店に入る日は、シフトに「ヘルプ」の印が出ます。辞めた人は「外す」にすると、表から消えます（過去のシフトは残ります）。</p>
+<form class="st-add" method="post" action="/shift/staff/add">
+  <input name="name" placeholder="名前" required maxlength="40">
+  <select name="home_store"><option>イノ</option><option>リッチ</option></select>
+  <button class="btn" type="submit">足す</button>
+</form>
+{% for s in staff %}
+<div class="st-card{% if not s.is_active %} off{% endif %}">
+  <span class="st-name">{{ s.name }}</span>
+  <span class="st-home">{{ s.home_store }}</span>
+  <form method="post" action="/shift/staff/{{ s.id }}/toggle"><button class="btn btn-ghost btn-sm" type="submit">{{ s.is_active ? '外す' : '戻す' }}</button></form>
+</div>
+{% endfor %}
+{% endblock %}

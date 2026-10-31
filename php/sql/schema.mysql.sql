@@ -153,3 +153,21 @@ CREATE TABLE IF NOT EXISTS error_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE IF NOT EXISTS shift_staff (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(40) NOT NULL,
+  home_store VARCHAR(10) NOT NULL DEFAULT 'イノ',
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT NOT NULL DEFAULT 1
+) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS shift_entries (
+  staff_id INT NOT NULL,
+  work_date DATE NOT NULL,
+  store VARCHAR(10) NOT NULL,
+  prev_store VARCHAR(10) NULL,
+  changed_at DATETIME NULL,
+  PRIMARY KEY (staff_id, work_date),
+  KEY idx_shift_date (work_date)
+) DEFAULT CHARSET=utf8mb4;

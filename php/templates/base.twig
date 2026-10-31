@@ -200,7 +200,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}"><span>使用入力</span></a>
   <a href="/order" class="nav-link {% if request.path starts with '/order' %}active{% endif %}"><span>発注</span></a>
   <a href="/customer-orders" class="nav-link {% if request.path starts with '/customer-orders' or request.path starts with '/prices' %}active{% endif %}"><span>お客様注文</span></a>
-  <a href="/settings" class="nav-link {% if request.path starts with '/settings' or request.path starts with '/products' %}active{% endif %}"><span>設定</span></a>
+  <a href="/settings" class="nav-link {% if request.path starts with '/settings' or request.path starts with '/products' or request.path starts with '/shift' %}active{% endif %}"><span>設定</span></a>
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
 </nav>

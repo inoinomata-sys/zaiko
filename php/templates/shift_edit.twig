@@ -1,0 +1,77 @@
+{% extends 'base.twig' %}
+{% block title %}シフトを入れる{% endblock %}
+{% block head %}
+<style>
+.se-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.se-top h1 { font-size: 18px; font-weight: 700; }
+.sh-nav { display: flex; align-items: center; gap: 6px; }
+.sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
+.se-hint { font-size: 12px; color: var(--fg2); margin-bottom: 8px; }
+.se-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+table.se { border-collapse: separate; border-spacing: 0; }
+.se th, .se td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0; text-align: center; }
+.se thead th { position: sticky; top: 0; background: #f8f0f3; z-index: 2; font-size: 12px; min-width: 62px; padding: 5px 2px; }
+.se thead th.sun { color: #c0392b; } .se thead th.sat { color: #2c6fb7; } .se thead th.today { background: #ffe9b0; }
+.se .nm { position: sticky; left: 0; background: #fff; z-index: 1; min-width: 84px; max-width: 84px; font-size: 13px; font-weight: 600; padding: 6px 4px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.se thead th.nm { z-index: 3; background: #f8f0f3; }
+.se select { width: 62px; height: 40px; border: 0; background: transparent; font-size: 14px; text-align-last: center; font-family: inherit; }
+.se select.v-イノ { background: #fbe3ec; font-weight: 700; }
+.se select.v-リッチ { background: #e3f0fb; font-weight: 700; }
+.se select.v-休 { background: #eee; color: #777; }
+.se select.saving { opacity: .5; }
+.se select.err { outline: 2px solid #b3261e; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← シフトにもどる</a></p>
+<div class="se-top">
+  <h1>シフトを入れる</h1>
+  <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}">›</a></div>
+</div>
+<p class="se-hint">選ぶと、すぐ保存されます。入れたあとに変えた日には、見る画面で「変更」の印が3日間つきます。</p>
+{% if staff %}
+<div class="se-wrap">
+<table class="se">
+  <thead><tr><th class="nm">名前</th>
+    {% for day in days %}<th class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}{% if day.today %} today{% endif %}">{{ day.d }}<br>{{ day.w }}</th>{% endfor %}
+  </tr></thead>
+  <tbody>
+  {% for s in staff %}
+    <tr><th class="nm">{{ s.name }}<span style="font-weight:400;color:var(--fg2);font-size:11px"> {{ s.home_store }}</span></th>
+    {% for day in days %}
+      {% set v = cells[s.id][day.date] %}
+      <td><select class="v-{{ v }}" data-sid="{{ s.id }}" data-date="{{ day.date }}" data-prev="{{ v }}">
+        <option value=""{% if v == '' %} selected{% endif %}>－</option>
+        <option value="イノ"{% if v == 'イノ' %} selected{% endif %}>イノ</option>
+        <option value="リッチ"{% if v == 'リッチ' %} selected{% endif %}>リッチ</option>
+        <option value="休"{% if v == '休' %} selected{% endif %}>休</option>
+      </select></td>
+    {% endfor %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p style="color:var(--fg2)">まだスタッフがいません。<a href="/shift/staff">スタッフを入れる</a></p>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.se select').forEach(sel => sel.addEventListener('change', async () => {
+  const v = sel.value;
+  sel.classList.add('saving'); sel.classList.remove('err');
+  try {
+    const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: v})});
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw 0;
+    sel.className = v ? 'v-' + v : '';
+    sel.dataset.prev = v;
+  } catch (e) {
+    sel.value = sel.dataset.prev; sel.classList.add('err');
+    alert('保存できませんでした。もう一度お試しください');
+  } finally { sel.classList.remove('saving'); }
+}));
+</script>
+{% endblock %}
