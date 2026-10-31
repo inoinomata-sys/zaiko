@@ -12,11 +12,16 @@
 {% block content %}
 <div class="ad">
   <h1>🔒 管理者の暗証番号</h1>
-  {% if unset %}
+  {% if win %}
+  <div style="font-size:34px;font-weight:800;text-align:center;color:var(--acc);margin:18px 0">正解！</div>
+  <p style="text-align:center">設定を開きます…</p>
+  <script>setTimeout(function () { location.href = {{ next|json_encode|raw }}; }, 1500);</script>
+  <p style="text-align:center"><a href="{{ next }}">開かない時は、ここを押してください</a></p>
+  {% elseif unset %}
   <p>暗証番号が、まだ決まっていません。サーバーの設定（config.php）に、管理者の暗証番号（数字）を入れると、この画面が開けるようになります。</p>
   {% else %}
   <p>お店の管理をする人だけが、開ける画面です。暗証番号を入れてください（開いたあと、{{ 60 }}分間は、そのまま使えます）。</p>
-  {% if error %}<div class="e">{{ error }}</div>{% endif %}
+  {% if error %}<div class="e" style="font-size:22px;font-weight:800;text-align:center">{{ error }}</div>{% endif %}
   <form method="post" action="/admin/unlock">
     <input type="hidden" name="next" value="{{ next }}">
     <input type="text" name="user" value="admin" autocomplete="username" style="display:none" tabindex="-1" aria-hidden="true">

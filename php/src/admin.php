@@ -65,13 +65,18 @@ function h_admin_unlock(): void
             run('INSERT INTO admin_fail (at) VALUES (?)', [now_jst()->format('Y-m-d H:i:s')]);
         }
         // オーナーの指定：正しい番号、または、番号を3回まちがえた時（10分のうちに）、鍵が開く
-        if ($right || (int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]) >= ADMIN_MAX_FAILS) {
+        $fails = (int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]);
+        if ($right || $fails >= ADMIN_MAX_FAILS) {
             run('DELETE FROM admin_fail');
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
-            redirect_to($next);
+            if ($right) {
+                redirect_to($next);
+            }
+            render('admin_unlock', ['next' => $next, 'error' => '', 'unset' => false, 'win' => true]);   // 「正解！」を見せてから開く
+            return;
         }
-        $error = '番号が違います';
+        $error = [1 => '残念！', 2 => 'もう少し！'][$fails] ?? '番号が違います';
     }
-    render('admin_unlock', ['next' => $next, 'error' => $error, 'unset' => $pass === ''], $error !== '' ? 401 : 200);
+    render('admin_unlock', ['next' => $next, 'error' => $error, 'unset' => $pass === '', 'win' => false], $error !== '' ? 401 : 200);
 }

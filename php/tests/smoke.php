@@ -379,19 +379,20 @@ ok($st === 404, 'シフト: いないスタッフは断る');
 http('POST', "/shift/staff/{$sid}/toggle", null, []);
 ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
 
-// 暗証番号を、3回まちがえると、鍵が開く（オーナーの指定）
+// 暗証番号を、3回まちがえると、鍵が開く（オーナーの指定）。1回目「残念！」、2回目「もう少し！」、3回目「正解！」
 $NO_ADMIN = true;
-[$st1] = http('POST', '/admin/unlock', null, ['pass' => 'x1', 'next' => '/settings']);
-[$st2] = http('POST', '/admin/unlock', null, ['pass' => 'x2', 'next' => '/settings']);
-ok($st1 === 401 && $st2 === 401, '暗証番号: 1〜2回のまちがいでは、開かない', "{$st1},{$st2}");
-[$st3, , $h3] = http('POST', '/admin/unlock', null, ['pass' => 'x3', 'next' => '/settings']);
+[$st1, $b1] = http('POST', '/admin/unlock', null, ['pass' => 'x1', 'next' => '/settings']);
+[$st2, $b2] = http('POST', '/admin/unlock', null, ['pass' => 'x2', 'next' => '/settings']);
+ok($st1 === 401 && str_contains($b1, '残念！'), '暗証番号: 1回目は「残念！」で開かない', "{$st1}");
+ok($st2 === 401 && str_contains($b2, 'もう少し！'), '暗証番号: 2回目は「もう少し！」で開かない', "{$st2}");
+[$st3, $b3, $h3] = http('POST', '/admin/unlock', null, ['pass' => 'x3', 'next' => '/settings']);
 $opened = false;
 foreach ($h3 as $h) {
     if (preg_match('/^Set-Cookie:\s*zadmin=/i', $h)) {
         $opened = true;
     }
 }
-ok($st3 === 302 && $opened, '暗証番号: 3回まちがえると、開く', "status={$st3}");
+ok($st3 === 200 && $opened && str_contains($b3, '正解！'), '暗証番号: 3回目は「正解！」で開く', "status={$st3}");
 $NO_ADMIN = false;
 
 exit($fail ? 1 : 0);
