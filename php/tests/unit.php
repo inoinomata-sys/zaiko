@@ -97,6 +97,13 @@ check('LINE署名 本文が違う', line_signature_ok($lineBody . ' ', 'secret1'
 check('LINE署名 シークレットが違う', line_signature_ok($lineBody, 'secret2', $lineSig), false);
 check('LINE署名 ヘッダーなし', line_signature_ok($lineBody, 'secret1', ''), false);
 check('LINE署名 シークレット未設定', line_signature_ok($lineBody, '', $lineSig), false);
+// 発注書リンクの署名
+$sg = line_order_sig(12, 2000000000, 'secretX');
+check('リンク署名 同じ入力は同じ', line_order_sig(12, 2000000000, 'secretX'), $sg);
+check('リンク署名 発注番号が違えば別', line_order_sig(13, 2000000000, 'secretX') !== $sg, true);
+check('リンク署名 期限が違えば別', line_order_sig(12, 2000000001, 'secretX') !== $sg, true);
+check('リンク署名 シークレットが違えば別', line_order_sig(12, 2000000000, 'secretY') !== $sg, true);
+check('リンク署名 長さ', strlen($sg), 32);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

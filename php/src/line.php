@@ -100,3 +100,95 @@ function h_settings_line_assign(): void
     });
     redirect_to('/settings/line');
 }
+
+// ── 発注書を、業者さんの LINE に送る ───────────────────────────────────────────────
+
+const LINE_LINK_DAYS = 7;   // 発注書のリンクが開ける日数
+
+function ensure_line_send_table(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    run('CREATE TABLE IF NOT EXISTS line_sends (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_id INT NOT NULL,
+        user_id VARCHAR(64) NOT NULL,
+        status INT NOT NULL,
+        sent_at DATETIME NOT NULL,
+        KEY idx_line_sends_order (order_id)
+    ) DEFAULT CHARSET=utf8mb4');
+    $done = true;
+}
+
+function line_order_sig(int $orderId, int $exp, string $secret): string
+{
+    return substr(hash_hmac('sha256', "order|{$orderId}|{$exp}", hash('sha256', 'link|' . $secret)), 0, 32);
+}
+
+function line_order_link(int $orderId, int $exp, string $secret): string
+{
+    $host = $_SERVER['HTTP_HOST'] ?? 'sougoukanri.ino-vifare.com';
+    return "https://{$host}/pub/order?id={$orderId}&exp={$exp}&sig=" . line_order_sig($orderId, $exp, $secret);
+}
+
+/** 業者さんが、LINE のリンクから開く発注書（ログインなし。署名と期限で確認する） */
+function h_pub_order(): void
+{
+    $id = (int)($_GET['id'] ?? 0);
+    $exp = (int)($_GET['exp'] ?? 0);
+    $sig = (string)($_GET['sig'] ?? '');
+    $secret = (string)(line_config()['secret'] ?? '');
+    if ($id <= 0 || $secret === '' || $exp < time() || !hash_equals(line_order_sig($id, $exp, $secret), $sig)) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        exit('このリンクは、期限が切れているか、正しくありません。お手数ですが、ご連絡ください。');
+    }
+    $_GET['inline'] = '1';
+    h_order_pdf($id);
+}
+
+/** この発注の仕入先にひも付いた、LINE の送り先（なければ null） */
+function line_contact_for_order(int $orderId): ?array
+{
+    ensure_line_tables();
+    return row('SELECT c.user_id, c.display_name FROM orders o JOIN line_contacts c ON c.supplier = o.supplier WHERE o.id = ?', [$orderId]);
+}
+
+function h_order_line_send(int $id): void
+{
+    $cfg = line_config();
+    $secret = (string)($cfg['secret'] ?? '');
+    $token = (string)($cfg['token'] ?? '');
+    $order = row('SELECT id, store, supplier, order_month, order_day FROM orders WHERE id = ?', [$id]);
+    if (!$order) {
+        respond_json(['ok' => false, 'error' => '発注が見つかりません'], 404);
+    }
+    $to = line_contact_for_order($id);
+    if ($secret === '' || $token === '' || !$to) {
+        respond_json(['ok' => false, 'error' => 'この仕入先の LINE の送り先が、決まっていません（設定 > LINE）'], 400);
+    }
+    ensure_line_send_table();
+    $exp = time() + LINE_LINK_DAYS * 86400;
+    $text = "【発注書】有限会社イノ（{$order['store']}）\n{$order['order_month']}月{$order['order_day']}日の発注です。\n"
+        . "下のリンクから、PDFをご確認ください（" . LINE_LINK_DAYS . "日間有効）。\n"
+        . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
+    $ctx = stream_context_create(['http' => [
+        'method' => 'POST', 'timeout' => 10, 'ignore_errors' => true,
+        'header' => "Authorization: Bearer {$token}\r\nContent-Type: application/json\r\nX-Line-Retry-Key: " . bin2hex(random_bytes(8)) . '-' . bin2hex(random_bytes(2)) . "\r\n",
+        'content' => json_encode(['to' => $to['user_id'], 'messages' => [['type' => 'text', 'text' => $text]]], JSON_UNESCAPED_UNICODE),
+    ]]);
+    @file_get_contents('https://api.line.me/v2/bot/message/push', false, $ctx);
+    $status = 0;
+    foreach ($http_response_header ?? [] as $h) {
+        if (preg_match('#^HTTP/\S+ (\d+)#', $h, $m)) {
+            $status = (int)$m[1];
+        }
+    }
+    run('INSERT INTO line_sends (order_id, user_id, status, sent_at) VALUES (?,?,?,?)', [$id, $to['user_id'], $status, now_jst()->format('Y-m-d H:i:s')]);
+    if ($status !== 200) {
+        respond_json(['ok' => false, 'error' => "LINE に送れませんでした（{$status}）。もう一度お試しください"], 502);
+    }
+    respond_json(['ok' => true, 'to' => $to['display_name']]);
+}

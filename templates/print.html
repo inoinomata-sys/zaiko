@@ -67,6 +67,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
   <a class="btn btn-print" id="pdf-btn" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
+  {% if line_to %}<button type="button" class="btn btn-print" id="line-btn" data-sent="{{ line_sent or '' }}" data-to="{{ line_to }}" data-sup="{{ sup_info.name }}">LINEで送る</button>{% endif %}
 </div>
 
 <div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
@@ -140,6 +141,27 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
     navigator.share({files: [file]}).catch(err => {
       if (err.name !== 'AbortError') { openInSafari(); alert('共有できませんでした。もう一度ボタンを押すとPDFを開きます。'); }
     });
+  });
+})();
+(function () {
+  const lb = document.getElementById('line-btn');
+  if (!lb) return;
+  lb.addEventListener('click', async () => {
+    let msg = lb.dataset.sup + ' の ' + lb.dataset.to + ' さんに、この発注書を LINE で送ります。よろしいですか？';
+    if (lb.dataset.sent) msg = 'この発注書は、すでに送信済みです（' + lb.dataset.sent + '）。\n\n' + msg;
+    if (!confirm(msg)) return;
+    lb.disabled = true; lb.textContent = '送信中…';
+    try {
+      const res = await fetch('/order/{{ order.id }}/line', {method: 'POST'});
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.error || '送れませんでした');
+      lb.textContent = '送りました ✓';
+      lb.dataset.sent = new Date().toLocaleString('ja-JP');
+      setTimeout(() => { lb.disabled = false; lb.textContent = 'もう一度LINEで送る'; }, 4000);
+    } catch (e) {
+      alert(e.message || '送れませんでした');
+      lb.disabled = false; lb.textContent = 'LINEで送る';
+    }
   });
 })();
 </script>

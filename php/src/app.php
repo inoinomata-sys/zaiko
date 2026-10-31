@@ -117,6 +117,8 @@ function routes(): array
         ['POST', '/shift/staff/add', 'h_shift_staff_add'],
         ['POST', '/shift/staff/<int:id>/toggle', 'h_shift_staff_toggle'],
         ['POST', '/line/webhook', 'h_line_webhook'],
+        ['GET', '/pub/order', 'h_pub_order'],
+        ['POST', '/order/<int:id>/line', 'h_order_line_send'],
         ['GET', '/settings/line', 'h_settings_line'],
         ['POST', '/settings/line/assign', 'h_settings_line_assign'],
         ['GET', '/ping', 'h_ping'],

@@ -276,8 +276,14 @@ function h_order_print(int $id): void
             $totalQty += (float)$it['qty'];
         }
     }
+    $lineTo = line_contact_for_order($id);
+    if ($lineTo) {
+        ensure_line_send_table();
+    }
+    $lineSent = $lineTo ? val('SELECT MAX(sent_at) FROM line_sends WHERE order_id = ? AND status = 200', [$id]) : null;
     render('print', ['order' => $order, 'blocks' => $blocks, 'sup_info' => order_sup_info($order),
-        'item_count' => $itemCount, 'total_qty' => $totalQty]);
+        'item_count' => $itemCount, 'total_qty' => $totalQty,
+        'line_to' => $lineTo ? ($lineTo['display_name'] ?: 'LINE') : '', 'line_sent' => $lineSent]);
 }
 
 function pdf_filename(array $order): string

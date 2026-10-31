@@ -335,6 +335,9 @@ function require_basic_auth(): void
     if ($path === '/ping') {
         return;
     }
+    if ($path === '/pub/order' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+        return;   // 業者さんが LINE のリンクから開く発注書。署名と期限で確認する（line.php）
+    }
     if ($path === '/line/webhook' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         return;   // LINE からの知らせ。ログインはなく、署名で確認する（line.php）
     }
