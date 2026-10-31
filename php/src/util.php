@@ -258,3 +258,57 @@ function respond_json_after(array $data, int $status, callable $after): never
     }
     exit;
 }
+
+// ── 画面を見るためのID・パスワード（Basic認証）。config.php の 'basic_auth' に書いた時だけ有効 ─────────────────
+
+/** 送られてきた Authorization から [ID, パスワード] を取り出す（サーバーによって入る場所が違う） */
+function basic_auth_credentials(): array
+{
+    if (isset($_SERVER['PHP_AUTH_USER'])) {
+        return [(string)$_SERVER['PHP_AUTH_USER'], (string)($_SERVER['PHP_AUTH_PW'] ?? '')];
+    }
+    $h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if ($h === '' && function_exists('getallheaders')) {
+        foreach (getallheaders() as $k => $v) {
+            if (strtolower($k) === 'authorization') {
+                $h = $v;
+            }
+        }
+    }
+    if (stripos($h, 'basic ') === 0) {
+        $dec = base64_decode(substr($h, 6), true);
+        if ($dec !== false && str_contains($dec, ':')) {
+            [$u, $pw] = explode(':', $dec, 2);
+            return [$u, $pw];
+        }
+    }
+    return ['', ''];
+}
+
+function basic_auth_ok(array $cfg, string $user, string $pass): bool
+{
+    $okUser = hash_equals((string)($cfg['user'] ?? ''), $user);
+    $okPass = hash_equals((string)($cfg['pass'] ?? ''), $pass);
+    return $okUser && $okPass && ($cfg['user'] ?? '') !== '' && ($cfg['pass'] ?? '') !== '';
+}
+
+/** 設定があれば、ID・パスワードを聞く。/ping（生きているかの確認）だけは、聞かない */
+function require_basic_auth(): void
+{
+    $cfg = $GLOBALS['CONFIG']['basic_auth'] ?? null;
+    if (!is_array($cfg) || ($cfg['user'] ?? '') === '') {
+        return;
+    }
+    if ((parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/') === '/ping') {
+        return;
+    }
+    [$u, $pw] = basic_auth_credentials();
+    if (basic_auth_ok($cfg, $u, $pw)) {
+        return;
+    }
+    http_response_code(401);
+    header('WWW-Authenticate: Basic realm="sougoukanri", charset="UTF-8"');
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'IDとパスワードが必要です。';
+    exit;
+}

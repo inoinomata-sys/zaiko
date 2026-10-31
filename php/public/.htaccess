@@ -1,6 +1,8 @@
 Require all granted
 # すべての画面を index.php に集める（実在するファイル=画像・JS・PDFフォントなどは、そのまま返す）
 RewriteEngine On
+# ID・パスワード（Basic認証）の情報を、PHPに渡す
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L]

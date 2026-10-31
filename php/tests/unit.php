@@ -52,5 +52,14 @@ foreach ($v['nfkc'] as $c) {
     check('nfkc ' . json_encode($c['in'], JSON_UNESCAPED_UNICODE), nfkc($c['in']), $c['out']);
     check('nfkc_basic ' . json_encode($c['in'], JSON_UNESCAPED_UNICODE), nfkc_basic($c['in']), $c['out']);
 }
+// ID・パスワードの確認
+$cfg = ['user' => 'u1', 'pass' => 'p1'];
+check('basic_auth 正しい', basic_auth_ok($cfg, 'u1', 'p1'), true);
+check('basic_auth パスワード違い', basic_auth_ok($cfg, 'u1', 'x'), false);
+check('basic_auth ID違い', basic_auth_ok($cfg, 'x', 'p1'), false);
+check('basic_auth 空', basic_auth_ok($cfg, '', ''), false);
+check('basic_auth 設定が空なら通さない', basic_auth_ok(['user' => '', 'pass' => ''], '', ''), false);
+$_SERVER['HTTP_AUTHORIZATION'] = 'Basic ' . base64_encode('u1:p:1');
+check('basic_auth 取り出し(コロン入りパスワード)', basic_auth_credentials(), ['u1', 'p:1']);
 echo "{$n} 件を確認、失敗 {$fail} 件\n";
 exit($fail ? 1 : 0);
