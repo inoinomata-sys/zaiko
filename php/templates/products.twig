@@ -1,0 +1,232 @@
+{% extends 'base.twig' %}
+{% block title %}商品マスター{% endblock %}
+{% block head %}
+<style>
+.sup-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.sup-tab {
+  padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--fg2); font-size: 15px; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+}
+.sup-tab:hover { text-decoration: none; border-color: var(--acc); color: var(--acc); }
+.sup-tab.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.master-table { min-width: 680px; }
+.st-label { display: none; font-size: 10px; color: var(--fg2); text-align: center; }
+.master-table td.name { white-space: nowrap; }
+@media (max-width: 560px) {
+  /* スマホでは、基準の入力欄が最初から見えるように、カテゴリ列を隠して商品名を折り返す */
+  .master-table { min-width: 0; }
+  .master-table .col-cat { display: none; }
+  .st-label { display: block; }
+  .master-table td.name { white-space: normal; min-width: 96px; max-width: 150px; overflow-wrap: anywhere; font-size: 14px; }
+  .mv { width: 32px; height: 32px; }
+}
+.mv {
+  width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--acc); font-size: 14px; cursor: pointer;
+  touch-action: manipulation; font-family: inherit;
+}
+.mv:active { background: var(--acc); color: #fff; }
+.mv:disabled { opacity: .4; }
+tr:target td { background: #fff4d6; }
+tr.moved td { background: #fff4d6; transition: background .6s; }
+.sup-tab .cnt { margin-left: 6px; font-size: 12px; font-weight: 400; opacity: .8; }
+</style>
+{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <h1 style="font-size:20px;font-weight:700">商品マスター</h1>
+  <button class="btn btn-primary" onclick="document.getElementById('add-form').style.display='block'">＋ 商品追加</button>
+</div>
+
+<div class="sup-tabs">
+  {% for sname in supplier_names %}
+  <a href="/products?supplier={{ sname|urlencode }}" class="sup-tab {% if current_supplier == sname %}on{% endif %}">{{ sname }}<span class="cnt">{{ (counts[sname] ?? 0) }}</span></a>
+  {% endfor %}
+  <a href="/products?supplier=all" class="sup-tab {% if current_supplier == 'all' %}on{% endif %}">すべて<span class="cnt">{{ total }}</span></a>
+</div>
+
+<!-- 追加フォーム -->
+<div class="card" id="add-form" style="display:none;margin-bottom:16px">
+  <div class="card-head">商品を追加</div>
+  <form method="post" action="/products/add" id="add-product-form" style="padding:16px">
+    <input type="hidden" name="request_key" id="add-key">
+    <div class="form-row">
+      <div class="form-group">
+        <label>カテゴリ（選ぶか新しく入力）</label>
+        <input type="text" name="category" list="cat-list" placeholder="プライム" style="width:180px">
+        <datalist id="cat-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+      </div>
+      <div class="form-group">
+        <label>商品名</label>
+        <input type="text" name="name" required placeholder="例: 7NB" style="width:160px">
+      </div>
+      <div class="form-group">
+        <label>基準数 イノ</label>
+        <input type="number" name="base_qty_ino" value="1" min="0" step="any" inputmode="decimal" style="width:80px">
+      </div>
+      <div class="form-group">
+        <label>基準数 リッチ</label>
+        <input type="number" name="base_qty_rich" value="1" min="0" step="any" inputmode="decimal" style="width:80px">
+      </div>
+      <div class="form-group">
+        <label>仕入先</label>
+        <select name="supplier" style="width:150px">
+          {% for s in supplier_names %}<option {% if s == current_supplier %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>備考</label>
+        <input type="text" name="note" placeholder="ネット" style="width:100px">
+      </div>
+      <button type="submit" class="btn btn-primary" id="add-btn" style="margin-top:18px">追加</button>
+      <button type="button" class="btn btn-ghost" style="margin-top:18px"
+              onclick="document.getElementById('add-form').style.display='none'">キャンセル</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+  <table class="master-table">
+    <thead>
+      <tr>
+        <th style="width:84px">並び順</th>
+        <th class="col-cat">カテゴリ</th>
+        <th>商品名</th>
+        <th class="r">基準 イノ</th>
+        <th class="r">基準 リッチ</th>
+        <th>仕入先</th>
+        <th>備考</th>
+        <th>状態</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% if not rows %}
+    <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--fg2)">この会社の商品はまだありません。「＋ 商品追加」から登録できます。</td></tr>
+    {% endif %}
+    {% for p in rows %}
+    <tr id="p{{ p.id }}" data-id="{{ p.id }}" data-key="{{ p.supplier }}|{{ p.category }}" {% if not p.is_active %}style="opacity:.45"{% endif %}>
+      <td style="white-space:nowrap">
+        <button type="button" class="mv" onclick="move(this,'up')" aria-label="上へ">▲</button>
+        <button type="button" class="mv" onclick="move(this,'down')" aria-label="下へ">▼</button>
+      </td>
+      <td class="col-cat" style="font-size:12px;color:var(--fg2);white-space:nowrap">{{ p.category }}</td>
+      <td class="name" {% if not p.is_active %}style="text-decoration:line-through"{% endif %}>{{ p.name }}</td>
+      {% for st in stores %}
+      <td class="r">
+        <div class="st-label">{{ st }}</div>
+        <input type="number" value="{{ p.base_by_store[st]|n }}" min="0" step="any" inputmode="decimal" style="width:60px;text-align:right"
+               aria-label="基準 {{ st }}" data-saved="{{ p.base_by_store[st]|n }}"
+               onchange="updateBase({{ p.id }}, this.value, this, {{ st|tojson|forceescape }})">
+      </td>
+      {% endfor %}
+      <td>
+        <select style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px"
+                onchange="updateSupplier({{ p.id }}, this.value)">
+          {% for s in supplier_names %}
+          <option {% if p.supplier == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td style="font-size:12px;color:var(--fg2)">{{ p.note ?: '' }}</td>
+      <td>
+        {% if p.is_active %}
+          <span class="badge badge-ok">有効</span>
+        {% else %}
+          <span class="badge badge-muted">無効</span>
+        {% endif %}
+      </td>
+      <td>
+        <form method="post" action="/products/{{ p.id }}/toggle" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm">
+            {{ ((p.is_active) ? ('無効化') : ('有効化')) }}
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+{% if request.args.added %}toast({{ ('「' ~ request.args.added ~ '」を登録しました')|tojson }}, 3000);{% endif %}
+// 商品追加は、ページを切り替えずに送る。通信が切れても自動でやり直し、失敗しても入力は消さない
+(function () {
+  const form = document.getElementById('add-product-form');
+  const key = document.getElementById('add-key');
+  const btn = document.getElementById('add-btn');
+  const newKey = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : String(Date.now()) + Math.random().toString(16).slice(2);
+  key.value = newKey();
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = '追加中…';
+    const body = new URLSearchParams(new FormData(form));
+    let lastError = '通信エラー';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('/products/add', {method: 'POST', body, headers: {'Accept': 'application/json'}});
+        if (res.ok) { location.href = (await res.json()).url; return; }
+        if (res.status < 500) { lastError = (await res.json()).error || '入力を確認してください'; break; }
+        lastError = 'サーバーが混み合っています';
+      } catch (err) { lastError = '通信が切れました'; }
+      if (attempt < 2) { btn.textContent = 'やり直し中…'; await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); }
+    }
+    toast(lastError + '。入力はそのままです。もう一度「追加」を押してください', 5000);
+    btn.disabled = false; btn.textContent = '追加';
+  });
+})();
+
+let moving = false;
+async function move(btn, dir) {
+  if (moving) return;
+  const row = btn.closest('tr');
+  moving = true;
+  row.querySelectorAll('.mv').forEach(b => b.disabled = true);
+  try {
+    const res = await fetch(`/products/${row.dataset.id}/move`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({dir})
+    });
+    const d = await res.json();
+    if (!d.ok) throw 0;
+    if (!d.moved) { toast(dir === 'up' ? 'カテゴリ内の一番上です' : 'カテゴリ内の一番下です'); return; }
+    const other = document.querySelector(`tr[data-id="${d.other_id}"]`);
+    if (!other) { location.reload(); return; }
+    if (dir === 'up') other.before(row); else other.after(row);
+    row.classList.add('moved');
+    setTimeout(() => row.classList.remove('moved'), 700);
+  } catch (e) {
+    toast('並び替えに失敗しました');
+  } finally {
+    moving = false;
+    row.querySelectorAll('.mv').forEach(b => b.disabled = false);
+  }
+}
+async function updateBase(id, val, input, store) {
+  if (val === '' || isNaN(parseFloat(val)) || parseFloat(val) < 0) {
+    toast('0以上の数を入力してください');
+    if (input) input.value = input.dataset.saved;
+    return;
+  }
+  const fd = new FormData();
+  fd.append('base_qty', val);
+  fd.append('store', store);
+  let ok = false;
+  try { ok = (await fetch(`/products/${id}/base`, {method:'POST', body:fd})).ok; } catch (e) {}
+  if (ok) { if (input) input.dataset.saved = val; toast(`基準数（${store}）を更新しました`); }
+  else { toast('基準数の保存に失敗しました。もう一度お試しください'); if (input) input.value = input.dataset.saved; }
+}
+async function updateSupplier(id, val) {
+  const fd = new FormData();
+  fd.append('supplier', val);
+  const res = await fetch(`/products/${id}/supplier`, {method:'POST', body:fd});
+  if (res.ok) toast('仕入先を更新しました');
+}
+</script>
+{% endblock %}

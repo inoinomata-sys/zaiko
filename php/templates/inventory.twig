@@ -1,0 +1,363 @@
+{% extends 'base.twig' %}
+{% block title %}在庫管理{% endblock %}
+
+{% block head %}
+<style>
+.bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chip {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--fg2); font: inherit; font-size: 14px;
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+.chip.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+.chip .num { font-weight: 700; margin-left: 4px; }
+.store-chip { font-size: 16px; padding: 8px 22px; font-weight: 700; }
+.notice summary { cursor: pointer; }
+.notice {
+  background: #fff8e6; border: 1px solid #f1d38a; color: #7a5a00;
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
+}
+
+.inv-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.inv-row:last-child { border-bottom: none; }
+.inv-info { flex: 1; min-width: 0; }
+.inv-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
+.inv-meta { font-size: 12px; color: var(--fg2); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.inv-meta .short { color: var(--warn); font-weight: 700; }
+.tag { padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.tag-unchecked { background: #fde8e8; color: #b42318; }
+.tag-stale { background: #fff1d6; color: #8a5300; }
+.tag-ok { background: #e3f5ea; color: #1d6b3f; }
+.ordered { color: #1d4f80; font-weight: 600; }
+.zero-confirmed { color: var(--danger); font-weight: 700; }
+
+.stepper { display: flex; align-items: center; flex-shrink: 0; }
+.stepper-btn {
+  width: 48px; height: 48px; border: 2px solid var(--acc); background: #fff;
+  color: var(--acc); font-size: 24px; font-weight: 700; cursor: pointer;
+  font-family: inherit; user-select: none; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:first-child { border-radius: 8px 0 0 8px; }
+.stepper-btn:last-child  { border-radius: 0 8px 8px 0; }
+.stepper-btn:active { background: var(--acc); color: #fff; }
+.stepper-btn:disabled { opacity: .35; cursor: default; }
+.qty {
+  width: 64px; height: 48px; text-align: center; font-size: 20px; font-weight: 700;
+  font-variant-numeric: tabular-nums; font-family: inherit; background: #fff;
+  border: none; border-top: 2px solid var(--acc); border-bottom: 2px solid var(--acc);
+  -moz-appearance: textfield;
+}
+.qty::-webkit-outer-spin-button, .qty::-webkit-inner-spin-button { -webkit-appearance: none; }
+.qty:focus { outline: none; background: #f0f7ff; }
+.side { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 64px; flex-shrink: 0; }
+.status { font-size: 11px; min-height: 14px; text-align: center; white-space: nowrap; }
+.status.saving { color: var(--fg2); }
+.status.saved { color: #1d6b3f; }
+.status.error { color: var(--danger); font-weight: 700; cursor: pointer; text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .inv-row { flex-wrap: wrap; }
+  .inv-info { flex-basis: 100%; }
+  .stepper { margin-left: auto; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px">
+  <h1 style="font-size:20px; font-weight:700">在庫管理</h1>
+  <a href="/order?store={{ store|urlencode }}" class="btn btn-primary">発注書を作成</a>
+</div>
+
+<div class="bar">
+  {% for st in stores %}
+  <a href="/?store={{ st|urlencode }}{% if current_cat %}&cat={{ current_cat|urlencode }}{% endif %}" class="chip store-chip {% if st == store %}on{% endif %}">{{ st }}</a>
+  {% endfor %}
+</div>
+
+<div class="cat-scroll" id="sup-tabs">
+  <button type="button" class="on" data-sup="">すべての会社</button>
+  {% for n in sups %}<button type="button" data-sup="{{ n }}">{{ n }}</button>{% endfor %}
+</div>
+<div class="cat-scroll" id="cat-tabs">
+  <button type="button" class="{% if not current_cat %}on{% endif %}" data-cat="">すべての棚</button>
+  {% for c in cats %}<button type="button" class="{% if current_cat == c %}on{% endif %}" data-cat="{{ c }}">{{ c }}</button>{% endfor %}
+</div>
+
+<div class="bar" id="filters">
+  <button class="chip on" data-f="all">すべて</button>
+  <button class="chip" data-f="unchecked">未確認<span class="num">{{ counts.unchecked }}</span></button>
+  <button class="chip" data-f="stale">{{ stale_days }}日以上 確認なし<span class="num">{{ counts.stale }}</span></button>
+  <button class="chip" data-f="shortage">不足<span class="num">{{ counts.shortage }}</span></button>
+</div>
+
+<details class="notice">
+  <summary>数えた時は、数を入れて<b>「確認」</b>を押す</summary>
+  <div style="margin-top:6px">
+    <b>＋／－</b>は使った・補充した時の数量変更です（「最終更新」が変わります）。<br>
+    実際に数えた時は、数を入れて<b>「確認」</b>を押すと確認日時が記録されます。<br>
+    「未確認」は数えた記録がない商品です。在庫がなかった時は「?」のまま「確認」を押すと 0 で記録されます。
+  </div>
+</details>
+
+{% for cat, prods in grouped %}
+<div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
+  <div class="card-head" style="flex-wrap:wrap; gap:8px">
+    <span>{{ ((cat) ? (cat) : ('（未分類）')) }} <span style="font-size:13px; color:var(--fg2); font-weight:400">{{ prods|length }} 品</span></span>
+    <button class="btn btn-ghost btn-sm" type="button" onclick="checkCategory(this, {{ cat|tojson|forceescape }})">この棚を確認済みにする</button>
+  </div>
+  {% for p in prods %}
+  <div class="inv-row" data-sup="{{ p.supplier ?: '' }}" data-id="{{ p.id }}" data-base="{{ p.base_qty }}" data-version="{{ p.version }}"
+       data-unchecked="{{ ((p.unchecked) ? (1) : (0)) }}" data-stale="{{ ((p.stale) ? (1) : (0)) }}">
+    <div class="inv-info">
+      <div class="inv-name">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</div>
+      <div class="inv-meta">
+        <span>基準 {{ p.base_qty|n }}</span>
+        <span class="short-cell">{% if p.shortage > 0 %}<span class="short">不足 {{ p.shortage|n }}</span>{% endif %}</span>
+        <span class="check-cell">
+          {% if p.unchecked %}<span class="tag tag-unchecked">未確認</span>
+          {% elif p.stale %}<span class="tag tag-stale">確認 {{ p.checked_at|jst }}</span>
+          {% else %}<span class="tag tag-ok">確認 {{ p.checked_at|jst }}</span>{% endif %}
+        </span>
+        <span class="changed-cell">{% if p.changed_at %}最終更新 {{ p.changed_at|jst }}{% endif %}</span>
+        {% if p.ordered_qty %}<span class="ordered">{{ p.ordered_at|md }}発注分 {{ p.ordered_qty|n }} を含む</span>{% endif %}
+      </div>
+    </div>
+    <div class="stepper">
+      <button class="stepper-btn" type="button" data-d="-1" aria-label="1減らす">－</button>
+      <input class="qty" type="number" inputmode="decimal" min="0" step="any"
+             value="{% if p.has_stock %}{{ p.current_qty|n }}{% endif %}"
+             placeholder="?" data-saved="{{ p.current_qty|n }}">
+      <button class="stepper-btn" type="button" data-d="1" aria-label="1増やす">＋</button>
+    </div>
+    <div class="side">
+      <button class="btn btn-ghost btn-sm check-btn" type="button" title="実際に数えた数として確認日時を記録する">確認</button>
+      <div class="status"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% if not grouped %}
+<div style="text-align:center; padding:60px; color:var(--fg2)">
+  商品が登録されていません。<a href="/products">商品マスター</a>から追加してください。
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STORE = {{ store|tojson }};
+const fmt = n => Number.isInteger(n) ? String(n) : String(+n.toFixed(2));
+
+// 商品ごとに送信を直列化し、連打は短時間ためてから1回の加減として送る
+const state = new Map();
+function st(row) {
+  if (!state.has(row)) state.set(row, {pending: 0, timer: null, busy: false, queue: []});
+  return state.get(row);
+}
+
+function setStatus(row, cls, text) {
+  const el = row.querySelector('.status');
+  el.className = 'status ' + cls;
+  el.textContent = text;
+}
+
+function applyServer(row, d) {
+  const s = st(row);
+  row.dataset.version = d.version;
+  const inp = row.querySelector('.qty');
+  inp.dataset.saved = d.qty;
+  if (document.activeElement !== inp) inp.value = fmt(d.qty + s.pending);
+  const base = parseFloat(row.dataset.base) || 0;
+  const sh = Math.max(base - d.qty, 0);
+  row.querySelector('.short-cell').innerHTML = sh > 0 ? `<span class="short">不足 ${fmt(sh)}</span>` : '';
+  row.querySelector('.check-cell').innerHTML = d.checked_at
+    ? `<span class="tag tag-ok">確認 ${d.checked_at}</span>`
+    : '<span class="tag tag-unchecked">未確認</span>';
+  row.querySelector('.changed-cell').textContent = d.changed_at ? '最終更新 ' + d.changed_at : '';
+  if (d.checked_at) { row.dataset.unchecked = 0; row.dataset.stale = 0; }
+  row.querySelector('.stepper-btn[data-d="-1"]').disabled = (d.qty + s.pending) <= 0;
+}
+
+async function send(row, body) {
+  const s = st(row);
+  s.busy = true;
+  setStatus(row, 'saving', '保存中…');
+  let res, data;
+  try {
+    res = await fetch('/api/stock', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({product_id: row.dataset.id, store: STORE, ...body})
+    });
+    data = await res.json();
+  } catch (e) {
+    data = {ok: false, error: '通信エラー'};
+  }
+  s.busy = false;
+  if (data.ok) {
+    applyServer(row, data);
+    setStatus(row, 'saved', '保存済み');
+  } else if (data.conflict) {
+    applyServer(row, data);
+    setStatus(row, 'error', '再確認を');
+    toast(data.error, 4000);
+  } else {
+    if (body.op === 'delta') s.pending += body.value;
+    setStatus(row, 'error', '失敗・再送');
+    row.querySelector('.status').onclick = () => flush(row);
+    toast((data.error || '保存に失敗しました') + '（「失敗・再送」を押すと再送します）', 4000);
+    return;
+  }
+  next(row);
+}
+
+function next(row) {
+  const s = st(row);
+  if (s.busy) return;
+  const job = s.queue.shift();
+  if (job) return send(row, job);
+  if (s.pending !== 0) flush(row);
+}
+
+function flush(row) {
+  const s = st(row);
+  clearTimeout(s.timer);
+  if (s.pending === 0 || s.busy) return;
+  const v = s.pending; s.pending = 0;
+  send(row, {op: 'delta', value: v});
+}
+
+function stepRow(row, d) {
+  const s = st(row);
+  const inp = row.querySelector('.qty');
+  const cur = parseFloat(inp.value);
+  const shown = isNaN(cur) ? parseFloat(inp.dataset.saved) || 0 : cur;
+  if (shown + d < 0) return;
+  s.pending += d;
+  inp.value = fmt(shown + d);
+  row.querySelector('.stepper-btn[data-d="-1"]').disabled = shown + d <= 0;
+  setStatus(row, 'saving', '入力中…');
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => flush(row), 600);
+}
+
+function setDirect(row) {
+  const inp = row.querySelector('.qty');
+  const v = parseFloat(inp.value);
+  if (isNaN(v) || v < 0) {
+    toast('0以上の数を入力してください');
+    inp.value = fmt(parseFloat(inp.dataset.saved) || 0);
+    return;
+  }
+  const s = st(row);
+  clearTimeout(s.timer); s.pending = 0;
+  s.queue.push({op: 'set', value: v, version: +row.dataset.version});
+  next(row);
+}
+
+document.querySelectorAll('.inv-row').forEach(row => {
+  row.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => stepRow(row, +b.dataset.d)));
+  const inp = row.querySelector('.qty');
+  inp.addEventListener('change', () => setDirect(row));
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  row.querySelector('.check-btn').addEventListener('click', () => {
+    // 空欄（?）のまま「確認」＝数えたら在庫がなかった、として0で確認する
+    if (inp.value === '') inp.value = '0';
+    const v = parseFloat(inp.value);
+    if (isNaN(v) || v < 0) { toast('0以上の数を入力してください'); return; }
+    const s = st(row);
+    clearTimeout(s.timer); s.pending = 0;
+    s.queue.push({op: 'check', value: v, version: +row.dataset.version});
+    next(row);
+  });
+  row.querySelector('.stepper-btn[data-d="-1"]').disabled = (parseFloat(inp.dataset.saved) || 0) <= 0;
+});
+
+async function checkCategory(btn, cat) {
+  const rows = [...btn.closest('.cat-card').querySelectorAll('.inv-row')];
+  const blank = rows.filter(r => r.querySelector('.qty').value === '').length;
+  const msg = '表示中の数量で、この棚を全部確認済みにします。'
+    + (blank ? `数量が空欄の ${blank} 品は確認済みになりません。` : '');
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = 1;
+    btn.textContent = 'もう一度押すと確定';
+    toast(msg, 4000);
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = 'この棚を確認済みにする'; }, 4000);
+    return;
+  }
+  delete btn.dataset.armed;
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const res = await fetch('/api/stock/check_category', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({store: STORE, category: cat})
+    });
+    const d = await res.json();
+    if (!d.ok) throw 0;
+    toast(`${d.count} 品を確認済みにしました` + (d.skipped ? `（数量未入力の ${d.skipped} 品は対象外）` : ''), 3500);
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    toast('保存に失敗しました');
+    btn.disabled = false; btn.textContent = 'この棚を確認済みにする';
+  }
+}
+
+let currentCat = {{ current_cat|tojson }}, currentF = 'all', currentSup = '';
+const CAT_SUPS = {{ cat_sups|tojson }};
+try { currentSup = localStorage.getItem('inv:sup') || ''; } catch (e) {}
+if (currentSup && !document.querySelector('#sup-tabs button[data-sup="' + CSS.escape(currentSup) + '"]')) currentSup = '';
+function applyFilter() {
+  // 会社を選ぶと、その会社にある棚だけを上のタブに出す
+  document.querySelectorAll('#cat-tabs button').forEach(b => {
+    const c = b.dataset.cat;
+    b.style.display = (!c || !currentSup || (CAT_SUPS[c] || []).includes(currentSup)) ? '' : 'none';
+  });
+  if (currentCat && currentSup && !(CAT_SUPS[currentCat] || []).includes(currentSup)) {
+    currentCat = '';
+    document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', !x.dataset.cat));
+  }
+  document.querySelectorAll('#sup-tabs button').forEach(x => x.classList.toggle('on', x.dataset.sup === currentSup));
+  document.querySelectorAll('.cat-card').forEach(card => {
+    let any = false;
+    if (!currentCat || card.dataset.cat === currentCat) {
+      card.querySelectorAll('.inv-row').forEach(row => {
+        const f = currentF, short = !!row.querySelector('.short');
+        const show = (!currentSup || row.dataset.sup === currentSup) && (f === 'all' || (f === 'unchecked' && row.dataset.unchecked === '1')
+          || (f === 'stale' && row.dataset.stale === '1') || (f === 'shortage' && short));
+        row.style.display = show ? '' : 'none';
+        any = any || show;
+      });
+    }
+    card.style.display = any ? '' : 'none';
+  });
+}
+document.querySelectorAll('#filters .chip').forEach(chip => chip.addEventListener('click', () => {
+  document.querySelectorAll('#filters .chip').forEach(c => c.classList.toggle('on', c === chip));
+  currentF = chip.dataset.f;
+  applyFilter();
+}));
+document.querySelectorAll('#sup-tabs button').forEach(b => b.addEventListener('click', () => {
+  currentSup = b.dataset.sup;
+  try { localStorage.setItem('inv:sup', currentSup); } catch (e) {}
+  applyFilter();
+  window.scrollTo({top: 0});
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
+}));
+document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  currentCat = b.dataset.cat;
+  applyFilter();
+  window.scrollTo({top: 0});
+  b.scrollIntoView({inline: 'center', block: 'nearest'});
+}));
+applyFilter();
+document.querySelector('#cat-tabs .on')?.scrollIntoView({inline: 'center', block: 'nearest'});
+
+window.addEventListener('beforeunload', e => {
+  for (const s of state.values()) if (s.pending !== 0 || s.busy || s.queue.length) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

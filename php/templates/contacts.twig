@@ -1,0 +1,79 @@
+{% extends 'base.twig' %}
+{% block title %}担当者設定{% endblock %}
+
+{% block head %}
+<style>
+.sup-section { margin-bottom: 24px; }
+.sup-title {
+  font-size: 16px; font-weight: 700;
+  padding: 10px 16px;
+  background: var(--acc); color: #fff;
+  border-radius: 8px 8px 0 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.contact-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+.contact-table th {
+  background: #f8f0f3; font-size: 12px; font-weight: 600;
+  padding: 7px 10px; border-bottom: 2px solid var(--border);
+  color: var(--fg2);
+}
+.contact-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.contact-table tr:last-child td { border-bottom: none; }
+.add-row { background: #fdf8fa; }
+.add-row td { padding: 10px; }
+input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
+.hint { font-size: 11px; color: var(--fg2); margin-top: 3px; }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<h2 style="font-size:18px; font-weight:700; margin-bottom:16px">仕入先 担当者設定</h2>
+
+{% for sup in suppliers %}
+<div class="sup-section card">
+  <div class="sup-title">
+    <span>{{ sup.name }}</span>
+    <span style="font-size:12px; font-weight:400">担当者 {{ sup.contacts|length }}名</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table class="contact-table">
+    <thead>
+      <tr>
+        <th>担当者名</th>
+        <th>FAX</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in sup.contacts %}
+      <tr>
+        <form method="post" action="/settings/contacts/{{ c.id }}/update">
+        <td><input class="ci" name="contact_name" value="{{ c.name }}" placeholder="大橋様"></td>
+        <td><input class="ci" name="fax" value="{{ c.fax }}" placeholder="06-XXXX-XXXX" style="width:140px"></td>
+        <td style="white-space:nowrap; display:flex; gap:6px; align-items:center; padding-top:10px">
+          <button type="submit" class="btn btn-primary btn-sm">保存</button>
+        </form>
+          <form method="post" action="/settings/contacts/{{ c.id }}/delete" onsubmit="return confirm('削除しますか？')">
+            <button type="submit" class="btn btn-danger btn-sm">削除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      <!-- 追加行 -->
+      <tr class="add-row">
+        <form method="post" action="/settings/contacts/add">
+        <input type="hidden" name="supplier_name" value="{{ sup.name }}">
+        <td><input class="ci" name="contact_name" placeholder="担当者名"></td>
+        <td><input class="ci" name="fax" placeholder="FAX番号" style="width:140px"></td>
+        <td><button type="submit" class="btn btn-success btn-sm">追加</button></td>
+        </form>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+

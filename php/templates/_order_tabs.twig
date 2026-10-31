@@ -1,0 +1,9 @@
+<style>
+.ot { display: flex; gap: 8px; margin-bottom: 14px; }
+.ot a { flex: 1; text-align: center; padding: 12px 0; font-size: 16px; font-weight: 700; border: 1px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); text-decoration: none; }
+.ot a.on { background: var(--accent, #c2527a); border-color: transparent; color: #fff; }
+</style>
+<div class="ot">
+  <a href="/prices" class="{% if request.path starts with '/prices' %}on{% endif %}">＋ 注文を作る</a>
+  <a href="/customer-orders" class="{% if request.path == '/customer-orders' %}on{% endif %}">注文の一覧</a>
+</div>

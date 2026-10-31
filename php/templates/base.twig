@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}在庫・発注管理{% endblock %} — イノ</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#c2547a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="在庫管理">
+<link rel="apple-touch-icon" href="/static/icons/ino5-180.png">
+<style>
+:root {
+  --bg: #fdf0f4;
+  --surface: #fff;
+  --border: #f0d5de;
+  --fg: #2d1a22;
+  --fg2: #8a5a6a;
+  --acc: #c2547a;
+  --acc-h: #a83f63;
+  --ok: #1a9e5a;
+  --warn: #d4820a;
+  --danger: #c0392b;
+  --nav-h: 52px;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+button, a { touch-action: manipulation; }
+body { font-family: 'Hiragino Sans', 'Meiryo', system-ui, sans-serif;
+       font-size: 14px; background: var(--bg); color: var(--fg); }
+a { color: var(--acc); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* NAV */
+nav {
+  background: var(--acc);
+  color: #fff;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+nav .brand { font-size: 16px; font-weight: 700; margin-right: 16px; color: #fff; white-space: nowrap; }
+nav a.nav-link {
+  padding: 8px 14px;
+  border-radius: 14px;
+  border: 2px solid rgba(255,255,255,.75);
+  color: rgba(255,255,255,.85);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background .15s;
+  white-space: nowrap;
+}
+nav a.nav-link:hover { background: rgba(255,255,255,.15); text-decoration: none; color: #fff; }
+nav a.nav-link.active { background: rgba(255,255,255,.22); color: #fff; }
+@media (max-width: 700px) {
+  /* スマホ・タブレット: 文字を枠で囲んだ5つのボタンを、横いっぱいに並べる（今の画面は白く塗りつぶす） */
+  :root { --nav-h: 56px; }
+  nav { padding: 6px 6px; gap: 5px; }
+  nav .brand, nav .spacer, nav .store-badge { display: none; }
+  nav a.nav-link { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; height: 100%;
+                   padding: 0 1px; font-size: clamp(11px, 3.3vw, 15px); font-weight: 700; text-align: center; white-space: nowrap; }
+  nav a.nav-link.active { background: #fff; color: var(--acc); border-color: #fff; }
+  main { padding: 12px; }
+}
+}
+nav .spacer { flex: 1; }
+nav .store-badge {
+  background: rgba(255,255,255,.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* MAIN */
+main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* CARD */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.card-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* TABLES */
+table { width: 100%; border-collapse: collapse; }
+th {
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg2);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  background: #f8fafc;
+}
+th.r, td.r { text-align: right; }
+td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f3f7fc; }
+td.name { font-weight: 500; }
+td.low  { color: var(--warn); font-weight: 700; }
+td.out  { color: var(--danger); font-weight: 700; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 14px; border-radius: 7px; border: none;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+  touch-action: manipulation;
+}
+.btn-primary { background: var(--acc); color: #fff; }
+.btn-primary:hover { background: var(--acc-h); }
+.btn-success { background: var(--ok); color: #fff; }
+.btn-danger  { background: var(--danger); color: #fff; }
+.btn-ghost   { background: transparent; color: var(--acc); border: 1px solid var(--acc); }
+.btn-ghost:hover { background: #e8f0f9; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* BADGE */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.badge-warn { background: #fef3cd; color: #856404; }
+.badge-ok   { background: #d1fae5; color: #065f46; }
+.badge-muted{ background: #e9ecef; color: #6c757d; }
+
+/* FORM */
+.form-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--fg2); }
+input[type=text], input[type=number], select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  font-family: inherit; font-size: 14px; background: #fff; color: var(--fg);
+  min-width: 0;
+}
+input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--acc); }
+
+/* TOAST */
+#toast {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: rgba(15,20,35,.88); color: #fff;
+  padding: 10px 18px; border-radius: 20px; font-size: 13px;
+  opacity: 0; transition: all .2s; pointer-events: none;
+  white-space: nowrap; z-index: 999;
+}
+.cat-scroll {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.cat-scroll button {
+  flex: 0 0 auto; padding: 8px 14px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface); color: var(--fg2); font: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; touch-action: manipulation;
+}
+.cat-scroll button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+#to-top {
+  position: fixed; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--acc); color: #fff; font-size: 22px; font-weight: 700; line-height: 1;
+  box-shadow: 0 3px 12px rgba(0,0,0,.28); z-index: 900; opacity: 0; pointer-events: none;
+  transition: opacity .2s; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+/* 操作ボタン（＋／－や▲▼）がある側と重ならないよう、商品マスターは左、そのほかは右に置く */
+#to-top[data-side="left"] { right: auto; left: 14px; }
+#to-top.show { opacity: .92; pointer-events: auto; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav>
+  <span class="brand">在庫管理</span>
+  <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}"><span>在庫</span></a>
+  <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}"><span>使用入力</span></a>
+  <a href="/order" class="nav-link {% if request.path starts with '/order' %}active{% endif %}"><span>発注</span></a>
+  <a href="/customer-orders" class="nav-link {% if request.path starts with '/customer-orders' or request.path starts with '/prices' %}active{% endif %}"><span>お客様注文</span></a>
+  <a href="/settings" class="nav-link {% if request.path starts with '/settings' or request.path starts with '/products' %}active{% endif %}"><span>設定</span></a>
+  <span class="spacer"></span>
+  <span class="store-badge">イノ</span>
+</nav>
+<div id="pwa-banner" style="display:none;background:#1a6fbf;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;">
+  <span>ホーム画面に追加してアプリとして使えます</span>
+  <button onclick="installPWA()" style="background:#fff;color:#1a6fbf;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">追加する</button>
+  <button onclick="this.parentElement.style.display='none'" style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:18px;margin-left:auto;">✕</button>
+</div>
+<main>
+{% block content %}{% endblock %}
+</main>
+<button id="to-top" type="button" aria-label="一番上に戻る" data-side="{{ ((request.path starts with '/products') ? ('right') : ('left')) }}">↑</button>
+<div id="toast"></div>
+<script>
+(function () {
+  const btn = document.getElementById('to-top');
+  function place() {
+    // 画面の下に固定された発注フッターがある時は、その上に出す
+    const f = document.querySelector('.order-footer, .cart-bar');
+    btn.style.bottom = f ? `calc(${f.offsetHeight + 14}px + env(safe-area-inset-bottom, 0px))` : '';
+  }
+  function update() { btn.classList.toggle('show', window.scrollY > 500); }
+  window.addEventListener('scroll', update, {passive: true});
+  window.addEventListener('resize', place);
+  btn.addEventListener('click', () => window.scrollTo({top: 0, behavior: 'smooth'}));
+  place(); update();
+  // スクロールの合図が遅れる環境（慣性スクロール中など）でも、ボタンの出し入れが遅れないよう見張る
+  setInterval(update, 300);
+  window.addEventListener('load', place);
+})();
+
+function toast(msg, dur=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+</script>
+{% block scripts %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', {scope: '/'});
+}
+
+// ホーム画面追加バナー
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('pwa-banner').style.display = 'flex';
+});
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    document.getElementById('pwa-banner').style.display = 'none';
+  });
+}
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-banner').style.display = 'none';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>発注書 — {{ order.order_month }}月{{ order.order_day }}日 {{ order.store }} {{ sup_info.name }}</title>
+<style>
+body {
+  font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+  font-size: 15px; background: #eef2f7; margin: 0; padding: 16px; color: #111;
+}
+.screen-header {
+  background: #c2547a; color: #fff; padding: 12px 20px; border-radius: 8px 8px 0 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.screen-header h2 { font-size: 16px; font-weight: 700; margin: 0; }
+.btn-row { display: flex; gap: 10px; padding: 12px 0; justify-content: flex-end; flex-wrap: wrap; }
+.btn { padding: 10px 18px; border-radius: 7px; border: none; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn-print { background: #c2547a; color: #fff; }
+.btn-back  { background: transparent; color: #c2547a; border: 1px solid #c2547a; }
+.order-summary { margin-bottom: 10px; color: #555; }
+
+.sheet {
+  background: #fff; border: 1px solid #ccc; border-radius: 0 0 8px 8px;
+  padding: 20px; max-width: 760px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,.1);
+}
+.doc-to { font-size: 22px; font-weight: 700; }
+.doc-sub { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 6px 0 14px; font-size: 15px; }
+table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
+.items thead th {
+  background: #444; color: #fff; text-align: left; padding: 7px 10px; font-weight: 600; font-size: 14px;
+}
+.items thead th.q { text-align: right; width: 5em; }
+.items td { padding: 8px 10px; border-bottom: 1px solid #ccc; vertical-align: top; overflow-wrap: anywhere; }
+.items td.q { text-align: right; font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.items tr.cat td { background: #e2e2e2; font-weight: 700; padding: 6px 10px; border-bottom: 1px solid #999; }
+.note { color: #555; font-size: .85em; }
+.empty { padding: 30px; text-align: center; color: #777; }
+
+@media print {
+  @page {
+    size: A4 portrait; margin: 14mm 14mm 16mm;
+    @bottom-center { content: counter(page) " / " counter(pages) " ページ"; font-size: 9pt; }
+  }
+  body { background: #fff; padding: 0; font-size: 12pt; }
+  .screen-header, .btn-row, .order-summary { display: none !important; }
+  .sheet { border: none; padding: 0; box-shadow: none; max-width: none; }
+  .doc-to { font-size: 18pt; }
+  .doc-sub { font-size: 12pt; }
+  table.items { font-size: 12pt; }
+  .items thead { display: table-header-group; }
+  .items thead th { font-size: 11pt; }
+  .items td.q { font-size: 14pt; }
+  .items tr { break-inside: avoid; page-break-inside: avoid; }
+  .items tr.cat { break-after: avoid; page-break-after: avoid; }
+  .items thead th, .items tr.cat td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="screen-header">
+  <h2>発注書 — {{ order.order_month }}月{{ order.order_day }}日（{{ order.store }}）{{ sup_info.name }}</h2>
+  <a href="/order/history" style="color:rgba(255,255,255,.85);text-decoration:none;font-size:14px">← 履歴へ</a>
+</div>
+
+<div class="btn-row">
+  <button class="btn btn-back" onclick="history.back()">← 戻る</button>
+  <a class="btn btn-print" id="pdf-btn" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
+</div>
+
+<div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
+
+<div class="sheet">
+  <div class="doc-to">{{ sup_info.name }} 御中{% if sup_info.contacts and sup_info.contacts[0].name %}　担当 {{ sup_info.contacts[0].name }}{% endif %}</div>
+  <div class="doc-sub">
+    <span>発注日 <strong>{{ order.order_month }}月{{ order.order_day }}日</strong>　店舗 <strong>{{ order.store }}</strong></span>
+    <span>(有)イノ　TEL 072-999-6571</span>
+  </div>
+
+  {% if blocks %}
+  <table class="items">
+    <thead><tr><th>商品名</th><th class="q">数量</th></tr></thead>
+    <tbody>
+    {% for cat, items in blocks %}
+      <tr class="cat"><td colspan="2">{{ cat }}</td></tr>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.name }}{% if it.note %} <span class="note">（{{ it.note }}）</span>{% endif %}</td>
+        <td class="q">{{ it.qty|n }}</td>
+      </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">発注品はありません</div>
+  {% endif %}
+</div>
+
+<script>
+// iPhoneのホーム画面アプリでPDFを直接開くと、戻る・共有ボタンのない画面になり保存できない。
+// 共有メニュー（ファイルに保存など）を使う。共有はタップ直後に呼ぶ必要があるため、PDFは先に取得しておき、
+// 取得が終わるまでボタンは押せないようにする。共有が使えない時はSafariの画面で開く（右上に共有ボタンがある）。
+(function () {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (!ios) return;
+  const btn = document.getElementById('pdf-btn');
+  const url = btn.getAttribute('href');
+  const name = {{ ("発注書_" ~ order.order_month ~ "月" ~ order.order_day ~ "日_" ~ sup_info.name ~ ".pdf")|tojson }};
+  let file = null;
+
+  function openInSafari() {
+    btn.removeAttribute('download');
+    btn.href = url + '?inline=1';
+    btn.target = '_blank';
+    btn.style.pointerEvents = '';
+    btn.style.opacity = '';
+    btn.textContent = 'PDFを開く（右上の共有から保存）';
+  }
+
+  btn.removeAttribute('download');
+  btn.style.pointerEvents = 'none';
+  btn.style.opacity = '.6';
+  btn.textContent = 'PDFを準備中…';
+
+  if (!navigator.canShare) { openInSafari(); return; }
+  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+    const f = new File([b], name, {type: 'application/pdf'});
+    if (!navigator.canShare({files: [f]})) return openInSafari();
+    file = f;
+    btn.style.pointerEvents = '';
+    btn.style.opacity = '';
+    btn.textContent = 'PDFを保存・共有';
+  }).catch(openInSafari);
+
+  btn.addEventListener('click', e => {
+    if (!file) return;
+    e.preventDefault();
+    navigator.share({files: [file]}).catch(err => {
+      if (err.name !== 'AbortError') { openInSafari(); alert('共有できませんでした。もう一度ボタンを押すとPDFを開きます。'); }
+    });
+  });
+})();
+</script>
+</body>
+</html>

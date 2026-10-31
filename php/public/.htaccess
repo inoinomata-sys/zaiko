@@ -1,0 +1,15 @@
+Require all granted
+# すべての画面を index.php に集める（実在するファイル=画像・JS・PDFフォントなどは、そのまま返す）
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+
+# 文字コード
+AddDefaultCharset UTF-8
+
+# サービスワーカー（ホーム画面アプリ）は、ルート直下から全体に効かせる
+<Files "sw.js">
+  Header set Service-Worker-Allowed "/"
+  Header set Cache-Control "no-cache"
+</Files>

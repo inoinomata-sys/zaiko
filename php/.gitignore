@@ -1,0 +1,12 @@
+# 作って置くもの（GitHub Actions が作る）
+/vendor/
+/config.php
+/public/static/
+/public/sw.js
+/storage/pdffont/unifont/*.ttf
+/storage/pdffont/unifont/*.dat
+/storage/pdffont/unifont/*.mtx.php
+/storage/pdffont/unifont/*.cw127.php
+/storage/cache/*
+/storage/twig_cache/*
+!/storage/**/.gitkeep

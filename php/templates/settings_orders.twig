@@ -1,0 +1,55 @@
+{% extends 'base.twig' %}
+{% block title %}発注の取り消し{% endblock %}
+{% block head %}
+<style>
+.date-head { font-size: 16px; font-weight: 700; padding: 10px 0 8px; border-bottom: 2px solid var(--acc); margin: 18px 0 8px; }
+.order-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.order-store { background: var(--acc); color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.order-supplier { font-size: 15px; font-weight: 600; flex: 1; min-width: 120px; }
+.order-meta { font-size: 13px; color: var(--fg2); white-space: nowrap; }
+.warn { background: #fff6e5; border: 1px solid #f0d49a; color: #7a5200; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.6; margin-bottom: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<p style="margin-bottom:10px"><a href="/settings">← 設定にもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:10px">発注の取り消し</h1>
+<div class="warn">
+  取り消すと、<b>在庫から、その発注で足した分を引きます</b>。使用入力の数は、その発注の前の状態に戻ります。<b>元に戻せません。</b>
+</div>
+{% if grouped %}
+  {% for g in grouped %}{% set month = g.month %}{% set day = g.day %}{% set orders = g.orders %}
+  <div class="date-group">
+    <div class="date-head">{{ month }}月{{ day }}日</div>
+    {% for o in orders %}
+    <div class="order-card">
+      <span class="order-store">{{ o.store ?: '—' }}</span>
+      <span class="order-supplier">{{ o.supplier ?: '—' }}</span>
+      <span class="order-meta">{{ o.item_count }} 品 &nbsp;/&nbsp; {{ o.total_qty|int }} 点</span>
+      <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+              onclick="delOrder({{ o.id }}, {{ (o.store ~ ' ' ~ o.supplier ~ '（' ~ o.item_count ~ '品 / ' ~ (o.total_qty|int) ~ '点）')|tojson|forceescape }}, this)">取り消す</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="text-align:center;padding:60px;color:var(--fg2)">発注はありません</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function delOrder(id, label, btn) {
+  if (!confirm(label + ' の発注を取り消しますか？\n\n・在庫から、この発注で足した分を引きます\n・使用入力の数は、この発注の前の状態に戻ります\n（元に戻せません）')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/order/' + id + '/delete', {method: 'POST'});
+    if (!res.ok) throw 0;
+    const card = btn.closest('.order-card'), group = btn.closest('.date-group');
+    card.remove();
+    if (group && !group.querySelector('.order-card')) group.remove();
+    toast('取り消しました');
+  } catch (e) { btn.disabled = false; alert('取り消せませんでした。もう一度お試しください'); }
+}
+</script>
+{% endblock %}

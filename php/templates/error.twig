@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>読み込み中</title>
+<style>
+body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #fbeff3; color: #3a2a30; margin: 0; padding: 48px 20px; text-align: center; }
+h1 { font-size: 18px; margin-bottom: 10px; }
+p { font-size: 15px; color: #7a6168; }
+a { display: inline-block; margin-top: 18px; padding: 12px 26px; background: #c2547a; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>うまく読み込めませんでした</h1>
+<p id="msg">自動でもう一度読み込みます…</p>
+<a href="" onclick="location.reload(); return false;">再読み込み</a>
+<script>
+// 一時的なエラーが多いので1回だけ自動で再読み込みする（無限ループ防止のため sessionStorage で回数を見る）
+try {
+  const k = 'retry:' + location.pathname + location.search;
+  if (!sessionStorage.getItem(k)) {
+    sessionStorage.setItem(k, '1');
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    sessionStorage.removeItem(k);
+    document.getElementById('msg').textContent = '少し待ってから「再読み込み」を押してください。';
+  }
+} catch (e) {
+  document.getElementById('msg').textContent = '少し待ってから「再読み込み」を押してください。';
+}
+</script>
+</body>
+</html>

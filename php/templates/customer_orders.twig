@@ -1,0 +1,105 @@
+{% extends 'base.twig' %}
+{% block title %}お客様注文{% endblock %}
+
+{% block head %}
+<style>
+.o-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--fg); }
+.o-row:last-child { border-bottom: none; }
+.o-row:hover { background: #fdf3f7; text-decoration: none; color: var(--fg); }
+.o-name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.o-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
+.o-row.done { background: #f1f8f2; }
+.o-done { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #2e8b57; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+.o-todo { display: inline-block; font-size: 12px; font-weight: 700; color: #b8531a; border: 1px solid #e0a070; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+.o-part { display: inline-block; font-size: 12px; font-weight: 700; color: #7a5a00; background: #fff1c2; border: 1px solid #e3c66a; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+.o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.o-tabs button { flex: 1; padding: 9px 0; font-size: 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); color: var(--fg); font-family: inherit; }
+.o-tabs button.on { background: var(--accent, #c2527a); color: #fff; border-color: transparent; font-weight: 700; }
+.o-store { display: inline-block; font-size: 12px; font-weight: 700; color: var(--acc); border: 1px solid var(--acc); border-radius: 6px; padding: 0 6px; margin-right: 6px; vertical-align: 2px; }
+.o-total { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% include '_order_tabs.twig' %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:10px">
+  <h1 style="font-size:20px; font-weight:700">お客様注文の一覧</h1>
+  <div style="display:flex; gap:8px; flex-wrap:wrap">
+    <button type="button" class="btn btn-ghost pdf-un" data-base="/customer-orders/unordered/pdf" data-url="/customer-orders/unordered/pdf">未発注の商品をPDFに</button>
+    <button type="button" class="btn btn-ghost pdf-un" data-url="/prices/pdf" data-name="商品価格表.pdf">価格表PDFを保存・共有</button>
+  </div>
+</div>
+
+{% if orders %}
+<input type="search" id="q" placeholder="お客様名で探す" autocomplete="off"
+       style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:12px">
+<div class="o-tabs" id="s-tabs">
+  <button type="button" data-s="イノ">イノ</button>
+  <button type="button" data-s="リッチ">リッチ</button>
+</div>
+<div class="o-tabs" id="o-tabs">
+  <button type="button" class="on" data-f="all">すべて</button>
+  <button type="button" data-f="todo">未発注</button>
+  <button type="button" data-f="done">発注済み</button>
+</div>
+<div class="card">
+  {% for o in orders %}
+  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ ((o.n and o.n_ordered == o.n) ? (1) : (0)) }}" data-store="{{ o.store }}">
+    <div>
+      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
+      <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
+    </div>
+    <div class="o-total">{{ o.total|yen }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding:28px; text-align:center; color:var(--fg2)">
+  まだお客様の注文はありません。<br>上の「＋ 注文を作る」で商品の数量を入れて、注文用紙を作ってください。
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 未発注の商品のPDF。iPhoneのアプリでは共有メニュー、それ以外はそのまま開く
+document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
+  const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
+  try {
+    const r = await fetch(btn.dataset.url); if (!r.ok) throw 0;
+    const f = new File([await r.blob()], btn.dataset.name || '未発注の商品.pdf', {type: 'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files: [f]})) { await navigator.share({files: [f]}).catch(() => {}); }
+    else { const u = URL.createObjectURL(f); const a = document.createElement('a'); a.href = u; a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 10000); }
+  } catch (e) { toast('PDFを作れませんでした。もう一度お試しください'); }
+  btn.disabled = false; btn.textContent = label;
+}));
+let ofilter = 'all', sfilter = 'イノ';
+try { const sv = localStorage.getItem('co:store'); if (sv === 'イノ' || sv === 'リッチ') sfilter = sv; } catch (e) {}
+function applyO() {
+  const q = norm(document.getElementById('q')?.value || '');
+  document.querySelectorAll('.o-row').forEach(r => {
+    const okF = ofilter === 'all' || (ofilter === 'done') === (r.dataset.ordered === '1');
+    const okS = !sfilter || r.dataset.store === sfilter;
+    r.style.display = okF && okS && (!q || norm(r.dataset.name).includes(q)) ? '' : 'none';
+  });
+}
+document.querySelectorAll('#s-tabs button').forEach(b => b.addEventListener('click', () => {
+  sfilter = b.dataset.s;
+  try { localStorage.setItem('co:store', sfilter); } catch (e) {}
+  showS();
+}));
+function showS() {
+  document.querySelectorAll('#s-tabs button').forEach(x => x.classList.toggle('on', x.dataset.s === sfilter));
+  document.querySelectorAll('.pdf-un[data-base]').forEach(p => { p.dataset.url = p.dataset.base + '?store=' + encodeURIComponent(sfilter); });
+  applyO();
+}
+document.querySelectorAll('#o-tabs button').forEach(b => b.addEventListener('click', () => {
+  ofilter = b.dataset.f;
+  document.querySelectorAll('#o-tabs button').forEach(x => x.classList.toggle('on', x === b));
+  applyO();
+}));
+const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+document.getElementById('q')?.addEventListener('input', applyO);
+showS();
+</script>
+{% endblock %}

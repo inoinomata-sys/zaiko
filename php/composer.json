@@ -1,0 +1,10 @@
+{
+  "name": "ino/zaiko",
+  "description": "有限会社イノ 在庫・発注管理（ロリポップ版 PHP + MySQL）",
+  "require": {
+    "php": ">=8.1",
+    "twig/twig": "^3.8",
+    "setasign/tfpdf": "^1.33"
+  },
+  "config": { "optimize-autoloader": true, "platform": { "php": "8.1.0" } }
+}
