@@ -117,7 +117,7 @@
         <span class="short-cell">{% if p.shortage > 0 %}<span class="short">不足 {{ p.shortage|n }}</span>{% endif %}</span>
         <span class="check-cell">
           {% if p.unchecked %}<span class="tag tag-unchecked">未確認</span>
-          {% elif p.stale %}<span class="tag tag-stale">確認 {{ p.checked_at|jst }}</span>
+          {% elseif p.stale %}<span class="tag tag-stale">確認 {{ p.checked_at|jst }}</span>
           {% else %}<span class="tag tag-ok">確認 {{ p.checked_at|jst }}</span>{% endif %}
         </span>
         <span class="changed-cell">{% if p.changed_at %}最終更新 {{ p.changed_at|jst }}{% endif %}</span>

@@ -117,6 +117,7 @@ def convert_text(s):
     s = re.sub(r'\{\{(.*?)\}\}', sub_print, s, flags=re.S)
     s = re.sub(r'\{%-?(.*?)-?%\}', sub_tag, s, flags=re.S)
     s = s.replace(".html'", ".twig'")
+    s = re.sub(r'\{%-?\s*elif\b', lambda m: m.group(0).replace('elif', 'elseif'), s)   # Twig は elseif
     return s
 
 

@@ -231,7 +231,7 @@
           {% if p.unchecked %}
             <span class="num none">未確認</span>
           {% else %}
-            <span class="num {% if p.current_qty <= 0 %}out{% elif p.current_qty < p.base_qty %}low{% else %}ok{% endif %}">{{ p.current_qty|n }}</span>
+            <span class="num {% if p.current_qty <= 0 %}out{% elseif p.current_qty < p.base_qty %}low{% else %}ok{% endif %}">{{ p.current_qty|n }}</span>
           {% endif %}
         </div>
         <div class="stat">
@@ -240,7 +240,7 @@
         </div>
         <div class="stat stat-short {% if shortage > 0 %}on{% endif %}">
           <span class="lbl">不足</span>
-          <span class="num {% if shortage > 0 %}short{% else %}muted{% endif %}">{% if p.unchecked %}？{% elif shortage > 0 %}{{ shortage|n }}{% else %}0{% endif %}</span>
+          <span class="num {% if shortage > 0 %}short{% else %}muted{% endif %}">{% if p.unchecked %}？{% elseif shortage > 0 %}{{ shortage|n }}{% else %}0{% endif %}</span>
         </div>
         {% if p.usage > 0 %}
         <div class="stat stat-use">

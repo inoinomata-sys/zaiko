@@ -46,7 +46,7 @@
   {% for o in orders %}
   <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ ((o.n and o.n_ordered == o.n) ? (1) : (0)) }}" data-store="{{ o.store }}">
     <div>
-      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
+      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elseif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
     </div>
     <div class="o-total">{{ o.total|yen }}</div>
