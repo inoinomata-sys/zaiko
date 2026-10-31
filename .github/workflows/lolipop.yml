@@ -1,0 +1,164 @@
+name: ロリポップ版（PHP）の確認と自動アップロード
+
+# 画面(templates/)・画像(static/)・PHP版(php/)を変えて main に push すると、
+#   1) 本物の MySQL を立ち上げて、全部の画面・機能・PDFを自動で試し、
+#   2) 問題がなければ、ロリポップへ自動でアップロードする（FTP の接続情報が Secrets に入っている時だけ）。
+# Render 版（app.py）だけの変更では動かない。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'php/**'
+      - 'templates/**'
+      - 'static/**'
+      - '.github/workflows/lolipop.yml'
+  pull_request:
+    paths:
+      - 'php/**'
+      - 'templates/**'
+      - 'static/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'アップロードの予行演習（実際には送らない）'
+        type: boolean
+        default: false
+
+concurrency:
+  group: lolipop-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # パスワードなどは、GitHub の Settings → Secrets に入れる（コードには書かない）
+      FTP_SERVER: ${{ secrets.LOLIPOP_FTP_SERVER }}
+      FTP_USER: ${{ secrets.LOLIPOP_FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.LOLIPOP_FTP_PASSWORD }}
+      FTP_DIR: ${{ secrets.LOLIPOP_FTP_DIR }}
+      SITE_URL: ${{ secrets.LOLIPOP_SITE_URL }}
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: zaiko
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, intl
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 画面(Flask版のテンプレート)をPHP用に変換する
+        run: python3 php/tools/convert_templates.py
+
+      - name: PHPの部品を入れる（Twig・tFPDF）
+        working-directory: php
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+      - name: 画像・サービスワーカー・日本語フォントを置く
+        run: |
+          mkdir -p php/public/static php/storage/pdffont/unifont php/storage/cache php/storage/twig_cache
+          cp static/manifest.json php/public/static/
+          cp -r static/icons php/public/static/
+          cp static/sw.js php/public/sw.js
+          cp static/NotoSansJP-Regular.ttf php/storage/pdffont/unifont/
+
+      - name: PHPの書き方を確かめる（文法）
+        run: |
+          find php/src php/public php/tests -name '*.php' -print0 | xargs -0 -n1 php -l > /tmp/lint.txt 2>&1; st=$?
+          cat /tmp/lint.txt | grep -v '^No syntax errors' || true
+          [ $st -eq 0 ] || { bash php/tests/ci_report.sh 'PHP文法' /tmp/lint.txt; exit 1; }
+
+      - name: 計算がPython版と同じ答えか確かめる
+        run: |
+          php php/tests/unit.php 2>&1 | tee /tmp/unit.txt; st=${PIPESTATUS[0]}
+          [ $st -eq 0 ] || { bash php/tests/ci_report.sh '計算の照合' /tmp/unit.txt; exit 1; }
+
+      - name: 画面(Twig)の書き方を確かめる
+        run: |
+          php php/tests/lint_twig.php 2>&1 | tee /tmp/twig.txt; st=${PIPESTATUS[0]}
+          [ $st -eq 0 ] || { bash php/tests/ci_report.sh 'Twig文法' /tmp/twig.txt; exit 1; }
+
+      - name: テスト用のデータベースを用意する
+        run: |
+          cat > php/config.php <<'PHP'
+          <?php
+          return ['db_host' => '127.0.0.1', 'db_name' => 'zaiko', 'db_user' => 'root', 'db_pass' => 'root', 'debug' => true];
+          PHP
+          mysql -h127.0.0.1 -uroot -proot zaiko < php/sql/schema.mysql.sql
+          mysql -h127.0.0.1 -uroot -proot zaiko < php/tests/seed.sql
+          sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+
+      - name: 全部の画面・機能・PDFを通しで試す
+        run: |
+          php -d display_errors=1 -d error_reporting=-1 -S 127.0.0.1:8080 -t php/public > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8080/ping >/dev/null && break; sleep 1; done
+          php php/tests/smoke.php http://127.0.0.1:8080 2>&1 | tee /tmp/smoke.txt; st=${PIPESTATUS[0]}
+          if [ $st -ne 0 ]; then
+            { cat /tmp/smoke.txt; echo '--- サーバーの記録 ---'; tail -n 40 server.log; } > /tmp/smoke_all.txt
+            bash php/tests/ci_report.sh '通し試験' /tmp/smoke_all.txt
+            exit 1
+          fi
+
+      - name: 試験用の設定を消す（ロリポップには送らない）
+        run: rm -f php/config.php server.log
+
+      - name: ロリポップへアップロード
+        if: >-
+          github.event_name != 'pull_request' && env.FTP_SERVER != '' && env.FTP_USER != ''
+          && env.FTP_PASSWORD != '' && env.FTP_DIR != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.LOLIPOP_FTP_SERVER }}
+          username: ${{ secrets.LOLIPOP_FTP_USER }}
+          password: ${{ secrets.LOLIPOP_FTP_PASSWORD }}
+          protocol: ${{ vars.LOLIPOP_FTP_PROTOCOL || 'ftps' }}
+          port: ${{ vars.LOLIPOP_FTP_PORT || 21 }}
+          local-dir: php/
+          server-dir: ${{ secrets.LOLIPOP_FTP_DIR }}
+          dry-run: ${{ inputs.dry_run || false }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            config.php
+            config.sample.php
+            tests/**
+            tools/**
+            sql/**
+            storage/cache/**
+            storage/twig_cache/**
+            composer.json
+            composer.lock
+
+      - name: アップロードの結果を確認する
+        if: >-
+          github.event_name != 'pull_request' && env.SITE_URL != '' && inputs.dry_run != true
+          && env.FTP_SERVER != ''
+        run: |
+          sleep 5
+          curl -fsS "${SITE_URL%/}/health" | python3 -m json.tool || echo '※ /health が開けませんでした（config.php が未設定か、公開フォルダの設定を確認してください）'
+
+      - name: アップロードしなかった理由
+        if: >-
+          github.event_name == 'pull_request' || env.FTP_SERVER == '' || env.FTP_USER == ''
+          || env.FTP_PASSWORD == '' || env.FTP_DIR == ''
+        run: echo "確認だけ行いました。アップロードには、リポジトリの Secrets に LOLIPOP_FTP_SERVER / USER / PASSWORD / DIR が必要です（手順書を参照）。"
