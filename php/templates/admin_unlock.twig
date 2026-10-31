@@ -1,34 +1,48 @@
-{% extends 'base.twig' %}
-{% block title %}管理者の暗証番号{% endblock %}
-{% block head %}
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000">
+<title>管理者の暗証番号</title>
 <style>
-.ad { max-width: 420px; margin: 30px auto; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 22px 18px; }
-.ad h1 { font-size: 18px; margin: 0 0 6px; }
-.ad p { font-size: 13px; color: var(--fg2); margin: 0 0 14px; line-height: 1.6; }
-.ad input { width: 100%; box-sizing: border-box; font-size: 17px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; font-family: inherit; }
-.ad .e { color: #b3261e; font-size: 14px; margin-bottom: 10px; }
+html, body { margin: 0; height: 100%; background: #000; color: #fff; }
+body { display: flex; align-items: center; justify-content: center; font-family: -apple-system, "Hiragino Sans", sans-serif; padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom); box-sizing: border-box; }
+.ad { width: 100%; max-width: 360px; text-align: center; }
+h1 { font-size: 18px; font-weight: 600; margin: 0 0 22px; color: #fff; }
+.msg { font-size: 44px; font-weight: 800; margin: 0 0 22px; color: #fff; min-height: 56px; }
+.win { font-size: 64px; font-weight: 800; margin: 0 0 18px; color: #fff; }
+p { font-size: 14px; color: #cfcfcf; line-height: 1.7; margin: 0 0 16px; }
+input[type=password] { width: 100%; box-sizing: border-box; font-size: 34px; letter-spacing: 12px; text-align: center; padding: 14px 10px; background: #111; color: #fff; border: 2px solid #555; border-radius: 14px; margin-bottom: 14px; font-family: inherit; }
+input[type=password]:focus { outline: none; border-color: #fff; }
+input[type=password]::placeholder { font-size: 16px; letter-spacing: 0; color: #777; }
+button { width: 100%; font-size: 18px; font-weight: 700; padding: 14px; border: 0; border-radius: 14px; background: #fff; color: #000; font-family: inherit; }
+a { color: #bbb; font-size: 14px; }
+.back { margin-top: 26px; }
 </style>
-{% endblock %}
-{% block content %}
+</head>
+<body>
 <div class="ad">
-  <h1>管理者の暗証番号</h1>
   {% if win %}
-  <div style="font-size:34px;font-weight:800;text-align:center;color:var(--acc);margin:18px 0">正解！</div>
-  <p style="text-align:center">設定を開きます…</p>
+  <div class="win">正解！</div>
+  <p>設定を開きます…</p>
   <script>setTimeout(function () { location.href = {{ next|json_encode|raw }}; }, 1500);</script>
-  <p style="text-align:center"><a href="{{ next }}">開かない時は、ここを押してください</a></p>
+  <p><a href="{{ next }}">開かない時は、ここを押してください</a></p>
   {% elseif unset %}
+  <h1>管理者の暗証番号</h1>
   <p>暗証番号が、まだ決まっていません。サーバーの設定（config.php）に、管理者の暗証番号（数字）を入れると、この画面が開けるようになります。</p>
   {% else %}
-  <p>お店の管理をする人だけが、開ける画面です。暗証番号を入れてください（開いたあと、{{ 60 }}分間は、そのまま使えます）。</p>
-  {% if error %}<div class="e" style="font-size:22px;font-weight:800;text-align:center">{{ error }}</div>{% endif %}
+  <h1>管理者の暗証番号</h1>
+  <div class="msg">{{ error }}</div>
   <form method="post" action="/admin/unlock">
     <input type="hidden" name="next" value="{{ next }}">
     <input type="text" name="user" value="admin" autocomplete="username" style="display:none" tabindex="-1" aria-hidden="true">
     <input type="password" name="pass" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" placeholder="暗証番号" required autofocus>
-    <button class="btn" type="submit" style="width:100%">開く</button>
+    <button type="submit">開く</button>
   </form>
   {% endif %}
-  <p style="margin-top:14px"><a href="/">← 在庫にもどる</a></p>
+  <div class="back"><a href="/">← 在庫にもどる</a></div>
 </div>
-{% endblock %}
+</body>
+</html>
