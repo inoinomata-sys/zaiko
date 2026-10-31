@@ -84,7 +84,7 @@ function h_customer_orders(): void
 {
     $orders = rows('
         SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, COUNT(i.id) AS n,
-               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(i.unit_price * i.qty), 0) AS total
+               COALESCE(SUM(i.ordered), 0) AS n_ordered
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300');
     $lines = [];
@@ -95,7 +95,7 @@ function h_customer_orders(): void
             $lines[$r['order_id']][] = [$r['a'], $r['discount_pct'] ?? $pctOf[$r['order_id']]];
         }
     }
-    foreach ($orders as &$o) {
+    foreach ($orders as &$o) {   // 表示金額は、割引後の合計（行ごとに計算）
         $o['total'] = calc_discount_lines($lines[$o['id']] ?? [])[1];
     }
     unset($o);

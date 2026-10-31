@@ -8,7 +8,12 @@ require dirname(__DIR__) . '/src/app.php';
 
 $twig = twig();
 $bad = 0;
-foreach (glob(BASE_DIR . '/templates/*.twig') as $f) {
+$files = glob(BASE_DIR . '/templates/*.twig') ?: [];
+if (count($files) < 10) {   // 画面が見つからないまま成功にしない
+    echo "NG 画面(Twig)が " . count($files) . " 個しか見つかりません\n";
+    exit(1);
+}
+foreach ($files as $f) {
     $name = basename($f);
     try {
         $twig->load($name);

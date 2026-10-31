@@ -5,7 +5,15 @@ declare(strict_types=1);
 define('BASE_DIR', dirname(__DIR__));
 require BASE_DIR . '/src/util.php';
 
-$v = json_decode((string)file_get_contents(__DIR__ . '/vectors.json'), true);
+// 正解データが読めない・空の時は、何も確かめないまま成功にせず、失敗にする
+$raw = @file_get_contents(__DIR__ . '/vectors.json');
+$v = is_string($raw) ? json_decode($raw, true) : null;
+foreach (['discount', 'kind_rate', 'campaign_tier', 'price_kind', 'num_fmt', 'pct_fmt', 'sama', 'yen', 'nfkc'] as $k) {
+    if (!is_array($v) || empty($v[$k]) || !is_array($v[$k])) {
+        fwrite(STDERR, "NG vectors.json が読めないか、「{$k}」が空です。php/tools/gen_unit_vectors.py で作り直してください\n");
+        exit(1);
+    }
+}
 $fail = 0;
 $n = 0;
 
@@ -68,5 +76,9 @@ check('cookie 期限切れ', login_cookie_ok($cfg, login_cookie_value($cfg, time
 check('cookie 改ざん', login_cookie_ok($cfg, preg_replace('/^\d+/', (string)(time() + 999999), $ck)), false);
 check('cookie 別のパスワード', login_cookie_ok(['user' => 'u1', 'pass' => 'zz'], $ck), false);
 check('cookie 空', login_cookie_ok($cfg, ''), false);
+if ($n < 500) {
+    echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
+    exit(1);
+}
 echo "{$n} 件を確認、失敗 {$fail} 件\n";
 exit($fail ? 1 : 0);

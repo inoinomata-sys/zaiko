@@ -10,7 +10,6 @@ import re
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 SRC = os.path.join(ROOT, 'templates')
 DST = os.path.join(ROOT, 'php', 'templates')
-SKIP = {'print_pdf.html'}   # どの画面からも使われていない古い雛形
 
 
 def split_top(expr, word):
@@ -37,7 +36,7 @@ def split_top(expr, word):
 
 def convert_groups(expr):
     """括弧の中身も、同じ規則で変換する"""
-    out, depth, quote, i, start = [], 0, None, 0, None
+    out, depth, quote, i = [], 0, None, 0
     buf = ''
     while i < len(expr):
         c = expr[i]
@@ -52,7 +51,7 @@ def convert_groups(expr):
             quote = c
             buf += c
         elif c == '(' and depth == 0:
-            depth, start, buf_before = 1, i, buf
+            depth, buf_before = 1, buf
             buf = ''
             j, d, q = i + 1, 1, None
             while j < len(expr) and d:
@@ -145,8 +144,6 @@ def main():
     os.makedirs(DST, exist_ok=True)
     for f in sorted(glob.glob(os.path.join(SRC, '*.html'))):
         name = os.path.basename(f)
-        if name in SKIP:
-            continue
         s = open(f, encoding='utf-8').read()
         for old, new in SPECIAL.get(name, []):
             assert old in s, (name, old[:60])

@@ -6,6 +6,7 @@ declare(strict_types=1);
 function products_with_stock(string $store = 'イノ', ?string $cat = null, ?string $supplier = null): array
 {
     $where = '';
+    // SQLの？の並び: 発注済み数の副問い合わせ2つ、在庫の店舗、基準数の店舗、そのあとに絞り込み
     $params = [$store, $store, $store, $store];
     if ($cat) {
         $where .= ' AND p.category = ?';
@@ -31,7 +32,7 @@ function products_with_stock(string $store = 'イノ', ?string $cat = null, ?str
         LEFT JOIN product_base pb ON pb.product_id = p.id AND pb.store = ?
         WHERE p.is_active = 1 {$where}
         ORDER BY p.col_group, p.sort_order
-    ", [$store, $store, $store, $store, ...array_slice($params, 4)]);
+    ", $params);
 }
 
 // ── 在庫管理 ──────────────────────────────────────────────────────────────────

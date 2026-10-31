@@ -5,8 +5,6 @@ php/tests/vectors.json を作る。php/tests/unit.php が、これと PHP の結
 import json
 import os
 import random
-import sys
-from unittest import mock
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 import ast
