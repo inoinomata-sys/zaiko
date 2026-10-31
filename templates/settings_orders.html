@@ -26,6 +26,7 @@
       <span class="order-store">{{ o.store or '—' }}</span>
       <span class="order-supplier">{{ o.supplier or '—' }}</span>
       <span class="order-meta">{{ o.item_count }} 品 &nbsp;/&nbsp; {{ o.total_qty|int }} 点</span>
+      <a href="/order/{{ o.id }}/print" target="_blank" class="btn btn-ghost btn-sm">中身を見る</a>
       <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)"
               onclick="delOrder({{ o.id }}, {{ (o.store ~ ' ' ~ o.supplier ~ '（' ~ o.item_count ~ '品 / ' ~ (o.total_qty|int) ~ '点）')|tojson|forceescape }}, this)">取り消す</button>
     </div>
