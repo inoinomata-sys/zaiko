@@ -119,8 +119,12 @@ jobs:
             exit 1
           fi
 
-      - name: 試験用の設定を消す（ロリポップには送らない）
-        run: rm -f php/config.php server.log
+      - name: 試験用の設定と、作業場所の道が入った控えを消す（ロリポップには送らない）
+        run: |
+          rm -f php/config.php server.log
+          # フォントの情報の控え（.mtx.php など）には「作った場所の道」が書かれる。ロリポップでは使えないので、送らずに、向こうで作り直す
+          rm -f php/storage/pdffont/unifont/*.mtx.php php/storage/pdffont/unifont/*.cw127.php php/storage/pdffont/unifont/*.cw.dat
+          rm -rf php/storage/cache/* php/storage/twig_cache/*
 
       - name: ロリポップへアップロード
         if: >-
