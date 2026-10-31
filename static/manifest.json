@@ -1,7 +1,7 @@
 {
-  "name": "INO.inc 在庫管理",
-  "short_name": "在庫管理",
-  "description": "美容室の在庫・発注管理システム",
+  "name": "INO.inc 総合管理",
+  "short_name": "総合管理",
+  "description": "美容室の総合管理（在庫・発注・予定・シフト）",
   "start_url": "/menu",
   "display": "standalone",
   "background_color": "#fdf0f4",
@@ -10,13 +10,13 @@
   "lang": "ja",
   "icons": [
     {
-      "src": "/static/icons/ino6-192.png",
+      "src": "/static/icons/ino7-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/static/icons/ino6-512.png",
+      "src": "/static/icons/ino7-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
