@@ -119,7 +119,6 @@ foreach ($hdr as $h) {
 }
 ok($ADMIN_COOKIE !== '', '管理者の鍵: 暗証番号で開けられる', 'status=' . $st . ' / config に admin_pass が入っているか: ' . (str_contains((string)@file_get_contents(dirname(__DIR__) . '/config.php'), 'admin_pass') ? 'はい' : 'いいえ'));
 $NO_ADMIN = false;
-$GLOBALS['UNLOCK_DEBUG'] = 'unlock status=' . $st . ' cookie=' . ($ADMIN_COOKIE !== '' ? 'あり' : 'なし') . ' config先頭=' . substr(str_replace("\n", ' ', (string)@file_get_contents(dirname(__DIR__) . '/config.php')), 0, 120) . ' headers=' . implode(' | ', array_map(static fn($h) => substr($h, 0, 60), $hdr));
 
 echo "== 画面 ==\n";
 ok(trim(http('GET', '/ping')[1]) === 'ok', '/ping');
@@ -329,7 +328,7 @@ ok($st === 302, '設定: 鍵がかかっている');
 ok($st === 302, '商品マスター: 鍵がかかっている');
 [$st] = http('POST', '/order/1/delete', null, []);
 ok($st === 403, '発注の取り消し: 鍵なしでは断る', "status={$st}");
-page_ok('/admin/unlock', '合言葉');
+page_ok('/admin/unlock', '暗証番号');
 [$st] = http('POST', '/settings/line/assign', null, ['user_id' => 'U' . str_repeat('0', 32), 'supplier' => 'コタ']);
 ok($st === 403, 'LINE設定: 鍵なしでは、ひも付けできない', "status={$st}");
 $NO_ADMIN = false;
@@ -380,7 +379,4 @@ ok($st === 404, 'シフト: いないスタッフは断る');
 http('POST', "/shift/staff/{$sid}/toggle", null, []);
 ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
 
-if ($fail) {
-    echo "=== 鍵の調査 ===\n" . ($GLOBALS['UNLOCK_DEBUG'] ?? '(なし)') . "\n";
-}
 exit($fail ? 1 : 0);
