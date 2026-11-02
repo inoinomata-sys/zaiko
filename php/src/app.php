@@ -146,6 +146,9 @@ function run_app(): void
     }
     $path = request_path();
     try {
+        if (!in_array($path, ['/ping', '/health', '/line/webhook'], true)) {
+            ensure_data_migrations();   // 一回きりのデータの書き換え（済んでいれば、何もしない）
+        }
         $pathMatched = false;
         foreach (routes() as [$m, $pattern, $handler]) {
             $regex = '#^' . preg_replace('#<int:(\w+)>#', '(?P<$1>\d+)', $pattern) . '$#';

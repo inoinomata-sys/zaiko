@@ -29,6 +29,13 @@ const DATA_MIGRATIONS = [
         ["UPDATE price_items SET sort_order = 901308 WHERE name = 'V3 インテリジェント ファンデーション レフィル'"],
         ["UPDATE price_items SET sort_order = 901320 WHERE name = 'V3ナイトクリーム'"],
     ],
+    // 仕入先の名前を「三井コーポレーション」から「ミツイコーポレーション」に変える（商品・発注の履歴・担当者・LINEの送り先・発注の下書き）
+    '2026-11-02-supplier-mitsui' => [
+        ["UPDATE products SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
+        ["UPDATE orders SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
+        ["UPDATE supplier_contacts SET supplier_name = 'ミツイコーポレーション' WHERE supplier_name = '三井コーポレーション'"],
+        ["UPDATE order_drafts SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
+    ],
 ];
 
 function ensure_data_migrations(): void
@@ -38,9 +45,14 @@ function ensure_data_migrations(): void
         return;
     }
     $done = true;
-    run('CREATE TABLE IF NOT EXISTS data_migrations (name VARCHAR(100) NOT NULL PRIMARY KEY, done_at DATETIME NOT NULL) DEFAULT CHARSET=utf8mb4');
+    try {
+        $finished = array_column(rows('SELECT name FROM data_migrations'), 'name');
+    } catch (Throwable $e) {   // 表が、まだない（最初の1回）
+        run('CREATE TABLE IF NOT EXISTS data_migrations (name VARCHAR(100) NOT NULL PRIMARY KEY, done_at DATETIME NOT NULL) DEFAULT CHARSET=utf8mb4');
+        $finished = [];
+    }
     foreach (DATA_MIGRATIONS as $name => $statements) {
-        if (row('SELECT name FROM data_migrations WHERE name = ?', [$name])) {
+        if (in_array($name, $finished, true)) {
             continue;
         }
         transaction(function () use ($name, $statements) {
