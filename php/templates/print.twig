@@ -78,9 +78,9 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 <div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
 
 <div class="remark-edit">
-  <label for="remark-text">備考（発注書とLINEに入ります）</label>
+  <label for="remark-text">備考（発注書のPDFとLINEに入ります）</label>
   <textarea id="remark-text" maxlength="500" placeholder="例）午前中の配達を希望します">{{ order.remark ?: '' }}</textarea>
-  <div class="row"><button type="button" class="btn btn-print" id="remark-save">備考を保存</button><span id="remark-msg"></span></div>
+  <div class="row"><span id="remark-msg">入力すると、自動で保存されます</span></div>
 </div>
 
 <div class="sheet">
@@ -90,7 +90,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
     <span>(有)イノ　TEL 072-999-6571</span>
   </div>
 
-  {% if order.remark %}<div class="remark-view"><strong>備考</strong>　{{ order.remark }}</div>{% endif %}
+  <div class="remark-view" id="remark-view"{% if not order.remark %} hidden{% endif %}><strong>備考</strong>　<span id="remark-view-text">{{ order.remark ?: '' }}</span></div>
 
   {% if blocks %}
   <table class="items">
@@ -138,15 +138,23 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
   btn.style.opacity = '.6';
   btn.textContent = 'PDFを準備中…';
 
+  function load() {
+    file = null;
+    btn.style.pointerEvents = 'none';
+    btn.style.opacity = '.6';
+    btn.textContent = 'PDFを準備中…';
+    fetch(url, {cache: 'no-store'}).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
+      const f = new File([b], name, {type: 'application/pdf'});
+      if (!navigator.canShare({files: [f]})) return openInSafari();
+      file = f;
+      btn.style.pointerEvents = '';
+      btn.style.opacity = '';
+      btn.textContent = 'PDFを保存・共有';
+    }).catch(openInSafari);
+  }
   if (!navigator.canShare) { openInSafari(); return; }
-  fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => {
-    const f = new File([b], name, {type: 'application/pdf'});
-    if (!navigator.canShare({files: [f]})) return openInSafari();
-    file = f;
-    btn.style.pointerEvents = '';
-    btn.style.opacity = '';
-    btn.textContent = 'PDFを保存・共有';
-  }).catch(openInSafari);
+  window.refreshPdf = load;
+  load();
 
   btn.addEventListener('click', e => {
     if (!file) return;
@@ -157,21 +165,31 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
   });
 })();
 (function () {
-  const sv = document.getElementById('remark-save');
-  sv.addEventListener('click', async () => {
-    const msg = document.getElementById('remark-msg');
-    sv.disabled = true; msg.textContent = '保存中…';
-    try {
-      const res = await fetch('/order/{{ order.id }}/remark', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({remark: document.getElementById('remark-text').value})});
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok || !j.ok) throw new Error(j.error || '保存できませんでした');
-      location.reload();
-    } catch (e) {
-      alert(e.message || '保存できませんでした');
-      sv.disabled = false; msg.textContent = '';
-    }
-  });
+  const ta = document.getElementById('remark-text');
+  const msg = document.getElementById('remark-msg');
+  const view = document.getElementById('remark-view');
+  const viewText = document.getElementById('remark-view-text');
+  let timer = null, saved = ta.value, chain = Promise.resolve();
+  function show() { viewText.textContent = ta.value.trim(); view.hidden = !ta.value.trim(); }
+  function save() {
+    clearTimeout(timer);
+    const v = ta.value;
+    if (v === saved) return chain;
+    msg.textContent = '保存中…';
+    chain = chain.then(async () => {
+      try {
+        const res = await fetch('/order/{{ order.id }}/remark', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({remark: v})});
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) throw new Error(j.error || '保存できませんでした');
+        saved = v; msg.textContent = '保存しました';
+        if (window.refreshPdf) window.refreshPdf();
+      } catch (e) { msg.textContent = (e.message || '保存できませんでした') + '（もう一度入力してください）'; }
+    });
+    return chain;
+  }
+  window.saveRemark = save;
+  ta.addEventListener('input', () => { show(); msg.textContent = '入力中…'; clearTimeout(timer); timer = setTimeout(save, 800); });
+  ta.addEventListener('blur', save);
 })();
 (function () {
   const lb = document.getElementById('line-btn');
@@ -181,6 +199,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
     if (lb.dataset.sent) msg = 'この発注書は、すでに送信済みです（' + lb.dataset.sent + '）。\n\n' + msg;
     if (!confirm(msg)) return;
     lb.disabled = true; lb.textContent = '送信中…';
+    if (window.saveRemark) await window.saveRemark();
     try {
       const res = await fetch('/order/{{ order.id }}/line', {method: 'POST'});
       const j = await res.json().catch(() => ({}));
