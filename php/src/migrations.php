@@ -36,6 +36,10 @@ const DATA_MIGRATIONS = [
         ["UPDATE supplier_contacts SET supplier_name = 'ミツイコーポレーション' WHERE supplier_name = '三井コーポレーション'"],
         ["UPDATE order_drafts SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
     ],
+    // 「V3ナイトクリーム」は、プレジストの「Vフィックス アメージングクリーム 50g」（22,000円）と同じ商品なので、名前を書き換える（サロンアンサーと同じ名前）
+    '2026-11-02-amazing-cream' => [
+        ["UPDATE price_items SET name = 'プレジスト Vフィックス アメージングクリーム 50g', price = 22000 WHERE category = 'メイクアイテム・化粧品' AND name = 'V3ナイトクリーム'"],
+    ],
 ];
 
 function ensure_data_migrations(): void
