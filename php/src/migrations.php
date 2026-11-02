@@ -17,6 +17,18 @@ const DATA_MIGRATIONS = [
           SELECT 'メイクアイテム・化粧品', 'V3 エキサイティング ファンデーション レフィル', 7700, 901310, 1 FROM DUAL
           WHERE NOT EXISTS (SELECT 1 FROM price_items WHERE name = 'V3 エキサイティング ファンデーション レフィル')"],
     ],
+    // V3ファンデの並びを、サロンアンサーの表示順（1301〜1308）と同じにする。ナイトクリームは、その後ろ
+    '2026-11-02-v3-order' => [
+        ["UPDATE price_items SET sort_order = 901301 WHERE name = 'V3 エキサイティング ファンデーション 本体'"],
+        ["UPDATE price_items SET sort_order = 901302 WHERE name = 'V3 エキサイティング ファンデーション レフィル'"],
+        ["UPDATE price_items SET sort_order = 901303 WHERE name = 'V3 シャイニング ファンデーション 本体'"],
+        ["UPDATE price_items SET sort_order = 901304 WHERE name = 'V3 シャイニング ファンデーション レフィル'"],
+        ["UPDATE price_items SET sort_order = 901305 WHERE name = 'V3 ブリリアント ファンデーション 本体'"],
+        ["UPDATE price_items SET sort_order = 901306 WHERE name = 'V3 ブリリアント ファンデーション レフィル'"],
+        ["UPDATE price_items SET sort_order = 901307 WHERE name = 'V3 インテリジェント ファンデーション 本体'"],
+        ["UPDATE price_items SET sort_order = 901308 WHERE name = 'V3 インテリジェント ファンデーション レフィル'"],
+        ["UPDATE price_items SET sort_order = 901320 WHERE name = 'V3ナイトクリーム'"],
+    ],
 ];
 
 function ensure_data_migrations(): void
