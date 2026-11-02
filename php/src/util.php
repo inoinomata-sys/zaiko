@@ -15,7 +15,7 @@ const PRICE_NOTE = '表示の価格は税込です。';
 const DISCOUNT_ROUND = 10;
 const CAMPAIGN_TIERS = [[15000, 8], [20000, 10], [30000, 12], [40000, 13], [80000, 14]];
 const CAMPAIGN_TOP = 16;
-const PDF_VER = '3';
+const PDF_VER = '4';
 const ORDER_PDF_MAX_SCALE = 1.6;
 
 /** 画面の入り口で出す「見つかりません」などの例外 */
