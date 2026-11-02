@@ -172,6 +172,12 @@ function build_order_pdf_file(int $orderId): string
     $pdf->Cell(110, 8, "発注日 {$date}　店舗 {$order['store']}");
     pdf_nl($pdf, 0, 8, '(有)イノ　TEL 072-999-6571', 'R');
     $pdf->Ln(2);
+    $remark = trim((string)($order['remark'] ?? ''));
+    if ($remark !== '') {
+        $pdf->SetFont(PDF_FONT, '', 13);
+        $pdf->ml(0, 6.5, "備考：{$remark}");
+        $pdf->Ln(2);
+    }
 
     $gap = 3;
     $colW = ($pdf->pageW() - $pdf->leftM() - $pdf->rightM() - $gap * (PDF_COLS - 1)) / PDF_COLS;

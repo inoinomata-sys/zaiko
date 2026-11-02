@@ -235,7 +235,7 @@ function insert_order(string $store, string $supplier, ?int $month, ?int $day, a
 function load_order(int $orderId): array
 {
     $order = row('
-        SELECT o.id, o.store, o.supplier, o.order_month, o.order_day, o.created_at,
+        SELECT o.id, o.store, o.supplier, o.order_month, o.order_day, o.created_at, o.notes AS remark,
                (SELECT c.contact_name FROM supplier_contacts c WHERE c.supplier_name = o.supplier
                 ORDER BY c.sort_order, c.id LIMIT 1) AS contact_name
         FROM orders o WHERE o.id = ?', [$orderId]);
@@ -284,6 +284,20 @@ function h_order_print(int $id): void
     render('print', ['order' => $order, 'blocks' => $blocks, 'sup_info' => order_sup_info($order),
         'item_count' => $itemCount, 'total_qty' => $totalQty,
         'line_to' => $lineTo ? line_recipient_label($order) : '', 'line_sent' => $lineSent]);
+}
+
+/** 発注書の備考を保存する（空なら消す）。PDFは作り直す */
+function h_order_remark(int $id): void
+{
+    $remark = trim((string)(req_json()['remark'] ?? ''));
+    if (mb_strlen($remark) > 500) {
+        respond_json(['ok' => false, 'error' => '備考は500文字までです'], 400);
+    }
+    if (!val('SELECT id FROM orders WHERE id = ?', [$id])) {
+        respond_json(['ok' => false, 'error' => '発注が見つかりません'], 404);
+    }
+    run('UPDATE orders SET notes = ?, pdf = NULL, pdf_ver = NULL WHERE id = ?', [$remark === '' ? null : $remark, $id]);
+    respond_json(['ok' => true]);
 }
 
 function pdf_filename(array $order): string

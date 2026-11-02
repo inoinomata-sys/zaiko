@@ -210,6 +210,11 @@ page_ok("/order/{$oid}/print", 'ワールド美容');
 pdf_ok("/order/{$oid}/pdf", ['ワールド美容 御中', '手入力の品']);
 pdf_ok("/order/{$oid}/pdf?inline=1");
 ok(db_val("SELECT pdf_ver FROM orders WHERE id={$oid}") === '3', '作ったPDFは保存される');
+[$st, $j] = http('POST', "/order/{$oid}/remark", ['remark' => '午前中の配達希望']);
+ok($st === 200, '備考を保存できる', (string)$st);
+ok(db_val("SELECT pdf FROM orders WHERE id={$oid}") === null, '備考を直すとPDFは作り直しになる');
+page_ok("/order/{$oid}/print", '午前中の配達希望');
+pdf_ok("/order/{$oid}/pdf", ['午前中の配達希望']);
 page_ok('/order/history', 'ワールド美容');
 page_ok('/settings/orders', '取り消す');
 

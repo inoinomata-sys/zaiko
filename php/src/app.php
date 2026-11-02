@@ -83,6 +83,7 @@ function routes(): array
         ['GET', '/order/history', 'h_order_history'],
         ['GET', '/order/<int:id>/print', 'h_order_print'],
         ['GET', '/order/<int:id>/pdf', 'h_order_pdf'],
+        ['POST', '/order/<int:id>/remark', 'h_order_remark'],
         ['POST', '/order/<int:id>/delete', 'h_order_delete'],
         ['GET', '/prices', 'h_prices'],
         ['GET', '/prices/pdf', 'h_prices_pdf'],

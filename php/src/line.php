@@ -235,7 +235,7 @@ function h_order_line_send(int $id): void
     $cfg = line_config();
     $secret = (string)($cfg['secret'] ?? '');
     $token = (string)($cfg['token'] ?? '');
-    $order = row('SELECT id, store, supplier, order_month, order_day FROM orders WHERE id = ?', [$id]);
+    $order = row('SELECT id, store, supplier, order_month, order_day, notes FROM orders WHERE id = ?', [$id]);
     if (!$order) {
         respond_json(['ok' => false, 'error' => '発注が見つかりません'], 404);
     }
@@ -249,8 +249,10 @@ function h_order_line_send(int $id): void
     $contact = trim((string)val('SELECT contact_name FROM supplier_contacts WHERE supplier_name = ? AND contact_name <> \'\' ORDER BY sort_order, id LIMIT 1', [$order['supplier']]));
     $atena = $contact !== '' ? $contact . '様' : $order['supplier'] . 'ご担当者様';
     $storeName = $order['store'] === 'イノ' ? 'イノ本店' : $order['store'] . '店';   // イノ本店 / リッチ店
+    $remark = trim((string)($order['notes'] ?? ''));
     $text = "【発注書】【{$storeName}】\n{$atena}\nいつもありがとうございます。\n有限会社イノです。\n"
         . "{$order['order_month']}月{$order['order_day']}日の発注書をお送りします。\n"
+        . ($remark !== '' ? "【備考】\n{$remark}\n" : '')
         . "下のリンクから、PDFをご確認ください。\n"
         . line_order_link($id, $exp, $secret) . "\nよろしくお願いいたします。";
     $ctx = stream_context_create(['http' => [
