@@ -221,6 +221,15 @@ function line_contact_for_order(int $orderId): ?array
     return row('SELECT user_id, display_name FROM line_contacts WHERE supplier = ?', [$sup]);
 }
 
+/** 確認画面に出す、送り先の名前：「会社名 担当者名様」（LINE の表示名ではなく、設定の「仕入先の担当者」を使う） */
+function line_recipient_label(array $order): string
+{
+    $sup = (string)($order['supplier'] ?? '');
+    $contact = trim((string)($order['contact_name'] ?? ''));
+    $contact = preg_replace('/様$/u', '', $contact) ?? $contact;
+    return $contact !== '' ? "{$sup} {$contact}様" : $sup;
+}
+
 function h_order_line_send(int $id): void
 {
     $cfg = line_config();

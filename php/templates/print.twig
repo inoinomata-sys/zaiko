@@ -147,7 +147,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
   const lb = document.getElementById('line-btn');
   if (!lb) return;
   lb.addEventListener('click', async () => {
-    let msg = lb.dataset.sup + ' の ' + lb.dataset.to + ' さんに、この発注書を LINE で送ります。よろしいですか？';
+    let msg = lb.dataset.to + ' に、この発注書を LINE で送ります。よろしいですか？';
     if (lb.dataset.sent) msg = 'この発注書は、すでに送信済みです（' + lb.dataset.sent + '）。\n\n' + msg;
     if (!confirm(msg)) return;
     lb.disabled = true; lb.textContent = '送信中…';
