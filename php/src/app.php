@@ -11,6 +11,7 @@ require __DIR__ . '/customer.php';
 require __DIR__ . '/products.php';
 require __DIR__ . '/shift.php';
 require __DIR__ . '/schedule.php';
+require __DIR__ . '/migrations.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/line.php';
 

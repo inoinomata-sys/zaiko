@@ -318,6 +318,9 @@ if ($failures) {
 
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/portal', 'シフト');
+page_ok('/prices', 'V3 エキサイティング ファンデーション レフィル');
+ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-02-v3-foundation'") === 1, 'データの書き換え: 記録が残る');
+ok((int)db_val("SELECT COUNT(*) FROM price_items WHERE name = 'V3 エキサイティング ファンデーション レフィル'") === 1, 'データの書き換え: 追加が1件だけ');
 [$st] = http('GET', '/menu');
 ok($st === 302, '/menu は、在庫の画面に移す', "status={$st}");
 page_ok('/schedule');

@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 function load_prices(): array
 {
+    ensure_data_migrations();
     $groups = [];
     foreach (rows('SELECT id, category, name, spec, price, note FROM price_items WHERE is_active = 1 ORDER BY sort_order, id') as $r) {
         $r['kind'] = price_kind($r['category'], $r['name']);
