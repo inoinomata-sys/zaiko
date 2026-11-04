@@ -262,7 +262,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -323,6 +323,53 @@ SCHEMA_SQL = [
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
         saved_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (store, supplier))""",
+    # デモ版：仕入れ先名・カテゴリ名・店名を架空に変更
+    "UPDATE products SET supplier='株式会社サクラコスメティクス' WHERE supplier IN ('株式会社ワールド美容','ワールド美容')",
+    "UPDATE products SET supplier='株式会社フジワラ商事' WHERE supplier IN ('株式会社トピー商事','トピー商事')",
+    "UPDATE products SET supplier='ビューティーライン' WHERE supplier IN ('アイテム美容')",
+    "UPDATE products SET supplier='タナカコーポレーション株式会社' WHERE supplier IN ('ミツイコーポレーション株式会社','ミツイコーポレーション','三井コーポレーション')",
+    "UPDATE products SET supplier='プレミアム（P.シリーズ）Web注文' WHERE supplier IN ('ナプラ（N.シリーズ）Web注文')",
+    "UPDATE products SET supplier='株式会社スターデザイン' WHERE supplier IN ('株式会社クリエイティブブレーン','コタ')",
+    "UPDATE products SET supplier='ルーチェ' WHERE supplier IN ('リファ')",
+    "UPDATE products SET supplier='株式会社グレース' WHERE supplier IN ('株式会社アモール','アモール')",
+    "UPDATE products SET category='スタンダード' WHERE category='プライム'",
+    "UPDATE products SET category='スタンダードクイック' WHERE category='プライムクイック'",
+    "UPDATE products SET category='スタンダードシリーズ２剤' WHERE category='プライムシリーズ２剤'",
+    "UPDATE products SET category='ベーシックカラー' WHERE category='アジアンカラー'",
+    "UPDATE products SET category='プレミアムカラー' WHERE category='アドﾐｵカラー'",
+    "UPDATE products SET category='プレミアムシリーズ２剤' WHERE category='アドﾐｵシリーズ２剤'",
+    "UPDATE products SET category='スタイリング剤' WHERE category='アリミノ整髪料'",
+    "UPDATE products SET category='マニキュア' WHERE category='オアシックマニュキア'",
+    "UPDATE products SET category='カラーミックス' WHERE category='カラーミューズ'",
+    "UPDATE products SET category='クリアライン' WHERE category='クオライン'",
+    "UPDATE products SET category='パーマ液' WHERE category='コスメカール&パーマ'",
+    "UPDATE products SET category='クリームシリーズ' WHERE category='コスメクリーム'",
+    "UPDATE products SET category='ケアシリーズ' WHERE category='ナプラ'",
+    "UPDATE products SET category='ホームケア' WHERE category='ﾎｰﾕｰ'",
+    "UPDATE products SET category='A.シリーズ' WHERE category='N.ｼﾘｰｽﾞ'",
+    "UPDATE products SET category='ブリーチ・脱色・クリア' WHERE category='ブリーチ・脱染・クリア'",
+    "UPDATE stock SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE stock SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE orders SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE orders SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE orders SET supplier='株式会社サクラコスメティクス' WHERE supplier IN ('株式会社ワールド美容','ワールド美容')",
+    "UPDATE orders SET supplier='株式会社フジワラ商事' WHERE supplier IN ('株式会社トピー商事','トピー商事')",
+    "UPDATE orders SET supplier='ビューティーライン' WHERE supplier='アイテム美容'",
+    "UPDATE orders SET supplier='タナカコーポレーション株式会社' WHERE supplier IN ('ミツイコーポレーション株式会社','ミツイコーポレーション')",
+    "UPDATE orders SET supplier='プレミアム（P.シリーズ）Web注文' WHERE supplier='ナプラ（N.シリーズ）Web注文'",
+    "UPDATE orders SET supplier='株式会社スターデザイン' WHERE supplier IN ('株式会社クリエイティブブレーン','コタ')",
+    "UPDATE orders SET supplier='ルーチェ' WHERE supplier='リファ'",
+    "UPDATE orders SET supplier='株式会社グレース' WHERE supplier IN ('株式会社アモール','アモール')",
+    "UPDATE supplier_contacts SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE supplier_contacts SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE supplier_contacts SET supplier_name='株式会社サクラコスメティクス' WHERE supplier_name IN ('株式会社ワールド美容','ワールド美容')",
+    "UPDATE product_base SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE product_base SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE customer_orders SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE customer_orders SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE order_drafts SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
+    "UPDATE order_drafts SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
+    "UPDATE order_drafts SET supplier='株式会社サクラコスメティクス' WHERE supplier IN ('株式会社ワールド美容','ワールド美容')",
 ]
 
 
