@@ -156,7 +156,7 @@ function pdf_nl(ZPdf $pdf, float $w, float $h, string $txt, string $align = 'L',
 function build_order_pdf_file(int $orderId): string
 {
     [$order, $blocks] = load_order($orderId);
-    $sup = $order['supplier'] ?: 'ワールド美容';
+    $sup = $order['supplier'] ?: SUPPLIER_NAMES[0];
     $contact = $order['contact_name'] ?? '';
     $date = "{$order['order_month']}月{$order['order_day']}日";
 

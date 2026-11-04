@@ -128,10 +128,10 @@ ok(($h['font'] ?? false) === true, 'PDF のフォントが置かれている');
 page_ok('/', 'ホーユートリートメント');
 page_ok('/?store=' . rawurlencode('リッチ'));
 page_ok('/usage', 'NCSシャンプー');
-page_ok('/usage?supplier=' . rawurlencode('ワールド美容'));
+page_ok('/usage?supplier=' . rawurlencode('株式会社ワールド美容'));
 page_ok('/order', '店舗を選択');
-page_ok('/order?store=' . rawurlencode('イノ'), 'ワールド美容');
-page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('ワールド美容'), 'ミントトリートメント');
+page_ok('/order?store=' . rawurlencode('イノ'), '株式会社ワールド美容');
+page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), 'ミントトリートメント');
 page_ok('/order/history');
 page_ok('/settings', '発注の取り消し');
 page_ok('/settings/orders');
@@ -171,7 +171,7 @@ ok($st === 200 && $j['pending'] == 2, '使用 −1', json_encode($j));
 ok($st === 400 && $j['pending'] == 2, '使用を0より少なくはできない', json_encode($j, JSON_UNESCAPED_UNICODE));
 ok((float)db_val("SELECT current_qty FROM stock WHERE product_id=2 AND store='イノ'") == -1.0, '使用入力で在庫が減る（1 − 2 = −1）');
 
-$body = page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('ワールド美容'));
+$body = page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'));
 preg_match('/USAGE_UPTO\s*=\s*(\d+)/', $body, $m);
 $upto = (int)($m[1] ?? 0);
 ok($upto > 0, '発注画面に使用入力の範囲(USAGE_UPTO)が出る');
@@ -179,12 +179,12 @@ preg_match('/REQUEST_KEY\s*=\s*"([0-9a-f]{32})"/', $body, $m);
 $rk = $m[1] ?? '';
 ok($rk !== '', '発注画面に二重送信防止の鍵が出る');
 
-[$st, $j] = api('/api/order_draft', ['store' => 'イノ', 'supplier' => 'ワールド美容', 'items' => ['1' => [2, 0.0]], 'custom' => [['name' => '手入力', 'spec' => '', 'qty' => 1]]]);
+[$st, $j] = api('/api/order_draft', ['store' => 'イノ', 'supplier' => '株式会社ワールド美容', 'items' => ['1' => [2, 0.0]], 'custom' => [['name' => '手入力', 'spec' => '', 'qty' => 1]]]);
 ok($st === 200 && !empty($j['saved_at']), '発注の下書きを保存', json_encode($j, JSON_UNESCAPED_UNICODE));
-page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('ワールド美容'), '手入力');
+page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), '手入力');
 
 $before1 = (float)db_val("SELECT current_qty FROM stock WHERE product_id=1 AND store='イノ'");
-$payload = ['store' => 'イノ', 'supplier' => 'ワールド美容', 'month' => (int)date('n'), 'day' => (int)date('j'), 'usage_upto' => $upto, 'request_key' => $rk,
+$payload = ['store' => 'イノ', 'supplier' => '株式会社ワールド美容', 'month' => (int)date('n'), 'day' => (int)date('j'), 'usage_upto' => $upto, 'request_key' => $rk,
     'items' => [['product_id' => 1, 'order_qty' => 3, 'base_qty' => 3, 'stock_qty' => 5], ['product_id' => 2, 'order_qty' => 2],
         ['custom_name' => '手入力の品', 'order_qty' => 1], ['product_id' => 3, 'order_qty' => 0]]];
 [$st, $j] = api('/order/save', $payload);
@@ -206,8 +206,8 @@ $oid2 = (int)($j4['order_id'] ?? 0);
 [$st, $j] = api('/api/usage', ['product_id' => 2, 'store' => 'イノ', 'delta' => 1]);
 ok($st === 200 && $j['pending'] == 1, '発注確定のあとは、使用数が数え直しになる（前の分は引き継がない）', json_encode($j));
 
-page_ok("/order/{$oid}/print", 'ワールド美容');
-pdf_ok("/order/{$oid}/pdf", ['ワールド美容 御中', '手入力の品']);
+page_ok("/order/{$oid}/print", '株式会社ワールド美容');
+pdf_ok("/order/{$oid}/pdf", ['株式会社ワールド美容 御中', '手入力の品']);
 pdf_ok("/order/{$oid}/pdf?inline=1");
 ok(db_val("SELECT pdf_ver FROM orders WHERE id={$oid}") === '4', '作ったPDFは保存される');
 [$st, $j] = http('POST', "/order/{$oid}/remark", ['remark' => '午前中の配達希望']);
@@ -218,7 +218,7 @@ pdf_ok("/order/{$oid}/pdf", ['午前中の配達希望']);
 [$st] = http('POST', "/order/{$oid}/email", null, []);
 ok($st === 400, 'メールアドレスがなければ、メールは送らない', (string)$st);
 page_ok('/settings/contacts', 'メール');
-page_ok('/order/history', 'ワールド美容');
+page_ok('/order/history', '株式会社ワールド美容');
 page_ok('/settings/orders', '取り消す');
 
 $after1 = (float)db_val("SELECT current_qty FROM stock WHERE product_id=1 AND store='イノ'");
@@ -280,7 +280,7 @@ pdf_ok('/prices/pdf');
 ok($st === 200 && (int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid}") === 0, 'お客様注文を削除すると、明細も消える');
 
 echo "== 商品マスターと担当者 ==\n";
-[$st, $body] = http('POST', '/products/add', null, ['name' => 'テスト新商品', 'category' => 'トリートメント', 'supplier' => 'ワールド美容',
+[$st, $body] = http('POST', '/products/add', null, ['name' => 'テスト新商品', 'category' => 'トリートメント', 'supplier' => '株式会社ワールド美容',
     'base_qty_ino' => '3', 'base_qty_rich' => '1', 'request_key' => 'k' . bin2hex(random_bytes(8))], 'application/json');
 $j = json_decode($body, true);
 ok($st === 200 && !empty($j['ok']) && str_contains((string)($j['url'] ?? ''), '#p'), '商品を追加（JSON）', $body);
@@ -288,7 +288,7 @@ $newId = (int)db_val("SELECT id FROM products WHERE name='テスト新商品'");
 ok($newId > 0, '追加した商品がある');
 ok((int)db_val("SELECT COUNT(*) FROM product_base WHERE product_id={$newId}") === 2, '店舗ごとの基準数が2つ入る');
 ok((float)db_val("SELECT base_qty FROM product_base WHERE product_id={$newId} AND store='リッチ'") == 1.0, 'リッチの基準数が入る');
-[$st] = http('POST', '/products/add', null, ['name' => '', 'supplier' => 'ワールド美容']);
+[$st] = http('POST', '/products/add', null, ['name' => '', 'supplier' => '株式会社ワールド美容']);
 ok($st === 302, '商品名が空ならもどる（302）');
 [$st, $j] = api("/products/{$newId}/move", ['dir' => 'up']);
 ok($st === 200 && !empty($j['ok']), '商品を上へ', json_encode($j));

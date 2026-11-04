@@ -63,6 +63,21 @@ const DATA_MIGRATIONS = [
         ["UPDATE supplier_contacts SET supplier_name = '株式会社クリエイティブブレーン' WHERE supplier_name = 'コタ'"],
         ["UPDATE order_drafts SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
     ],
+    // 仕入先の名前に「株式会社」をつける（ワールド美容・トピー商事・アモール）。商品・発注の履歴・担当者・発注の下書きを書き換える
+    '2026-11-04-supplier-kabushiki' => [
+        ["UPDATE products SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE orders SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社ワールド美容' WHERE supplier_name = 'ワールド美容'"],
+        ["UPDATE order_drafts SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE products SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE orders SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社トピー商事' WHERE supplier_name = 'トピー商事'"],
+        ["UPDATE order_drafts SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE products SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+        ["UPDATE orders SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社アモール' WHERE supplier_name = 'アモール'"],
+        ["UPDATE order_drafts SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+    ],
 ];
 
 function ensure_data_migrations(): void

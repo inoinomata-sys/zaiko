@@ -44,7 +44,7 @@ function h_order_top(): void
 function h_order_form(): void
 {
     $store = $_GET['store'] ?? 'イノ';
-    $supplier = $_GET['supplier'] ?? 'ワールド美容';
+    $supplier = $_GET['supplier'] ?? SUPPLIER_NAMES[0];
     $now = now_jst();
 
     // この画面に出した使用数の範囲（これより後に入力された使用は次回の発注に回す）
@@ -140,7 +140,7 @@ function h_order_save(): void
         bad_input();
     }
     $store = $d['store'] ?? 'イノ';
-    $supplier = $d['supplier'] ?? 'ワールド美容';
+    $supplier = $d['supplier'] ?? SUPPLIER_NAMES[0];
     $items = $d['items'] ?? [];
     $requestKey = ($d['request_key'] ?? null) ?: null;
     if (!is_array($items)) {
@@ -261,7 +261,7 @@ function load_order(int $orderId): array
 
 function order_sup_info(array $order): array
 {
-    $name = $order['supplier'] ?: 'ワールド美容';
+    $name = $order['supplier'] ?: SUPPLIER_NAMES[0];
     $contact = $order['contact_name'] ?? null;
     return ['name' => $name, 'contacts' => $contact ? [['name' => $contact]] : []];
 }
@@ -310,7 +310,7 @@ function h_order_remark(int $id): void
 
 function pdf_filename(array $order): string
 {
-    return "発注書_{$order['order_month']}月{$order['order_day']}日_" . ($order['supplier'] ?: 'ワールド美容') . '.pdf';
+    return "発注書_{$order['order_month']}月{$order['order_day']}日_" . ($order['supplier'] ?: SUPPLIER_NAMES[0]) . '.pdf';
 }
 
 function h_order_pdf(int $id): void
