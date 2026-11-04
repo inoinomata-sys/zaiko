@@ -43,7 +43,7 @@ def _get_pool():
                     keepalives_interval=10, keepalives_count=3)
     return _pool
 
-STORES = ['ヘアーサロンポジテイブ', 'ヘアーサロンポジテイブ２']
+STORES = ['イノ', 'リッチ']
 SUPPLIER_NAMES = ['株式会社ワールド美容', '株式会社トピー商事', 'アイテム美容', 'ミツイコーポレーション株式会社',
                   'ナプラ（N.シリーズ）Web注文', '株式会社クリエイティブブレーン', 'リファ', '株式会社アモール', '買い物忘れ・買い物しといて',
                   'コーナン・業務用スーパー・100均一']
@@ -318,7 +318,7 @@ SCHEMA_SQL = [
     # 商品ごとの発注済み（仕入先がまちまちなので、注文の中で商品ごとに印を付ける）
     "ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ordered BOOLEAN NOT NULL DEFAULT false",
     # お客様の注文が、どちらの店の注文か
-    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS store TEXT NOT NULL DEFAULT 'ヘアーサロンポジテイブ'",
+    "ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS store TEXT NOT NULL DEFAULT 'イノ'",
     # 発注画面の下書き（入力途中の発注数）。店舗×仕入先ごとに1つ。確定すると消える
     """CREATE TABLE IF NOT EXISTS order_drafts (
         store TEXT NOT NULL, supplier TEXT NOT NULL, data JSONB NOT NULL,
@@ -425,7 +425,7 @@ PRODUCT_STOCK_SQL = """
 """
 
 
-def products_with_stock(store='ヘアーサロンポジテイブ', cat=None, supplier=None):
+def products_with_stock(store='イノ', cat=None, supplier=None):
     where, params = '', [store, store, store]
     if cat:
         where += " AND p.category=%s"
@@ -445,9 +445,9 @@ def products_with_stock(store='ヘアーサロンポジテイブ', cat=None, sup
 
 @app.route('/')
 def inventory():
-    store = request.args.get('store', 'ヘアーサロンポジテイブ')
+    store = request.args.get('store', 'イノ')
     if store not in STORES:
-        store = 'ヘアーサロンポジテイブ'
+        store = 'イノ'
     cat = request.args.get('cat', '')
 
     all_rows = products_with_stock(store)
@@ -505,7 +505,7 @@ def api_update_stock():
         value = None if value in (None, '') else float(value)
     except (KeyError, TypeError, ValueError):
         return jsonify(ok=False, error='入力が不正です'), 400
-    store = data.get('store', 'ヘアーサロンポジテイブ')
+    store = data.get('store', 'イノ')
     if store not in STORES or op not in ('delta', 'set', 'check'):
         return jsonify(ok=False, error='入力が不正です'), 400
     if op in ('delta', 'set') and value is None:
@@ -585,7 +585,7 @@ def api_update_stock():
 def api_check_category():
     """棚（カテゴリ）の一括確認。数量が一度も入力されていない商品は対象外（勝手に在庫0にしない）"""
     data = request.get_json() or {}
-    store = data.get('store', 'ヘアーサロンポジテイブ')
+    store = data.get('store', 'イノ')
     cat = data.get('category')
     if store not in STORES or cat is None:
         return jsonify(ok=False, error='入力が不正です'), 400
@@ -658,9 +658,9 @@ def pending_usage(cur, store, supplier=None, product_id=None):
 
 @app.route('/usage')
 def usage():
-    store = request.args.get('store', 'ヘアーサロンポジテイブ')
+    store = request.args.get('store', 'イノ')
     if store not in STORES:
-        store = 'ヘアーサロンポジテイブ'
+        store = 'イノ'
     supplier = request.args.get('supplier', '')
     db = get_db()
     cur = db.cursor()
@@ -687,7 +687,7 @@ def api_usage():
         delta = float(data['delta'])
     except (KeyError, TypeError, ValueError):
         return jsonify(ok=False, error='入力が不正です'), 400
-    store = data.get('store', 'ヘアーサロンポジテイブ')
+    store = data.get('store', 'イノ')
     if store not in STORES or delta == 0:
         return jsonify(ok=False, error='入力が不正です'), 400
     # 1回の問い合わせで、確認・記録・在庫の加減をまとめて行う（DBとの往復が多いと、iPhoneで反応が遅くなるため）。
@@ -764,7 +764,7 @@ def order_top():
 
 @app.route('/order/form')
 def order_form():
-    store    = request.args.get('store', 'ヘアーサロンポジテイブ')
+    store    = request.args.get('store', 'イノ')
     supplier = request.args.get('supplier', 'ワールド美容')
 
     now = now_jst()
@@ -854,7 +854,7 @@ def order_save():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify(ok=False, error='入力が不正です'), 400
-    store    = data.get('store', 'ヘアーサロンポジテイブ')
+    store    = data.get('store', 'イノ')
     supplier = data.get('supplier', 'ワールド美容')
     items    = data.get('items', [])
     request_key = data.get('request_key') or None
@@ -1012,7 +1012,7 @@ PDF_COLS = 3
 
 PRICE_TITLE = '商品価格表'
 PRICE_NOTE = '表示の価格は税込です。'
-PRICE_SHOP = '(有)ヘアーサロンポジテイブ　TEL 072-999-6571'
+PRICE_SHOP = '(有)イノ　TEL 072-999-6571'
 
 
 PRICE_FIRST_CATEGORIES = []   # 並びはレジの店販中分類の表示順（sort_order）どおり
@@ -1197,7 +1197,7 @@ def customer_order_save():
                 return jsonify(ok=False, error='「その他」の品名・値段・数量を確認してください'), 400
             customs.append((cn, cp, cq))
         campaign = bool(data.get('campaign'))
-        store = data.get('store', 'ヘアーサロンポジテイブ')
+        store = data.get('store', 'イノ')
         if store not in STORES:
             return jsonify(ok=False, error='店を選んでください'), 400
         disc = round(float(data.get('discount_pct') or 0), 2)
@@ -1617,7 +1617,7 @@ def build_pdf(order_id, conn=None):
     pdf.cell(0, 10, f"{sup_name} 御中" + (f"　担当 {contact_name}" if contact_name else ''), new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 13)
     pdf.cell(110, 8, f"発注日 {date_str}　店舗 {order['store']}")
-    pdf.cell(0, 8, "(有)ヘアーサロンポジテイブ　TEL 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 8, "(有)イノ　TEL 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
     pdf.ln(2)
 
     gap = 3
@@ -1834,7 +1834,7 @@ def product_add():
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
         """, (col_group, category, name, base_qty, note, supplier, pos, request_key))
         new_id = cur.fetchone()['id']
-        cur.execute("INSERT INTO product_base (product_id, store, base_qty) VALUES (%s,'ヘアーサロンポジテイブ',%s),(%s,'ヘアーサロンポジテイブ２',%s)",
+        cur.execute("INSERT INTO product_base (product_id, store, base_qty) VALUES (%s,'イノ',%s),(%s,'リッチ',%s)",
                     (new_id, base_ino, new_id, base_rich))
     url = url_for('products', supplier=supplier, added=name) + f'#p{new_id}'
     return jsonify(ok=True, url=url) if wants_json else redirect(url)
