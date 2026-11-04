@@ -78,6 +78,13 @@ const DATA_MIGRATIONS = [
         ["UPDATE supplier_contacts SET supplier_name = '株式会社アモール' WHERE supplier_name = 'アモール'"],
         ["UPDATE order_drafts SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
     ],
+    // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
+    '2026-11-04-supplier-mitsui-kabushiki' => [
+        ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+        ["UPDATE orders SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+        ["UPDATE supplier_contacts SET supplier_name = 'ミツイコーポレーション株式会社' WHERE supplier_name = 'ミツイコーポレーション'"],
+        ["UPDATE order_drafts SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+    ],
 ];
 
 function ensure_data_migrations(): void
