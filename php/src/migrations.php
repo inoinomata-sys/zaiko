@@ -29,61 +29,61 @@ const DATA_MIGRATIONS = [
         ["UPDATE price_items SET sort_order = 901308 WHERE name = 'V3 インテリジェント ファンデーション レフィル'"],
         ["UPDATE price_items SET sort_order = 901320 WHERE name = 'V3ナイトクリーム'"],
     ],
-    // 仕入先の名前を「タナカコーポレーション」から「タナカコーポレーション」に変える（商品・発注の履歴・担当者・LINEの送り先・発注の下書き）
+    // 仕入先の名前を「三井コーポレーション」から「ミツイコーポレーション」に変える（商品・発注の履歴・担当者・LINEの送り先・発注の下書き）
     '2026-11-02-supplier-mitsui' => [
-        ["UPDATE products SET supplier = 'タナカコーポレーション' WHERE supplier = 'タナカコーポレーション'"],
-        ["UPDATE orders SET supplier = 'タナカコーポレーション' WHERE supplier = 'タナカコーポレーション'"],
-        ["UPDATE supplier_contacts SET supplier_name = 'タナカコーポレーション' WHERE supplier_name = 'タナカコーポレーション'"],
-        ["UPDATE order_drafts SET supplier = 'タナカコーポレーション' WHERE supplier = 'タナカコーポレーション'"],
+        ["UPDATE products SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
+        ["UPDATE orders SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
+        ["UPDATE supplier_contacts SET supplier_name = 'ミツイコーポレーション' WHERE supplier_name = '三井コーポレーション'"],
+        ["UPDATE order_drafts SET supplier = 'ミツイコーポレーション' WHERE supplier = '三井コーポレーション'"],
     ],
     // 「V3ナイトクリーム」は、プレジストの「Vフィックス アメージングクリーム 50g」（22,000円）と同じ商品なので、名前を書き換える（サロンアンサーと同じ名前）
     '2026-11-02-amazing-cream' => [
         ["UPDATE price_items SET name = 'プレジスト Vフィックス アメージングクリーム 50g', price = 22000 WHERE category = 'メイクアイテム・化粧品' AND name = 'V3ナイトクリーム'"],
     ],
-    // お客様注文（価格表）のスターデザイン商品を、商品マスターの仕入先「スターデザイン」にも入れる（同じ名前が、すでにあれば入れない）。基準数は仮の1
+    // お客様注文（価格表）のコタ商品を、商品マスターの仕入先「コタ」にも入れる（同じ名前が、すでにあれば入れない）。基準数は仮の1
     '2026-11-04-cota-products' => [
         ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
           SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t),
                  CASE WHEN pi.name LIKE '%トリートメント%' THEN 'トリートメント' WHEN pi.name LIKE '%シャンプー%' THEN 'シャンプー' ELSE 'スタイリング・その他' END,
-                 pi.name, 1, 'スターデザイン', 1000 + pi.sort_order
+                 pi.name, 1, 'コタ', 1000 + pi.sort_order
           FROM price_items pi
-          WHERE pi.category = 'スターデザイン' AND pi.is_active = 1
-            AND NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'スターデザイン' AND p.name = pi.name)"],
+          WHERE pi.category = 'コタ' AND pi.is_active = 1
+            AND NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コタ' AND p.name = pi.name)"],
         ["INSERT INTO product_base (product_id, store, base_qty)
-          SELECT p.id, 'イノ', 1 FROM products p WHERE p.supplier = 'スターデザイン'
+          SELECT p.id, 'イノ', 1 FROM products p WHERE p.supplier = 'コタ'
             AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'イノ')"],
         ["INSERT INTO product_base (product_id, store, base_qty)
-          SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'スターデザイン'
+          SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コタ'
             AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
     ],
-    // 仕入先の名前を「スターデザイン」から「株式会社スターデザイン」に変える（商品・発注の履歴・担当者・発注の下書き）。お客様注文の価格表の「スターデザイン」は、商品の分類なので、そのまま
+    // 仕入先の名前を「コタ」から「株式会社クリエイティブブレーン」に変える（商品・発注の履歴・担当者・発注の下書き）。お客様注文の価格表の「コタ」は、商品の分類なので、そのまま
     '2026-11-04-supplier-creative-brain' => [
-        ["UPDATE products SET supplier = '株式会社スターデザイン' WHERE supplier = 'スターデザイン'"],
-        ["UPDATE orders SET supplier = '株式会社スターデザイン' WHERE supplier = 'スターデザイン'"],
-        ["UPDATE supplier_contacts SET supplier_name = '株式会社スターデザイン' WHERE supplier_name = 'スターデザイン'"],
-        ["UPDATE order_drafts SET supplier = '株式会社スターデザイン' WHERE supplier = 'スターデザイン'"],
+        ["UPDATE products SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+        ["UPDATE orders SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社クリエイティブブレーン' WHERE supplier_name = 'コタ'"],
+        ["UPDATE order_drafts SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
     ],
-    // 仕入先の名前に「株式会社」をつける（サクラコスメティクス・フジワラ商事・グレース）。商品・発注の履歴・担当者・発注の下書きを書き換える
+    // 仕入先の名前に「株式会社」をつける（ワールド美容・トピー商事・アモール）。商品・発注の履歴・担当者・発注の下書きを書き換える
     '2026-11-04-supplier-kabushiki' => [
-        ["UPDATE products SET supplier = '株式会社サクラコスメティクス' WHERE supplier = 'サクラコスメティクス'"],
-        ["UPDATE orders SET supplier = '株式会社サクラコスメティクス' WHERE supplier = 'サクラコスメティクス'"],
-        ["UPDATE supplier_contacts SET supplier_name = '株式会社サクラコスメティクス' WHERE supplier_name = 'サクラコスメティクス'"],
-        ["UPDATE order_drafts SET supplier = '株式会社サクラコスメティクス' WHERE supplier = 'サクラコスメティクス'"],
-        ["UPDATE products SET supplier = '株式会社フジワラ商事' WHERE supplier = 'フジワラ商事'"],
-        ["UPDATE orders SET supplier = '株式会社フジワラ商事' WHERE supplier = 'フジワラ商事'"],
-        ["UPDATE supplier_contacts SET supplier_name = '株式会社フジワラ商事' WHERE supplier_name = 'フジワラ商事'"],
-        ["UPDATE order_drafts SET supplier = '株式会社フジワラ商事' WHERE supplier = 'フジワラ商事'"],
-        ["UPDATE products SET supplier = '株式会社グレース' WHERE supplier = 'グレース'"],
-        ["UPDATE orders SET supplier = '株式会社グレース' WHERE supplier = 'グレース'"],
-        ["UPDATE supplier_contacts SET supplier_name = '株式会社グレース' WHERE supplier_name = 'グレース'"],
-        ["UPDATE order_drafts SET supplier = '株式会社グレース' WHERE supplier = 'グレース'"],
+        ["UPDATE products SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE orders SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社ワールド美容' WHERE supplier_name = 'ワールド美容'"],
+        ["UPDATE order_drafts SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE products SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE orders SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社トピー商事' WHERE supplier_name = 'トピー商事'"],
+        ["UPDATE order_drafts SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE products SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+        ["UPDATE orders SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社アモール' WHERE supplier_name = 'アモール'"],
+        ["UPDATE order_drafts SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
     ],
-    // 仕入先の名前を「タナカコーポレーション」から「タナカコーポレーション株式会社」に変える
+    // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
     '2026-11-04-supplier-mitsui-kabushiki' => [
-        ["UPDATE products SET supplier = 'タナカコーポレーション株式会社' WHERE supplier = 'タナカコーポレーション'"],
-        ["UPDATE orders SET supplier = 'タナカコーポレーション株式会社' WHERE supplier = 'タナカコーポレーション'"],
-        ["UPDATE supplier_contacts SET supplier_name = 'タナカコーポレーション株式会社' WHERE supplier_name = 'タナカコーポレーション'"],
-        ["UPDATE order_drafts SET supplier = 'タナカコーポレーション株式会社' WHERE supplier = 'タナカコーポレーション'"],
+        ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+        ["UPDATE orders SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+        ["UPDATE supplier_contacts SET supplier_name = 'ミツイコーポレーション株式会社' WHERE supplier_name = 'ミツイコーポレーション'"],
+        ["UPDATE order_drafts SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
     ],
 ];
 

@@ -34,8 +34,8 @@
 <input type="search" id="q" placeholder="お客様名で探す" autocomplete="off"
        style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:12px">
 <div class="o-tabs" id="s-tabs">
-  <button type="button" data-s="ヘアーサロンポジテイブ">ヘアーサロンポジテイブ</button>
-  <button type="button" data-s="ヘアーサロンポジテイブ２">ヘアーサロンポジテイブ２</button>
+  <button type="button" data-s="イノ">イノ</button>
+  <button type="button" data-s="リッチ">リッチ</button>
   <button type="button" data-s="" style="flex:0 0 auto;padding-left:14px;padding-right:14px;font-size:13px">全店舗</button>
 </div>
 <div class="o-tabs" id="o-tabs">
@@ -74,8 +74,8 @@ document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click'
   } catch (e) { toast('PDFを作れませんでした。もう一度お試しください'); }
   btn.disabled = false; btn.textContent = label;
 }));
-let ofilter = 'all', sfilter = 'ヘアーサロンポジテイブ';
-try { const sv = localStorage.getItem('co:store'); if (sv === 'ヘアーサロンポジテイブ' || sv === 'ヘアーサロンポジテイブ２' || sv === '') sfilter = sv; } catch (e) {}
+let ofilter = 'all', sfilter = 'イノ';
+try { const sv = localStorage.getItem('co:store'); if (sv === 'イノ' || sv === 'リッチ' || sv === '') sfilter = sv; } catch (e) {}
 function applyO() {
   const q = norm(document.getElementById('q')?.value || '');
   document.querySelectorAll('.o-row').forEach(r => {

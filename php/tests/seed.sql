@@ -6,16 +6,16 @@ DELETE FROM price_items; DELETE FROM orders; DELETE FROM order_items; DELETE FRO
 DELETE FROM customer_orders; DELETE FROM customer_order_items; DELETE FROM order_drafts;
 
 INSERT INTO products (id, col_group, category, name, base_qty, note, supplier, sort_order, is_active) VALUES
- (1, 1, 'トリートメント', 'ホーユートリートメント', 3, 'テスト備考', '株式会社サクラコスメティクス', 1, 1),
- (2, 1, 'トリートメント', 'ミントトリートメント 1000g', 2, NULL, '株式会社サクラコスメティクス', 2, 1),
- (3, 2, 'シャンプー', 'NCSシャンプー 1L', 4, NULL, '株式会社サクラコスメティクス', 1, 1),
+ (1, 1, 'トリートメント', 'ホーユートリートメント', 3, 'テスト備考', '株式会社ワールド美容', 1, 1),
+ (2, 1, 'トリートメント', 'ミントトリートメント 1000g', 2, NULL, '株式会社ワールド美容', 2, 1),
+ (3, 2, 'シャンプー', 'NCSシャンプー 1L', 4, NULL, '株式会社ワールド美容', 1, 1),
  (4, 1, 'コタ', 'コタシャンプー', 2, NULL, 'コタ', 1, 1);
 INSERT INTO product_base (product_id, store, base_qty) VALUES (1, 'イノ', 3), (1, 'リッチ', 2);
 INSERT INTO stock (product_id, store, current_qty, updated_at, changed_at, checked_at, version) VALUES
  (1, 'イノ', 5, '2026-10-01 10:00', '2026-10-01 10:00:00', '2026-10-01 10:00:00', 1),
  (2, 'イノ', 1, '2026-10-30 10:00', '2026-10-30 10:00:00', '2026-10-30 10:00:00', 1),
  (3, 'イノ', 0, NULL, NULL, NULL, 0);
-INSERT INTO supplier_contacts (id, supplier_name, contact_name, fax, line_user_id, sort_order) VALUES (1, '株式会社サクラコスメティクス', '山田', '06-0000-0000', '', 1);
+INSERT INTO supplier_contacts (id, supplier_name, contact_name, fax, line_user_id, sort_order) VALUES (1, '株式会社ワールド美容', '山田', '06-0000-0000', '', 1);
 INSERT INTO price_items (id, category, name, spec, price, note, sort_order, is_active, pos_id) VALUES
  (1, 'アリミノ シャンプー', '新コアミーシャンプーS 250ml', NULL, 4400, NULL, 100001, 1, 1648),
  (2, 'アルマダシリーズ', 'アルマダ1000ml', NULL, 11000, NULL, 1200001, 1, 179),

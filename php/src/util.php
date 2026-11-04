@@ -3,9 +3,9 @@ declare(strict_types=1);
 
 // ── 決まった値（Flask 版 app.py と同じ） ───────────────────────────────────────
 const STORES = ['イノ', 'リッチ'];
-const SUPPLIER_NAMES = ['株式会社サクラコスメティクス', '株式会社フジワラ商事', 'ビューティーライン', 'タナカコーポレーション株式会社',
-    'プレミアム（P.シリーズ）Web注文', '株式会社スターデザイン', 'ルーチェ', '株式会社グレース', '買い物忘れ・買い物しといて',
-    'ホームセンター・業務用スーパー・100均一'];
+const SUPPLIER_NAMES = ['株式会社ワールド美容', '株式会社トピー商事', 'アイテム美容', 'ミツイコーポレーション株式会社',
+    'ナプラ（N.シリーズ）Web注文', '株式会社クリエイティブブレーン', 'リファ', '株式会社アモール', '買い物忘れ・買い物しといて',
+    'コーナン・業務用スーパー・100均一'];
 const STALE_DAYS = 7;
 // 発注履歴に出さず、同じ日の二重発注の警告もしない仕入先（買い物リスト）
 const NO_HISTORY_SUPPLIERS = ['買い物忘れ・買い物しといて'];
@@ -168,7 +168,7 @@ function price_kind(?string $category, ?string $name): string
             $organic = true;
         }
     }
-    if (str_starts_with((string)$category, 'ルーチェ') || str_contains($name, 'ルーチェ') || str_contains($name, 'オーガニックノート') || $organic) {
+    if (str_starts_with((string)$category, 'リファ') || str_contains($name, 'リファ') || str_contains($name, 'オーガニックノート') || $organic) {
         return 'f5';
     }
     if (in_array($compact, ['アルマダ1000ml', 'エグータムプレミアム'], true)) {

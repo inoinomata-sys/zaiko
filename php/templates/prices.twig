@@ -109,7 +109,7 @@
 <div class="cart-bar" id="cart-bar">
   <div class="cart-sum">選択 <strong id="c-count">0</strong> 品　<span id="c-subline" hidden>小計 <span id="c-sub"></span>　</span>合計 <strong class="total" id="c-total">¥0</strong></div>
   <div class="cart-store" id="c-store" role="group" aria-label="店">
-    <button type="button" data-store="ヘアーサロンポジテイブ">ヘアーサロンポジテイブ</button><button type="button" data-store="ヘアーサロンポジテイブ２">ヘアーサロンポジテイブ２</button>
+    <button type="button" data-store="イノ">イノ</button><button type="button" data-store="リッチ">リッチ</button>
   </div>
   <div class="cart-disc"><label style="display:flex; align-items:center; gap:4px"><input type="checkbox" id="c-camp" style="width:auto" {% if not editing or editing.campaign %}checked{% endif %}>年末キャンペーン</label>　割引 <input type="number" id="c-disc" min="0" max="100" step="any" inputmode="decimal" placeholder="0" value="{{ ((editing and editing.discount_pct != '0') ? (editing.discount_pct) : ('')) }}"> %
     <span id="c-discamt" style="color:var(--danger); font-weight:700"></span></div>
@@ -158,7 +158,7 @@ function calcDisc(amounts, pct) {   // レジ（POS）と同じ：行ごとに10
 const TIERS = [[15000, 8], [20000, 10], [30000, 12], [40000, 13], [80000, 14]];
 function tierPct(s) { if (s <= 0) return 0; for (const [m, p] of TIERS) if (s <= m) return p; return 16; }
 function kindRate(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : k === 'z' ? 0 : t; }
-let curStore = {{ (((editing) ? (editing.store) : ('ヘアーサロンポジテイブ')))|tojson }};
+let curStore = {{ (((editing) ? (editing.store) : ('イノ')))|tojson }};
 function showStore() { document.querySelectorAll('#c-store button').forEach(b => b.classList.toggle('on', b.dataset.store === curStore)); }
 document.querySelectorAll('#c-store button').forEach(b => b.addEventListener('click', () => { curStore = b.dataset.store; showStore(); saveLocal(); }));
 let discManual = false;   // 割引率を手で入れた時は、自動で書き換えない

@@ -24,7 +24,7 @@ function ensure_schedule_tables(): void
         sort_order INT NOT NULL DEFAULT 0
     ) DEFAULT CHARSET=utf8mb4');
     if (!$existed) {   // 最初に表を作った時だけ、最初の予定を入れる
-        $seed = [['発注日前日（フジワラ商事）', 2], ['発注日前日（アイテム）', 3], ['発注日前日（ワールド）', 4],
+        $seed = [['発注日前日（トピー商事）', 2], ['発注日前日（アイテム）', 3], ['発注日前日（ワールド）', 4],
                  ['夜間清掃日', 3], ['ゴミ出し', 4], ['ゴミ出し', 0]];
         foreach ($seed as $i => [$title, $w]) {
             run('INSERT INTO schedule_rules (title, store, kind, weekday, sort_order) VALUES (?, \'\', \'weekly\', ?, ?)', [$title, $w, $i + 1]);
