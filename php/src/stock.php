@@ -219,6 +219,16 @@ function today_start(): DateTimeImmutable
     return now_jst()->setTime(0, 0, 0);
 }
 
+/** 入力した日時の表示（例：11/4 14:32） */
+function usage_stamp($at): string
+{
+    if (!$at) {
+        return '';
+    }
+    $d = $at instanceof DateTimeInterface ? $at : new DateTimeImmutable((string)$at);
+    return $d->format('n/j H:i');
+}
+
 /** 前回その仕入先に発注確定した後の使用数（＝仮発注数）と、今日入力した数を商品ごとに返す */
 function pending_usage(string $store, ?string $supplier = null, ?int $productId = null): array
 {
@@ -236,7 +246,8 @@ function pending_usage(string $store, ?string $supplier = null, ?int $productId 
     foreach (rows("
         SELECT u.product_id,
                SUM(u.qty) AS pending,
-               SUM(CASE WHEN u.at >= ? THEN u.qty ELSE 0 END) AS today
+               SUM(CASE WHEN u.at >= ? THEN u.qty ELSE 0 END) AS today,
+               MAX(u.at) AS last_at
         FROM usage_log u
         JOIN products p ON p.id = u.product_id
         WHERE u.store = ? {$where}
@@ -244,7 +255,7 @@ function pending_usage(string $store, ?string $supplier = null, ?int $productId 
                                WHERE o.store = u.store AND o.supplier = p.supplier), 0)
         GROUP BY u.product_id
     ", $params) as $r) {
-        $out[(int)$r['product_id']] = ['pending' => (float)$r['pending'], 'today' => (float)$r['today']];
+        $out[(int)$r['product_id']] = ['pending' => (float)$r['pending'], 'today' => (float)$r['today'], 'last' => usage_stamp($r['last_at'])];
     }
     return $out;
 }
@@ -260,7 +271,7 @@ function h_usage(): void
     $groups = [];
     $order = [];
     foreach ($list as $r) {
-        $u = $usageMap[(int)$r['id']] ?? ['pending' => 0.0, 'today' => 0.0];
+        $u = $usageMap[(int)$r['id']] ?? ['pending' => 0.0, 'today' => 0.0, 'last' => ''];
         $key = $r['supplier'] . "\0" . $r['category'];
         if (!isset($groups[$key])) {
             $groups[$key] = ['sup' => $r['supplier'], 'cat' => $r['category'], 'prods' => []];
@@ -304,7 +315,7 @@ function h_api_usage(): void
         }
         run('INSERT INTO usage_log (at, store, product_id, qty) VALUES (?, ?, ?, ?)', [$now, $store, $pid, $delta]);
         add_to_stock($store, [$pid => -$delta]);
-        return [['ok' => true, 'pending' => $u['pending'] + $delta, 'today' => $u['today'] + $delta], 200];
+        return [['ok' => true, 'pending' => $u['pending'] + $delta, 'today' => $u['today'] + $delta, 'last' => usage_stamp($now)], 200];
     });
     respond_json($data, $status);
 }

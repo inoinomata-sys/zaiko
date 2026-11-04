@@ -165,6 +165,7 @@ ok($st === 200 && ($j['count'] ?? 0) >= 2, '棚の一括確認', json_encode($j,
 echo "== 使用入力と発注 ==\n";
 [$st, $j] = api('/api/usage', ['product_id' => 2, 'store' => 'イノ', 'delta' => 3]);
 ok($st === 200 && $j['pending'] == 3 && $j['today'] == 3, '使用 +3', json_encode($j));
+ok($st === 200 && preg_match('#^\d+/\d+ \d{2}:\d{2}$#', (string)($j['last'] ?? '')), '使用入力: 入力した日時が返る', json_encode($j));
 [$st, $j] = api('/api/usage', ['product_id' => 2, 'store' => 'イノ', 'delta' => -1]);
 ok($st === 200 && $j['pending'] == 2, '使用 −1', json_encode($j));
 [$st, $j] = api('/api/usage', ['product_id' => 2, 'store' => 'イノ', 'delta' => -5]);
