@@ -262,7 +262,7 @@ def transaction(conn):
         cur.execute('COMMIT')
 
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 SCHEMA_SQL = [
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ",
     "ALTER TABLE stock ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0",
@@ -370,6 +370,23 @@ SCHEMA_SQL = [
     "UPDATE order_drafts SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
     "UPDATE order_drafts SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
     "UPDATE order_drafts SET supplier='株式会社サクラコスメティクス' WHERE supplier IN ('株式会社ワールド美容','ワールド美容')",
+    # デモ版 v15：残りの実在カテゴリ名を架空に変更し、仕入れ先をカテゴリ別に振り分け
+    "UPDATE products SET category='カラーリッチ' WHERE category='オルディーブ'",
+    "UPDATE products SET category='ナチュラルケア' WHERE category LIKE 'ハーブ%'",
+    "UPDATE products SET category='デイリーケア' WHERE category LIKE 'デミ%' OR category='デミ'",
+    "UPDATE products SET category='消耗品・備品' WHERE category='消耗品'",
+    "UPDATE products SET category='カラーベース' WHERE category LIKE '%カラー%' AND category NOT IN ('ベーシックカラー','プレミアムカラー','カラーミックス')",
+    # カテゴリ別に仕入れ先を振り分け（架空名に統一）
+    "UPDATE products SET supplier='株式会社フジワラ商事' WHERE category IN ('カラーリッチ','ナチュラルケア','デイリーケア','カラーベース')",
+    "UPDATE products SET supplier='ビューティーライン' WHERE category IN ('パーマ液','クリームシリーズ','消耗品・備品')",
+    "UPDATE products SET supplier='タナカコーポレーション株式会社' WHERE category IN ('スタイリング剤','ホームケア')",
+    "UPDATE products SET supplier='プレミアム（P.シリーズ）Web注文' WHERE category IN ('A.シリーズ','ケアシリーズ')",
+    "UPDATE products SET supplier='株式会社スターデザイン' WHERE category IN ('マニキュア','カラーミックス')",
+    "UPDATE products SET supplier='株式会社グレース' WHERE category IN ('ブリーチ・脱色・クリア','クリアライン')",
+    "UPDATE products SET supplier='株式会社サクラコスメティクス' WHERE category IN ('スタンダード','スタンダードクイック','スタンダードシリーズ２剤','ベーシックカラー','プレミアムカラー','プレミアムシリーズ２剤')",
+    # 上記で未設定（まだ実名が残っている）ものを一括で架空名に
+    "UPDATE products SET supplier='株式会社サクラコスメティクス' WHERE supplier NOT IN ('株式会社サクラコスメティクス','株式会社フジワラ商事','ビューティーライン','タナカコーポレーション株式会社','プレミアム（P.シリーズ）Web注文','株式会社スターデザイン','ルーチェ','株式会社グレース','買い物忘れ・買い物しといて','ホームセンター・業務用スーパー・100均一')",
+    "UPDATE orders SET supplier='株式会社フジワラ商事' WHERE supplier NOT IN ('株式会社サクラコスメティクス','株式会社フジワラ商事','ビューティーライン','タナカコーポレーション株式会社','プレミアム（P.シリーズ）Web注文','株式会社スターデザイン','ルーチェ','株式会社グレース','買い物忘れ・買い物しといて','ホームセンター・業務用スーパー・100均一') AND supplier IS NOT NULL AND supplier != ''",
 ]
 
 
