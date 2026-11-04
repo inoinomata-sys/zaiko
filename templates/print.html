@@ -79,7 +79,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 <div class="order-summary">発注品目 <strong>{{ item_count }}</strong> 品 ／ 合計 <strong>{{ total_qty|n }}</strong> 点</div>
 
 <div class="remark-edit">
-  <label for="remark-text">備考（発注書のPDFとLINEに入ります）</label>
+  <label for="remark-text">備考</label>
   <textarea id="remark-text" maxlength="500" placeholder="例）午前中の配達を希望します">{{ order.remark or '' }}</textarea>
   <div class="row"><span id="remark-msg">入力すると、自動で保存されます</span></div>
 </div>
