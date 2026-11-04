@@ -54,7 +54,7 @@ tr.moved td { background: #fff4d6; transition: background .6s; }
     <div class="form-row">
       <div class="form-group">
         <label>カテゴリ（選ぶか新しく入力）</label>
-        <input type="text" name="category" list="cat-list" placeholder="プライム" style="width:180px">
+        <input type="text" name="category" list="cat-list" placeholder="スタンダード" style="width:180px">
         <datalist id="cat-list">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
       </div>
       <div class="form-group">

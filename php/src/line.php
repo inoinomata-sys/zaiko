@@ -189,7 +189,7 @@ function line_order_sig(int $orderId, int $exp, string $secret): string
 
 function line_order_link(int $orderId, int $exp, string $secret): string
 {
-    $host = $_SERVER['HTTP_HOST'] ?? 'sougoukanri.ino-vifare.com';
+    $host = $_SERVER['HTTP_HOST'] ?? 'example.com';
     return "https://{$host}/pub/order?id={$orderId}&exp={$exp}&sig=" . line_order_sig($orderId, $exp, $secret);
 }
 
@@ -237,7 +237,7 @@ function order_notice_text(array $order, string $link): string
     $atena = $contact !== '' ? $contact . '様' : $order['supplier'] . 'ご担当者様';
     $storeName = $order['store'] === 'イノ' ? 'イノ本店' : $order['store'] . '店';   // イノ本店 / リッチ店
     $remark = trim((string)($order['notes'] ?? ''));
-    return "【発注書】【{$storeName}】\n{$atena}\nいつもありがとうございます。\n有限会社イノです。\n"
+    return "【発注書】【{$storeName}】\n{$atena}\nいつもありがとうございます。\n有限会社ビューティーサロン花です。\n"
         . "{$order['order_month']}月{$order['order_day']}日の発注書をお送りします。\n"
         . ($remark !== '' ? "【備考】\n{$remark}\n" : '')
         . "下のリンクから、PDFをご確認ください。\n"

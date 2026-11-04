@@ -1012,7 +1012,7 @@ PDF_COLS = 3
 
 PRICE_TITLE = '商品価格表'
 PRICE_NOTE = '表示の価格は税込です。'
-PRICE_SHOP = '(有)ヘアーサロンポジテイブ　TEL 072-999-6571'
+PRICE_SHOP = '(有)ビューティーサロン花　TEL 000-000-0000'
 
 
 PRICE_FIRST_CATEGORIES = []   # 並びはレジの店販中分類の表示順（sort_order）どおり
@@ -1617,7 +1617,7 @@ def build_pdf(order_id, conn=None):
     pdf.cell(0, 10, f"{sup_name} 御中" + (f"　担当 {contact_name}" if contact_name else ''), new_x='LMARGIN', new_y='NEXT')
     pdf.set_font(f, '', 13)
     pdf.cell(110, 8, f"発注日 {date_str}　店舗 {order['store']}")
-    pdf.cell(0, 8, "(有)ヘアーサロンポジテイブ　TEL 072-999-6571", align='R', new_x='LMARGIN', new_y='NEXT')
+    pdf.cell(0, 8, "(有)ビューティーサロン花　TEL 000-000-0000", align='R', new_x='LMARGIN', new_y='NEXT')
     pdf.ln(2)
 
     gap = 3

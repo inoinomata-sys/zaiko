@@ -170,7 +170,7 @@ function build_order_pdf_file(int $orderId): string
     pdf_nl($pdf, 0, 10, "{$sup} 御中" . ($contact ? "　担当 {$contact}様" : ''));
     $pdf->SetFont(PDF_FONT, '', 13);
     $pdf->Cell(110, 8, "発注日 {$date}　店舗 {$order['store']}");
-    pdf_nl($pdf, 0, 8, '(有)イノ　TEL 072-999-6571', 'R');
+    pdf_nl($pdf, 0, 8, '(有)ビューティーサロン花　TEL 000-000-0000', 'R');
     $pdf->Ln(2);
     $remark = trim((string)($order['remark'] ?? ''));
     if ($remark !== '') {

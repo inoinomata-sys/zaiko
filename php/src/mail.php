@@ -2,9 +2,9 @@
 declare(strict_types=1);
 
 // ── 発注書のメール送信 ─────────────────────────────────────────────────────────
-// 文面とPDFのリンクはLINEと同じ（line.php の order_notice_text）。送り元は config.php の mail.from（なければ order@ino-vifare.com）
+// 文面とPDFのリンクはLINEと同じ（line.php の order_notice_text）。送り元は config.php の mail.from（なければ order@example.com）
 
-const MAIL_DEFAULT_FROM = 'order@ino-vifare.com';
+const MAIL_DEFAULT_FROM = 'order@example.com';
 
 function mail_config(): array
 {
@@ -79,9 +79,9 @@ function h_order_email_send(int $id): void
     $reply = (string)(mail_config()['reply_to'] ?? '');
     $text = order_notice_text($order, line_order_link($id, time() + LINE_LINK_DAYS * 86400, $secret));
     $storeName = $order['store'] === 'イノ' ? 'イノ本店' : $order['store'] . '店';
-    $subject = "【発注書】【{$storeName}】{$order['order_month']}月{$order['order_day']}日 有限会社イノ";
+    $subject = "【発注書】【{$storeName}】{$order['order_month']}月{$order['order_day']}日 有限会社ビューティーサロン花";
     $headers = ['MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64',
-        'From: ' . mb_encode_mimeheader('有限会社イノ', 'UTF-8') . " <{$from}>"];
+        'From: ' . mb_encode_mimeheader('有限会社ビューティーサロン花', 'UTF-8') . " <{$from}>"];
     if (email_valid($reply)) {
         $headers[] = "Reply-To: {$reply}";
     }
