@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS products (
   name        VARCHAR(255) NOT NULL,
   base_qty    DOUBLE DEFAULT 0,
   note        VARCHAR(255) NULL,
-  supplier    VARCHAR(100) DEFAULT '株式会社ワールド美容',
+  supplier    VARCHAR(100) DEFAULT '株式会社サクラコスメティクス',
   sort_order  INT DEFAULT 0,
   is_active   TINYINT(1) DEFAULT 1,
   request_key VARCHAR(64) NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS supplier_contacts (
 CREATE TABLE IF NOT EXISTS orders (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   store        VARCHAR(20) NOT NULL DEFAULT 'イノ',
-  supplier     VARCHAR(100) DEFAULT '株式会社ワールド美容',
+  supplier     VARCHAR(100) DEFAULT '株式会社サクラコスメティクス',
   order_month  INT NULL,
   order_day    INT NULL,
   status       VARCHAR(20) DEFAULT 'draft',
