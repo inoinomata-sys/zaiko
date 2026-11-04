@@ -56,6 +56,13 @@ const DATA_MIGRATIONS = [
           SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コタ'
             AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
     ],
+    // 仕入先の名前を「コタ」から「株式会社クリエイティブブレーン」に変える（商品・発注の履歴・担当者・発注の下書き）。お客様注文の価格表の「コタ」は、商品の分類なので、そのまま
+    '2026-11-04-supplier-creative-brain' => [
+        ["UPDATE products SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+        ["UPDATE orders SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+        ["UPDATE supplier_contacts SET supplier_name = '株式会社クリエイティブブレーン' WHERE supplier_name = 'コタ'"],
+        ["UPDATE order_drafts SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+    ],
 ];
 
 function ensure_data_migrations(): void
