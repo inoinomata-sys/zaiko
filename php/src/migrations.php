@@ -40,6 +40,22 @@ const DATA_MIGRATIONS = [
     '2026-11-02-amazing-cream' => [
         ["UPDATE price_items SET name = 'プレジスト Vフィックス アメージングクリーム 50g', price = 22000 WHERE category = 'メイクアイテム・化粧品' AND name = 'V3ナイトクリーム'"],
     ],
+    // お客様注文（価格表）のコタ商品を、商品マスターの仕入先「コタ」にも入れる（同じ名前が、すでにあれば入れない）。基準数は仮の1
+    '2026-11-04-cota-products' => [
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t),
+                 CASE WHEN pi.name LIKE '%トリートメント%' THEN 'トリートメント' WHEN pi.name LIKE '%シャンプー%' THEN 'シャンプー' ELSE 'スタイリング・その他' END,
+                 pi.name, 1, 'コタ', 1000 + pi.sort_order
+          FROM price_items pi
+          WHERE pi.category = 'コタ' AND pi.is_active = 1
+            AND NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コタ' AND p.name = pi.name)"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'イノ', 1 FROM products p WHERE p.supplier = 'コタ'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'イノ')"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コタ'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
+    ],
 ];
 
 function ensure_data_migrations(): void
