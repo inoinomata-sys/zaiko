@@ -1,6 +1,7 @@
 from werkzeug.exceptions import HTTPException
 from flask import Flask, g, has_request_context, render_template, request, jsonify, redirect, url_for, abort, send_from_directory, make_response
 import os
+import re
 import sys
 import hashlib
 import math
@@ -370,6 +371,22 @@ def log_event(kind, path, text=''):
 
 # サーバーが（デプロイ以外で）勝手に再起動していないかを後から調べられるよう、起動を記録する
 threading.Thread(target=log_event, args=('BOOT', f'pid {os.getpid()}'), daemon=True).start()
+
+
+DEMO_MODE = os.environ.get('DEMO_MODE') == '1'
+
+
+@app.after_request
+def _demo_banner(resp):
+    # デモ用のサーバー（環境変数 DEMO_MODE=1）では、全ての画面の上に「デモ」の帯を出す
+    if DEMO_MODE and resp.mimetype == 'text/html' and not resp.direct_passthrough:
+        html = resp.get_data(as_text=True)
+        bar = ('<div style="background:#222;color:#fff;text-align:center;padding:6px 10px;font-size:13px">'
+               'デモ画面です。表示しているのは、架空のデータです。</div>')
+        html2 = re.sub(r'(<body[^>]*>)', lambda m: m.group(1) + bar, html, count=1)
+        if html2 != html:
+            resp.set_data(html2)
+    return resp
 
 
 @app.before_request
