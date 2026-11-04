@@ -72,6 +72,7 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
 <div class="btn-row">
   <button class="btn btn-back" onclick="history.back()">← 戻る</button>
   <a class="btn btn-print" id="pdf-btn" href="/order/{{ order.id }}/pdf" download>PDF ダウンロード</a>
+  {% if mail_to %}<button type="button" class="btn btn-print" id="mail-btn" data-sent="{{ mail_sent ?: '' }}" data-to="{{ mail_to }}">メールで送る</button>{% endif %}
   {% if line_to %}<button type="button" class="btn btn-print" id="line-btn" data-sent="{{ line_sent ?: '' }}" data-to="{{ line_to }}" data-sup="{{ sup_info.name }}">LINEで送る</button>{% endif %}
 </div>
 
@@ -190,6 +191,28 @@ table.items { width: 100%; border-collapse: collapse; font-size: 16px; }
   window.saveRemark = save;
   ta.addEventListener('input', () => { show(); msg.textContent = '入力中…'; clearTimeout(timer); timer = setTimeout(save, 800); });
   ta.addEventListener('blur', save);
+})();
+(function () {
+  const mb = document.getElementById('mail-btn');
+  if (!mb) return;
+  mb.addEventListener('click', async () => {
+    let msg = mb.dataset.to + ' に、この発注書をメールで送ります。よろしいですか？';
+    if (mb.dataset.sent) msg = 'この発注書は、すでにメールで送信済みです（' + mb.dataset.sent + '）。\n\n' + msg;
+    if (!confirm(msg)) return;
+    mb.disabled = true; mb.textContent = '送信中…';
+    if (window.saveRemark) await window.saveRemark();
+    try {
+      const res = await fetch('/order/{{ order.id }}/email', {method: 'POST'});
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.error || '送れませんでした');
+      mb.textContent = '送りました ✓';
+      mb.dataset.sent = new Date().toLocaleString('ja-JP');
+      setTimeout(() => { mb.disabled = false; mb.textContent = 'もう一度メールで送る'; }, 4000);
+    } catch (e) {
+      alert(e.message || '送れませんでした');
+      mb.disabled = false; mb.textContent = 'メールで送る';
+    }
+  });
 })();
 (function () {
   const lb = document.getElementById('line-btn');

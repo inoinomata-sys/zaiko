@@ -5,14 +5,15 @@ declare(strict_types=1);
 
 function get_suppliers_with_contacts(): array
 {
+    ensure_contact_email_column();
     $result = [];
     foreach (SUPPLIER_NAMES as $name) {
         $result[$name] = ['name' => $name, 'contacts' => []];
     }
-    foreach (rows('SELECT supplier_name, contact_name, fax, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id') as $r) {
+    foreach (rows('SELECT supplier_name, contact_name, fax, email, id FROM supplier_contacts ORDER BY supplier_name, sort_order, id') as $r) {
         $sn = $r['supplier_name'];
         $result[$sn] ??= ['name' => $sn, 'contacts' => []];
-        $result[$sn]['contacts'][] = ['id' => $r['id'], 'name' => $r['contact_name'], 'fax' => $r['fax']];
+        $result[$sn]['contacts'][] = ['id' => $r['id'], 'name' => $r['contact_name'], 'fax' => $r['fax'], 'email' => $r['email']];
     }
     return array_values($result);
 }
@@ -281,7 +282,14 @@ function h_order_print(int $id): void
         ensure_line_send_table();
     }
     $lineSent = $lineTo ? val('SELECT MAX(sent_at) FROM line_sends WHERE order_id = ? AND status = 200', [$id]) : null;
+    $mailTo = mail_contact_for_order($id);
+    $mailSent = null;
+    if ($mailTo) {
+        ensure_mail_send_table();
+        $mailSent = val('SELECT MAX(sent_at) FROM mail_sends WHERE order_id = ? AND ok = 1', [$id]);
+    }
     render('print', ['order' => $order, 'blocks' => $blocks, 'sup_info' => order_sup_info($order),
+        'mail_to' => $mailTo['email'] ?? '', 'mail_sent' => $mailSent,
         'item_count' => $itemCount, 'total_qty' => $totalQty,
         'line_to' => $lineTo ? line_recipient_label($order) : '', 'line_sent' => $lineSent]);
 }

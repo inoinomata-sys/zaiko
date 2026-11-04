@@ -200,17 +200,19 @@ function h_contact_add(): void
     if (!isset($_POST['supplier_name'])) {
         throw new HttpError(400);
     }
+    ensure_contact_email_column();
     $sn = $_POST['supplier_name'];
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM supplier_contacts WHERE supplier_name = ?', [$sn]);
-    run('INSERT INTO supplier_contacts (supplier_name, contact_name, fax, sort_order) VALUES (?,?,?,?)',
-        [$sn, $_POST['contact_name'] ?? '', $_POST['fax'] ?? '', $max + 1]);
+    run('INSERT INTO supplier_contacts (supplier_name, contact_name, fax, email, sort_order) VALUES (?,?,?,?,?)',
+        [$sn, $_POST['contact_name'] ?? '', $_POST['fax'] ?? '', trim((string)($_POST['email'] ?? '')), $max + 1]);
     redirect_to('/settings/contacts');
 }
 
 function h_contact_update(int $id): void
 {
     require_admin();
-    run('UPDATE supplier_contacts SET contact_name = ?, fax = ? WHERE id = ?', [$_POST['contact_name'] ?? '', $_POST['fax'] ?? '', $id]);
+    ensure_contact_email_column();
+    run('UPDATE supplier_contacts SET contact_name = ?, fax = ?, email = ? WHERE id = ?', [$_POST['contact_name'] ?? '', $_POST['fax'] ?? '', trim((string)($_POST['email'] ?? '')), $id]);
     redirect_to('/settings/contacts');
 }
 

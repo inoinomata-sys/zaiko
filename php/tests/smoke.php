@@ -215,6 +215,9 @@ ok($st === 200, '備考を保存できる', (string)$st);
 ok(db_val("SELECT pdf FROM orders WHERE id={$oid}") === null, '備考を直すとPDFは作り直しになる');
 page_ok("/order/{$oid}/print", '午前中の配達希望');
 pdf_ok("/order/{$oid}/pdf", ['午前中の配達希望']);
+[$st] = http('POST', "/order/{$oid}/email", null, []);
+ok($st === 400, 'メールアドレスがなければ、メールは送らない', (string)$st);
+page_ok('/settings/contacts', 'メール');
 page_ok('/order/history', 'ワールド美容');
 page_ok('/settings/orders', '取り消す');
 

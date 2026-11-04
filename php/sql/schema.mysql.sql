@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS supplier_contacts (
   contact_name  VARCHAR(100) NOT NULL DEFAULT '',
   fax           VARCHAR(50) NOT NULL DEFAULT '',
   line_user_id  VARCHAR(100) NOT NULL DEFAULT '',
+  email         VARCHAR(200) NOT NULL DEFAULT '',
   sort_order    INT NOT NULL DEFAULT 0,
   KEY supplier_contacts_name (supplier_name, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

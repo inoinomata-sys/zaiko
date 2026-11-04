@@ -42,6 +42,7 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
       <tr>
         <th>担当者名</th>
         <th>FAX</th>
+        <th>メール</th>
         <th></th>
       </tr>
     </thead>
@@ -51,6 +52,7 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
         <form method="post" action="/settings/contacts/{{ c.id }}/update">
         <td><input class="ci" name="contact_name" value="{{ c.name }}" placeholder="大橋様"></td>
         <td><input class="ci" name="fax" value="{{ c.fax }}" placeholder="06-XXXX-XXXX" style="width:140px"></td>
+        <td><input class="ci" name="email" type="email" value="{{ c.email }}" placeholder="example@xxx.jp" style="width:200px"></td>
         <td style="white-space:nowrap; display:flex; gap:6px; align-items:center; padding-top:10px">
           <button type="submit" class="btn btn-primary btn-sm">保存</button>
         </form>
@@ -66,6 +68,7 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
         <input type="hidden" name="supplier_name" value="{{ sup.name }}">
         <td><input class="ci" name="contact_name" placeholder="担当者名"></td>
         <td><input class="ci" name="fax" placeholder="FAX番号" style="width:140px"></td>
+        <td><input class="ci" name="email" type="email" placeholder="メールアドレス" style="width:200px"></td>
         <td><button type="submit" class="btn btn-success btn-sm">追加</button></td>
         </form>
       </tr>

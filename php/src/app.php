@@ -14,6 +14,7 @@ require __DIR__ . '/schedule.php';
 require __DIR__ . '/migrations.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/line.php';
+require __DIR__ . '/mail.php';
 
 // ── 画面（Twig）の準備 ─────────────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ function routes(): array
         ['POST', '/line/webhook', 'h_line_webhook'],
         ['GET', '/pub/order', 'h_pub_order'],
         ['POST', '/order/<int:id>/line', 'h_order_line_send'],
+        ['POST', '/order/<int:id>/email', 'h_order_email_send'],
         ['GET', '/admin/unlock', 'h_admin_unlock'],
         ['POST', '/admin/unlock', 'h_admin_unlock'],
         ['GET', '/settings/line', 'h_settings_line'],
