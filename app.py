@@ -360,8 +360,6 @@ SCHEMA_SQL = [
     "UPDATE orders SET supplier='株式会社スターデザイン' WHERE supplier IN ('株式会社クリエイティブブレーン','コタ')",
     "UPDATE orders SET supplier='ルーチェ' WHERE supplier='リファ'",
     "UPDATE orders SET supplier='株式会社グレース' WHERE supplier IN ('株式会社アモール','アモール')",
-    "UPDATE supplier_contacts SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
-    "UPDATE supplier_contacts SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
     "UPDATE supplier_contacts SET supplier_name='株式会社サクラコスメティクス' WHERE supplier_name IN ('株式会社ワールド美容','ワールド美容')",
     "UPDATE product_base SET store='ヘアーサロンポジテイブ' WHERE store='イノ'",
     "UPDATE product_base SET store='ヘアーサロンポジテイブ２' WHERE store='リッチ'",
