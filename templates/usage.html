@@ -23,6 +23,7 @@
 .u-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
 .u-meta { font-size: 12px; color: var(--fg2); margin-top: 3px; }
 .u-meta .today { color: var(--acc); font-weight: 700; }
+.u-meta .last { margin-left: 8px; }
 
 .stepper { display: flex; align-items: center; flex-shrink: 0; }
 .stepper-btn {
@@ -88,10 +89,10 @@
   </div>
   {% for p in prods %}
   <div class="u-row {% if p.pending > 0 %}has{% endif %}" data-id="{{ p.id }}" data-name="{{ p.name|lower }}"
-       data-pending="{{ p.pending }}" data-today="{{ p.today }}">
+       data-pending="{{ p.pending }}" data-today="{{ p.today }}" data-last="{{ p.last or '' }}">
     <div class="u-info">
       <div class="u-name">{{ p.name }}{% if p.note %} <span class="badge badge-muted" style="font-size:11px">{{ p.note }}</span>{% endif %}</div>
-      <div class="u-meta"><span class="today-cell">{% if p.today %}<span class="today">今日 +{{ p.today|n }}</span>{% endif %}</span></div>
+      <div class="u-meta"><span class="today-cell">{% if p.today %}<span class="today">今日 +{{ p.today|n }}</span>{% endif %}</span><span class="last">{% if p.last %}最終入力 {{ p.last }}{% endif %}</span></div>
     </div>
     <div class="stepper">
       <button class="stepper-btn" type="button" data-d="-1" aria-label="1減らす" {% if p.pending <= 0 %}disabled{% endif %}>－</button>
@@ -131,6 +132,7 @@ function render(row) {
   row.classList.toggle('has', shown > 0);
   const today = parseFloat(row.dataset.today) + s.pending;
   row.querySelector('.today-cell').innerHTML = today ? `<span class="today">今日 ${today > 0 ? '+' : ''}${fmt(today)}</span>` : '';
+  row.querySelector('.last').textContent = row.dataset.last ? '最終入力 ' + row.dataset.last : '';
 }
 
 function setStatus(row, cls, text) {
@@ -162,6 +164,7 @@ async function flush(row) {
     todayTotal += data.today - parseFloat(row.dataset.today);
     row.dataset.pending = data.pending;
     row.dataset.today = data.today;
+    if (data.last) row.dataset.last = data.last;
     document.getElementById('today-total').textContent = fmt(todayTotal);
     setStatus(row, 'saved', '保存済み');
     render(row);
