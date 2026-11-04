@@ -22,6 +22,14 @@
 .add-row { background: #fdf8fa; }
 .add-row td { padding: 10px; }
 input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
+/* 幅のせまい画面（iPhoneなど）では、1人分を縦に並べる（横にはみ出して、メール欄が見えなくならないように） */
+@media (max-width: 700px) {
+  .contact-table thead { display: none; }
+  .contact-table, .contact-table tbody { display: block; }
+  .contact-table tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
+  .contact-table td { flex: 1 1 100%; padding: 0; border: none; }
+  .contact-table td input.ci { width: 100% !important; font-size: 16px; }
+}
 .hint { font-size: 11px; color: var(--fg2); margin-top: 3px; }
 </style>
 {% endblock %}
