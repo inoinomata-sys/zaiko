@@ -331,6 +331,8 @@ page_ok('/prices', 'V3 エキサイティング ファンデーション レフ�
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-02-v3-foundation'") === 1, 'データの書き換え: 記録が残る');
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-04-cota-products'") === 1, 'データの書き換え: コタ商品の追加が済んでいる');
 ok((int)db_val("SELECT COUNT(*) FROM product_base b JOIN products p ON p.id = b.product_id WHERE p.supplier = '株式会社クリエイティブブレーン' AND b.store = 'リッチ'") >= 1, 'コタ商品に、店ごとの基準数がある');
+ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = 'コアミー・エクラリティWEB注文'") === 29, '新しい仕入先: コアミー・エクラリティの商品が29件入っている');
+page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('コアミー・エクラリティWEB注文'), 'ダイヤボンドシールド');
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-02-supplier-mitsui'") === 1, 'データの書き換え: 仕入先の名前の変更が済んでいる');
 ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = '三井コーポレーション'") === 0, '商品に、古い仕入先の名前が残っていない');
 ok((int)db_val("SELECT COUNT(*) FROM price_items WHERE name = 'V3 エキサイティング ファンデーション レフィル'") === 1, 'データの書き換え: 追加が1件だけ');

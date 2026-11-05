@@ -78,6 +78,102 @@ const DATA_MIGRATIONS = [
         ["UPDATE supplier_contacts SET supplier_name = '株式会社アモール' WHERE supplier_name = 'アモール'"],
         ["UPDATE order_drafts SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
     ],
+    // 新しい仕入先「コアミー・エクラリティWEB注文」と、その商品（コアミー サロンケア・エクラリティ）を入れる
+    '2026-11-05-supplier-coamy-eclarity' => [
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP1', 'コアミー サロンケア MHショットブースター（1000mL）', 1, 'コアミー・エクラリティWEB注文', 2000
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア MHショットブースター（1000mL）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア プロフィデンス コンプレックスチャージ S（1000g）', 1, 'コアミー・エクラリティWEB注文', 2001
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス コンプレックスチャージ S（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア プロフィデンス コンプレックスチャージ M（1000g）', 1, 'コアミー・エクラリティWEB注文', 2002
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス コンプレックスチャージ M（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア プロフィデンス コンプレックスチャージ EX（1000g）', 1, 'コアミー・エクラリティWEB注文', 2003
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス コンプレックスチャージ EX（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア エラプシーク コンプレックスチャージ CS（1000g）', 1, 'コアミー・エクラリティWEB注文', 2004
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク コンプレックスチャージ CS（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア エラプシーク コンプレックスチャージ MS（1000g）', 1, 'コアミー・エクラリティWEB注文', 2005
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク コンプレックスチャージ MS（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア フィナジー コンプレックスチャージ BT（1000g）', 1, 'コアミー・エクラリティWEB注文', 2006
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア フィナジー コンプレックスチャージ BT（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP2', 'コアミー サロンケア リペアティブ コンプレックスチャージ BC（1000g）', 1, 'コアミー・エクラリティWEB注文', 2007
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア リペアティブ コンプレックスチャージ BC（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP3', 'コアミー サロンケア プロフィデンス アシッドフィックス（1000g）', 1, 'コアミー・エクラリティWEB注文', 2008
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス アシッドフィックス（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP3', 'コアミー サロンケア エラプシーク アシッドフィックス（1000g）', 1, 'コアミー・エクラリティWEB注文', 2009
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク アシッドフィックス（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP3', 'コアミー サロンケア フィナジー アシッドフィックス（1000g）', 1, 'コアミー・エクラリティWEB注文', 2010
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア フィナジー アシッドフィックス（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP3', 'コアミー サロンケア リペアティブ アシッドフィックス（1000g）', 1, 'コアミー・エクラリティWEB注文', 2011
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア リペアティブ アシッドフィックス（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP3.5', 'コアミー サロンケア ティップコート α（450g）', 1, 'コアミー・エクラリティWEB注文', 2012
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア ティップコート α（450g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア プロフィデンス フィルマスク S（1000g）', 1, 'コアミー・エクラリティWEB注文', 2013
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス フィルマスク S（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア プロフィデンス フィルマスク M（1000g）', 1, 'コアミー・エクラリティWEB注文', 2014
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス フィルマスク M（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア プロフィデンス フィルマスク EX（1000g）', 1, 'コアミー・エクラリティWEB注文', 2015
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス フィルマスク EX（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア エラプシーク フィルマスク CS（1000g）', 1, 'コアミー・エクラリティWEB注文', 2016
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク フィルマスク CS（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア エラプシーク フィルマスク MS（1000g）', 1, 'コアミー・エクラリティWEB注文', 2017
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク フィルマスク MS（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア フィナジー フィルマスク BT（1000g）', 1, 'コアミー・エクラリティWEB注文', 2018
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア フィナジー フィルマスク BT（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP4', 'コアミー サロンケア リペアティブ フィルマスク BC（1000g）', 1, 'コアミー・エクラリティWEB注文', 2019
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア リペアティブ フィルマスク BC（1000g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア プロフィデンス セラムトリートメント S 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2020
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス セラムトリートメント S 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア プロフィデンス セラムトリートメント M 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2021
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス セラムトリートメント M 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア プロフィデンス セラムトリートメント EX 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2022
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア プロフィデンス セラムトリートメント EX 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア エラプシーク セラムトリートメント CS 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2023
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク セラムトリートメント CS 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア エラプシーク セラムトリートメント MS 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2024
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア エラプシーク セラムトリートメント MS 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア フィナジー セラムトリートメント BT 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2025
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア フィナジー セラムトリートメント BT 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'コアミー STEP5', 'コアミー サロンケア リペアティブ セラムトリートメント BC 12箱セット（480g）', 1, 'コアミー・エクラリティWEB注文', 2026
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'コアミー サロンケア リペアティブ セラムトリートメント BC 12箱セット（480g）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'エクラリティ STEP1', 'エクラリティ サロンケア ダイヤボンドシールド（800mL）', 1, 'コアミー・エクラリティWEB注文', 2027
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'エクラリティ サロンケア ダイヤボンドシールド（800mL）')"],
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), 'エクラリティ STEP2', 'エクラリティ サロンケア クレンズリペアフォーム（800mL）', 1, 'コアミー・エクラリティWEB注文', 2028
+          FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = 'エクラリティ サロンケア クレンズリペアフォーム（800mL）')"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'イノ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'イノ')"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
+    ],
     // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
     '2026-11-04-supplier-mitsui-kabushiki' => [
         ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
