@@ -188,6 +188,10 @@ const DATA_MIGRATIONS = [
           SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
             AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
     ],
+    // コアミーの【STEP3.5】ティップコート α は使わないので、商品から外す（履歴を残すため非表示にする）
+    '2026-11-05-coamy-step35-remove' => [
+        ["UPDATE products SET is_active = 0 WHERE supplier = 'コアミー・エクラリティWEB注文' AND category = 'コアミー STEP3.5'"],
+    ],
     // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
     '2026-11-04-supplier-mitsui-kabushiki' => [
         ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
