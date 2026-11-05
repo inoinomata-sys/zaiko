@@ -174,6 +174,20 @@ const DATA_MIGRATIONS = [
           SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
             AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
     ],
+    // お客様注文の価格表のアリミノ商品（シャンプー・トリートメント・1ヶ月ケア・アウトバス・ローション）を、「コアミー・エクラリティWEB注文」に入れる。並びはサロンケアの前
+    '2026-11-05-arimino-in-coamy' => [
+        ["INSERT INTO products (col_group, category, name, base_qty, supplier, sort_order)
+          SELECT (SELECT g FROM (SELECT COALESCE(MAX(col_group), 1) AS g FROM products) t), pi.category, pi.name, 1, 'コアミー・エクラリティWEB注文', pi.sort_order - 10000000
+          FROM price_items pi
+          WHERE pi.category LIKE 'アリミノ%' AND pi.is_active = 1
+            AND NOT EXISTS (SELECT 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文' AND p.name = pi.name)"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'イノ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'イノ')"],
+        ["INSERT INTO product_base (product_id, store, base_qty)
+          SELECT p.id, 'リッチ', 1 FROM products p WHERE p.supplier = 'コアミー・エクラリティWEB注文'
+            AND NOT EXISTS (SELECT 1 FROM product_base b WHERE b.product_id = p.id AND b.store = 'リッチ')"],
+    ],
     // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
     '2026-11-04-supplier-mitsui-kabushiki' => [
         ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
