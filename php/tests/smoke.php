@@ -335,6 +335,7 @@ ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = 'コアミー・�
 page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('コアミー・エクラリティWEB注文'), 'ダイヤボンドシールド');
 ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = 'コアミー・エクラリティWEB注文' AND category = 'コアミー STEP3.5' AND is_active = 1") === 0, 'コアミーSTEP3.5は外れている');
 ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = 'コアミー・エクラリティWEB注文' AND name = '新コアミーシャンプーS 250ml' AND sort_order < 0") === 1, 'アリミノ商品が、サロンケアの前に入っている');
+ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-06-line-contacts-supplier-rename'") === 1, 'データの書き換え: LINEの紐付けの仕入先名も直っている');
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-02-supplier-mitsui'") === 1, 'データの書き換え: 仕入先の名前の変更が済んでいる');
 ok((int)db_val("SELECT COUNT(*) FROM products WHERE supplier = '三井コーポレーション'") === 0, '商品に、古い仕入先の名前が残っていない');
 ok((int)db_val("SELECT COUNT(*) FROM price_items WHERE name = 'V3 エキサイティング ファンデーション レフィル'") === 1, 'データの書き換え: 追加が1件だけ');

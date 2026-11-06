@@ -192,6 +192,15 @@ const DATA_MIGRATIONS = [
     '2026-11-05-coamy-step35-remove' => [
         ["UPDATE products SET is_active = 0 WHERE supplier = 'コアミー・エクラリティWEB注文' AND category = 'コアミー STEP3.5'"],
     ],
+    // 仕入先の名前を変えたときに、LINEの紐付け（line_contacts）を書き換え忘れていたので、直す
+    '2026-11-06-line-contacts-supplier-rename' => [
+        ["UPDATE line_contacts SET supplier = '株式会社ワールド美容' WHERE supplier = 'ワールド美容'"],
+        ["UPDATE line_contacts SET supplier = '株式会社トピー商事' WHERE supplier = 'トピー商事'"],
+        ["UPDATE line_contacts SET supplier = '株式会社アモール' WHERE supplier = 'アモール'"],
+        ["UPDATE line_contacts SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
+        ["UPDATE line_contacts SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = '三井コーポレーション'"],
+        ["UPDATE line_contacts SET supplier = '株式会社クリエイティブブレーン' WHERE supplier = 'コタ'"],
+    ],
     // 仕入先の名前を「ミツイコーポレーション」から「ミツイコーポレーション株式会社」に変える
     '2026-11-04-supplier-mitsui-kabushiki' => [
         ["UPDATE products SET supplier = 'ミツイコーポレーション株式会社' WHERE supplier = 'ミツイコーポレーション'"],
@@ -208,6 +217,7 @@ function ensure_data_migrations(): void
         return;
     }
     $done = true;
+    ensure_line_tables();   // LINEの表は、実行時に作る表なので、書き換えの前に用意しておく
     try {
         $finished = array_column(rows('SELECT name FROM data_migrations'), 'name');
     } catch (Throwable $e) {   // 表が、まだない（最初の1回）
