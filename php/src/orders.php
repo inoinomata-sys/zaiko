@@ -62,17 +62,20 @@ function h_order_form(): void
     $counts = ['unchecked' => 0, 'stale' => 0, 'usage' => 0];
     foreach (products_with_stock($store, null, $supplier) as $r) {
         $r['usage'] = $usageMap[(int)$r['id']]['pending'] ?? 0.0;
-        $counts['usage'] += (int)($r['usage'] > 0);
-        // 保存した下書きがあればその数。下書きの後に増えた使用数は上乗せする
-        $default = (int)ceil($r['usage']);
-        $saved = $draftItems[(string)$r['id']] ?? null;
-        $r['qty0'] = !$saved ? $default : max(0, (int)$saved[0] + (int)ceil(max(0.0, $r['usage'] - (float)$saved[1])));
         $checked = jst_dt($r['checked_at']);
         $r['unchecked'] = $checked === null;
         $r['days'] = $checked === null ? null : (int)floor(($now->getTimestamp() - $checked->getTimestamp()) / 86400);
         $r['stale'] = !$r['unchecked'] && $r['days'] >= STALE_DAYS;
         // 数えた記録がない商品は在庫数が分からないので、不足数は出さない（在庫0扱いで発注しないため）
         $r['shortage'] = $r['unchecked'] ? 0 : max((float)($r['base_qty'] ?? 0) - (float)($r['current_qty'] ?? 0), 0);
+        // 在庫が基準数以上ある商品は、使用数があっても、発注数は0から始める（0に戻す手間をなくす）
+        $enough = !$r['unchecked'] && $r['shortage'] <= 0;
+        $r['enough'] = $enough;
+        $r['def'] = $enough ? 0 : (int)ceil($r['usage']);
+        $counts['usage'] += (int)($r['def'] > 0);
+        // 保存した下書きがあればその数。下書きの後に増えた使用数は上乗せする（在庫が足りている商品は上乗せしない）
+        $saved = $draftItems[(string)$r['id']] ?? null;
+        $r['qty0'] = !$saved ? $r['def'] : max(0, (int)$saved[0] + ($enough ? 0 : (int)ceil(max(0.0, $r['usage'] - (float)$saved[1]))));
         $counts['unchecked'] += (int)$r['unchecked'];
         $counts['stale'] += (int)$r['stale'];
         $grouped[(string)$r['category']][] = $r;

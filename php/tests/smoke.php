@@ -132,6 +132,7 @@ page_ok('/usage?supplier=' . rawurlencode('株式会社ワールド美容'));
 page_ok('/order', '店舗を選択');
 page_ok('/order?store=' . rawurlencode('イノ'), '株式会社ワールド美容');
 page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), 'ミントトリートメント');
+page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), 'data-def=');
 page_ok('/order/history');
 page_ok('/settings', '発注の取り消し');
 page_ok('/settings/orders');

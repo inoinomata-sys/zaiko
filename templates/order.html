@@ -170,7 +170,7 @@
 
 {% if counts.usage %}
 <div class="check-warn" style="background:#eef6ff;border-color:#b9d6f5;color:#1d4f80">
-  前回の発注確定から「使用入力」された <b>{{ counts.usage }}</b> 品の使用数を、発注数に入れています。必要に応じて＋／－で直してください。
+  前回の発注確定から「使用入力」されて、在庫が基準数に足りない <b>{{ counts.usage }}</b> 品の使用数を、発注数に入れています。在庫が足りている品は0から始まります。必要に応じて＋／－で直してください。
 </div>
 {% endif %}
 
@@ -258,7 +258,7 @@
     <div class="stepper">
       <button class="stepper-btn" onclick="step(this,-1)" type="button">－</button>
       <input class="order-qty" type="number" min="0" step="1" value="{{ p.qty0 }}"
-             data-id="{{ p.id }}" data-usage="{{ p.usage }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
+             data-id="{{ p.id }}" data-usage="{{ p.usage }}" data-def="{{ p.def }}" oninput="onQtyInput(this)" onchange="onOrderChange()">
       <button class="stepper-btn" onclick="step(this,1)" type="button">＋</button>
     </div>
   </div>
@@ -337,7 +337,7 @@ function collectDraft() {
   document.querySelectorAll('.order-row .order-qty').forEach(inp => {
     const usage = parseFloat(inp.dataset.usage) || 0;
     const qty = parseInt(inp.value) || 0;
-    if (qty !== Math.ceil(usage)) items[inp.dataset.id] = [qty, usage];
+    if (qty !== (parseInt(inp.dataset.def) || 0)) items[inp.dataset.id] = [qty, usage];
   });
   const custom = [...document.querySelectorAll('#custom-rows .custom-row')].map(r => ({
     name: r.querySelector('.custom-name').value.trim(), spec: r.querySelector('.custom-spec').value.trim(),
