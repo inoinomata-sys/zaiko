@@ -1,4 +1,4 @@
-const CACHE = 'zaiko-v1';
+const CACHE = 'zaiko-v2-skyblue';
 const OFFLINE_URLS = [
   '/',
   '/order',
