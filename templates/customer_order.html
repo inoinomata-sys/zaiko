@@ -16,6 +16,8 @@
 .slip .sum strong { font-size: 26px; }
 .ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #e0a070; color: #b8531a; background: #fff; font-family: inherit; cursor: pointer; }
 .ord-chip.on { background: #2e8b57; border-color: #2e8b57; color: #fff; }
+.st-btn { flex: 1; padding: 14px 8px; font-size: 17px; font-weight: 700; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); font-family: inherit; cursor: pointer; }
+.st-btn.on { background: #2e8b57; border-color: #2e8b57; color: #fff; }
 .act { display: flex; gap: 8px; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
 .act .btn { flex: 1 1 140px; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
 </style>
@@ -52,6 +54,13 @@
 <div class="card" id="ord-box" style="padding:12px 14px; margin-bottom:10px">
   <div id="ord-state" style="font-weight:700; font-size:16px; margin-bottom:10px"></div>
   <button class="btn btn-primary" type="button" id="ord-btn" style="width:100%; justify-content:center; padding:13px 10px; font-size:16px; white-space:normal; line-height:1.4; text-align:center"></button>
+</div>
+<div class="card" style="padding:12px 14px; margin-bottom:10px">
+  <div style="display:flex; gap:8px">
+    <button type="button" class="st-btn{% if order.ready_at %} on{% endif %}" id="st-ready" data-field="ready">{% if order.ready_at %}✔ 準備済{% else %}準備済{% endif %}</button>
+    <button type="button" class="st-btn{% if order.delivered_at %} on{% endif %}" id="st-delivered" data-field="delivered">{% if order.delivered_at %}✔ お渡し済{% else %}お渡し済{% endif %}</button>
+  </div>
+  <div id="st-note" style="font-size:12px; color:var(--fg2); margin-top:6px"></div>
 </div>
 <div class="act" style="margin-bottom:8px">
   <button class="btn btn-ghost pdf-un" type="button" data-url="/customer-orders/unordered/pdf?order={{ order.id }}">この注文の未発注の商品をPDFに</button>
@@ -97,6 +106,31 @@ document.getElementById('ord-btn').addEventListener('click', async () => {
   catch (e) { chips().forEach((c, i) => setChip(c, before[i])); showOrdered(); toast('保存できませんでした。もう一度お試しください'); }
 });
 showOrdered();
+// 準備済・お渡し済（押すたびに入／切。先に画面を変えて、保存に失敗した時だけ戻す）
+const stState = {ready: {{ 'true' if order.ready_at else 'false' }}, delivered: {{ 'true' if order.delivered_at else 'false' }}};
+const stStamp = {ready: '{% if order.ready_at %}{{ order.ready_at|jst }}{% endif %}', delivered: '{% if order.delivered_at %}{{ order.delivered_at|jst }}{% endif %}'};
+function showStatus() {
+  for (const f of ['ready', 'delivered']) {
+    const b = document.getElementById('st-' + f), label = f === 'ready' ? '準備済' : 'お渡し済';
+    b.classList.toggle('on', stState[f]); b.textContent = (stState[f] ? '✔ ' : '') + label;
+  }
+  const parts = [];
+  if (stState.ready && stStamp.ready) parts.push('準備 ' + stStamp.ready);
+  if (stState.delivered && stStamp.delivered) parts.push('お渡し ' + stStamp.delivered);
+  document.getElementById('st-note').textContent = parts.join('　');
+}
+document.querySelectorAll('.st-btn').forEach(b => b.addEventListener('click', async () => {
+  const f = b.dataset.field, on = !stState[f], before = {...stState};
+  stState[f] = on; if (f === 'delivered' && on) stState.ready = true; if (f === 'ready' && !on) stState.delivered = false;
+  showStatus();
+  try {
+    const res = await fetch('/customer-orders/{{ order.id }}/status', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({field: f, on})});
+    if (!res.ok) throw 0;
+    const j = await res.json();
+    stState.ready = j.ready; stState.delivered = j.delivered; stStamp.ready = j.ready_at; stStamp.delivered = j.delivered_at; showStatus();
+  } catch (e) { Object.assign(stState, before); showStatus(); toast('保存できませんでした。もう一度お試しください'); }
+}));
+showStatus();
 document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
   const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
   try {

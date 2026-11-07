@@ -93,6 +93,7 @@ function routes(): array
         ['GET', '/customer-orders/unordered/pdf', 'h_customer_orders_unordered_pdf'],
         ['GET', '/customer-orders/<int:id>', 'h_customer_order_view'],
         ['POST', '/customer-orders/<int:id>/ordered', 'h_customer_order_ordered'],
+        ['POST', '/customer-orders/<int:id>/status', 'h_customer_order_status'],
         ['POST', '/customer-orders/<int:id>/items/<int:iid>/ordered', 'h_customer_order_item_ordered'],
         ['GET', '/customer-orders/<int:id>/pdf', 'h_customer_order_pdf'],
         ['POST', '/customer-orders/<int:id>/delete', 'h_customer_order_delete'],

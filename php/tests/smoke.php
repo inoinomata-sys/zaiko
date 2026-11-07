@@ -277,6 +277,14 @@ ok($st === 400, 'お客様名なしは 400');
 ok($st === 400, '価格表にない商品は 400');
 pdf_ok('/prices/pdf', ['商品価格表', 'アルマダ1000ml', '11,000']);
 pdf_ok('/prices/pdf');
+[$st, $j] = api("/customer-orders/{$cid}/status", ['field' => 'delivered', 'on' => true]);
+ok($st === 200 && !empty($j['delivered']) && !empty($j['ready']) && $j['delivered_at'] !== '', 'お渡し済にすると、準備済にもなる');
+page_ok("/customer-orders/{$cid}", 'お渡し済');
+page_ok('/customer-orders', 'お渡し済');
+[$st, $j] = api("/customer-orders/{$cid}/status", ['field' => 'ready', 'on' => false]);
+ok($st === 200 && empty($j['ready']) && empty($j['delivered']), '準備済を外すと、お渡し済も外れる');
+[$st] = api("/customer-orders/{$cid}/status", ['field' => 'bogus', 'on' => true]);
+ok($st === 400, '準備済・お渡し済以外の指定は断る');
 [$st, $j] = api("/customer-orders/{$cid}/delete", []);
 ok($st === 200 && (int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid}") === 0, 'お客様注文を削除すると、明細も消える');
 

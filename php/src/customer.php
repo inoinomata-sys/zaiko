@@ -38,8 +38,25 @@ function h_prices(): void
 
 // ── お客様ごとの注文（商品袋に貼る注文用紙） ───────────────────────────────────
 
+/** お客様注文の「準備済」「お渡し済」の列（なければ足す） */
+function ensure_customer_status_columns(): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    foreach (['ready_at', 'delivered_at'] as $col) {
+        $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'customer_orders' AND column_name = ?", [$col]);
+        if (!$has) {
+            run("ALTER TABLE customer_orders ADD COLUMN {$col} DATETIME NULL");
+        }
+    }
+}
+
 function load_customer_order(int $oid): array
 {
+    ensure_customer_status_columns();
     $order = row('SELECT * FROM customer_orders WHERE id = ?', [$oid]);
     if (!$order) {
         throw new HttpError(404);
@@ -83,8 +100,9 @@ function order_discount(array $order, array &$items): array
 
 function h_customer_orders(): void
 {
+    ensure_customer_status_columns();
     $orders = rows('
-        SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, COUNT(i.id) AS n,
+        SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, o.ready_at, o.delivered_at, COUNT(i.id) AS n,
                COALESCE(SUM(i.ordered), 0) AS n_ordered
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300');
@@ -219,6 +237,37 @@ function h_customer_order_view(int $id): void
     [$disc, $payable, $label] = order_discount($order, $items);
     render('customer_order', ['order' => $order, 'items' => $items, 'subtotal' => $total, 'disc' => $disc,
         'total' => $payable, 'pct' => $label, 'note' => PRICE_NOTE]);
+}
+
+/** 準備済・お渡し済の印を付ける／外す。お渡し済にすると準備済にもなり、準備済を外すとお渡し済も外れる */
+function h_customer_order_status(int $id): void
+{
+    ensure_customer_status_columns();
+    $d = req_json() ?? [];
+    $field = (string)($d['field'] ?? '');
+    $on = !empty($d['on']);
+    if (!in_array($field, ['ready', 'delivered'], true)) {
+        bad_input();
+    }
+    if (!val('SELECT id FROM customer_orders WHERE id = ?', [$id])) {
+        respond_json(['ok' => false, 'error' => '注文が見つかりません'], 404);
+    }
+    $now = now_jst()->format('Y-m-d H:i:s');
+    if ($field === 'ready') {
+        run('UPDATE customer_orders SET ready_at = ?' . ($on ? '' : ', delivered_at = NULL') . ' WHERE id = ?', $on ? [$now, $id] : [null, $id]);
+    } elseif ($on) {
+        run('UPDATE customer_orders SET delivered_at = ?, ready_at = COALESCE(ready_at, ?) WHERE id = ?', [$now, $now, $id]);
+    } else {
+        run('UPDATE customer_orders SET delivered_at = NULL WHERE id = ?', [$id]);
+    }
+    $o = row('SELECT ready_at, delivered_at FROM customer_orders WHERE id = ?', [$id]);
+    respond_json(['ok' => true, 'ready' => $o['ready_at'] !== null, 'delivered' => $o['delivered_at'] !== null,
+        'ready_at' => status_stamp($o['ready_at']), 'delivered_at' => status_stamp($o['delivered_at'])]);
+}
+
+function status_stamp($at): string
+{
+    return $at ? (new DateTimeImmutable((string)$at))->format('n/j H:i') : '';
 }
 
 /** 注文の全商品を、発注済みにする／未発注に戻す */

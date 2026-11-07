@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS customer_orders (
   discount_pct DECIMAL(5,2) NOT NULL DEFAULT 0,
   campaign     TINYINT(1) NOT NULL DEFAULT 0,
   ordered_at   DATETIME NULL,
+  ready_at     DATETIME NULL,
+  delivered_at DATETIME NULL,
   store        VARCHAR(20) NOT NULL DEFAULT 'イノ',
   UNIQUE KEY customer_orders_request_key (request_key),
   KEY customer_orders_created (created_at)
