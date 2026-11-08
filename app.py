@@ -1111,10 +1111,10 @@ def price_kind(category, name):
 
 
 def kind_rate(kind, tier, unit=0):
-    if kind == 'a' and unit == 11000:   # アルマダ1000mlは、レジの「アルマダ5%」＝1本460円引き
+    if kind == 'a' and unit > 460:   # アルマダ1000ml・エグータムプレミアムは、レジの「アルマダ5%」＝1本460円引き
         p100 = int(round(tier * 100))
-        pay = (11000 * (10000 - p100) + 99999) // 100000 * 10 - 460
-        return ((11000 - pay) * 10000 + 10999) // 11000 / 100
+        pay = (unit * (10000 - p100) + 99999) // 100000 * 10 - 460
+        return ((unit - pay) * 10000 + unit - 1) // unit / 100
     if kind == 'a':
         return round(100 - (100 - tier) * 0.95, 2)
     if kind == 'z':

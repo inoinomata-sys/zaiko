@@ -177,16 +177,15 @@ function price_kind(?string $category, ?string $name): string
     return 'n';
 }
 
-/** アルマダ1000ml（単価11,000円）は、レジでは「アルマダ5%」を460円引きで1本ずつ打つ。キャンペーンの割引（10円単位に切り上げ）のあと、1本につき460円を引く */
-const ARMADA_UNIT = 11000;
+/** アルマダ1000ml・エグータムプレミアムは、レジでは「アルマダ5%」を460円引きで1本ずつ打つ。キャンペーンの割引（10円単位に切り上げ）のあと、1本につき460円を引く */
 const ARMADA_SPECIAL = 460;
 
 function kind_rate(string $kind, float|int $tier, int $unit = 0): float
 {
-    if ($kind === 'a' && $unit === ARMADA_UNIT) {
+    if ($kind === 'a' && $unit > ARMADA_SPECIAL) {
         $p100 = (int)round($tier * 100);
-        $pay = intdiv(ARMADA_UNIT * (10000 - $p100) + 99999, 100000) * 10 - ARMADA_SPECIAL;   // 1本の支払い額
-        return intdiv((ARMADA_UNIT - $pay) * 10000 + ARMADA_UNIT - 1, ARMADA_UNIT) / 100;   // 同じ金額になる割引率（百分率の小数第2位まで、切り上げ）
+        $pay = intdiv($unit * (10000 - $p100) + 99999, 100000) * 10 - ARMADA_SPECIAL;   // 1本の支払い額
+        return intdiv(($unit - $pay) * 10000 + $unit - 1, $unit) / 100;   // 同じ金額になる割引率（百分率の小数第2位まで、切り上げ）
     }
     if ($kind === 'a') {
         return round(100 - (100 - $tier) * 0.95, 2);
