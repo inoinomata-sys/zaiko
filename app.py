@@ -1110,7 +1110,11 @@ def price_kind(category, name):
     return 'n'
 
 
-def kind_rate(kind, tier):
+def kind_rate(kind, tier, unit=0):
+    if kind == 'a' and unit == 11000:   # アルマダ1000mlは、レジの「アルマダ5%」＝1本460円引き
+        p100 = int(round(tier * 100))
+        pay = (11000 * (10000 - p100) + 99999) // 100000 * 10 - 460
+        return ((11000 - pay) * 10000 + 10999) // 11000 / 100
     if kind == 'a':
         return round(100 - (100 - tier) * 0.95, 2)
     if kind == 'z':
@@ -1240,11 +1244,11 @@ def customer_order_save():
         order_of = {r['id']: n for n, r in enumerate(sorted(snap.values(), key=lambda r: r['id']))}
         # 「その他」（価格表にない商品）を先頭に、続けて価格表の商品
         # キャンペーンの時は、商品の種類ごとに行の割引率を決める（「通常」の行は、入力された割引率）
-        def line_pct(kind):
-            return kind_rate(kind, disc) if campaign else None
+        def line_pct(kind, unit=0):
+            return kind_rate(kind, disc, unit) if campaign else None
         rows_ = [(oid, None, cn, None, cp, cq, n, line_pct('n'), (None, cn) in was_ordered) for n, (cn, cp, cq) in enumerate(customs)]
         rows_ += [(oid, pid, snap[pid]['name'], snap[pid]['spec'], snap[pid]['price'], q, len(customs) + n,
-                   line_pct(price_kind(snap[pid]['category'], snap[pid]['name'])), (pid, None) in was_ordered)
+                   line_pct(price_kind(snap[pid]['category'], snap[pid]['name']), snap[pid]['price']), (pid, None) in was_ordered)
                   for n, (pid, q) in enumerate(items)]
         psycopg2.extras.execute_values(cur, """
             INSERT INTO customer_order_items (order_id, price_id, name, spec, unit_price, qty, sort_order, discount_pct, ordered) VALUES %s

@@ -215,7 +215,7 @@ function h_customer_order_save(): void
             $oid = last_id();
         }
         // 「その他」（価格表にない商品）を先頭に、続けて価格表の商品。キャンペーンの時は、商品の種類ごとに行の割引率を決める
-        $linePct = static fn(string $kind) => $campaign ? kind_rate($kind, $disc) : null;
+        $linePct = static fn(string $kind, int $unit = 0) => $campaign ? kind_rate($kind, $disc, $unit) : null;
         $rowsData = [];
         foreach ($customs as $n => [$cn, $cp, $cq]) {
             $rowsData[] = [$oid, null, $cn, null, $cp, $cq, $n, $linePct('n'), isset($wasOrdered['n' . $cn])];
@@ -223,7 +223,7 @@ function h_customer_order_save(): void
         foreach ($items as $n => [$pid, $q]) {
             $s = $snap[$pid];
             $rowsData[] = [$oid, $pid, $s['name'], $s['spec'], (int)$s['price'], $q, count($customs) + $n,
-                $linePct(price_kind($s['category'], $s['name'])), isset($wasOrdered['p' . $pid])];
+                $linePct(price_kind($s['category'], $s['name']), (int)$s['price']), isset($wasOrdered['p' . $pid])];
         }
         insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered'], $rowsData);
         return [['ok' => true, 'id' => $oid], 200];
