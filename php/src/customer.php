@@ -105,7 +105,7 @@ function h_customer_orders(): void
         SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, o.ready_at, o.delivered_at, COUNT(i.id) AS n,
                COALESCE(SUM(i.ordered), 0) AS n_ordered
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
-        GROUP BY o.id ORDER BY o.created_at DESC LIMIT 300');
+        GROUP BY o.id ORDER BY (o.delivered_at IS NOT NULL), o.created_at DESC LIMIT 300');   // お渡し済は下にまとめる
     $lines = [];
     if ($orders) {
         $ids = array_column($orders, 'id');
