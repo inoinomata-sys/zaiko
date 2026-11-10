@@ -7,6 +7,38 @@
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
 .sh-me { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fff; font-family: inherit; }
+@page { size: A4 landscape; margin: 8mm; }
+@media print {
+  nav, #pwa-banner, #to-top, #toast, .no-print, .sh-bar, .ent-list, #detail, .sh-foot, .back-link, .sh-nav a { display: none !important; }
+  body, main { background: #fff !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cal { max-width: none; }
+  .cal-cell { min-height: 27mm; font-size: 10pt; border-color: #999; break-inside: avoid; box-shadow: none !important; background: #fff !important; }
+  .cal-d { font-size: 12pt; }
+  .cal-hol { font-size: 8pt; }
+  .cal-p { font-size: 10pt; }
+  .cal-t { font-size: 8pt; }
+  .cal-ev { font-size: 9pt; }
+  .cal-head div { font-size: 10pt; }
+  h1 { font-size: 16pt !important; }
+  /* 白黒印刷：色に頼らず、文字と線で見分ける */
+  html, body, main, * { color: #000 !important; }
+  .cal-cell { border: 1px solid #000 !important; border-radius: 0 !important; }
+  .cal-cell.blank { border-color: transparent !important; }
+  .cal-cell.today { border-width: 2px !important; }
+  .cal-d.sun { background: #ddd !important; }
+  .cal-d.sun .cal-hol, .cal-hol { font-weight: 700; }
+  .cal-g { border-left: 3px solid #000 !important; }
+  .cal-g.rich { border-left: 3px dashed #000 !important; }
+  .cal-g.off { border-left: 3px dotted #000 !important; }
+  .cal-g.off .cal-p { text-decoration: line-through; }
+  .cal-g.off .cal-p .cal-t { text-decoration: none; }
+  .cal-p.me { background: none !important; font-weight: 400 !important; }
+  .cal-st { display: inline !important; font-weight: 700; font-size: 8pt; }
+  .cal-ev { border-left: 3px solid #000 !important; }
+
+  .sh-top { margin-bottom: 4mm; }
+}
 .sh-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: -4px 0 10px; }
 .sh-stamp { font-size: 13px; color: var(--fg2); }
 .ent-btn { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg2); font-family: inherit; cursor: pointer; }
@@ -29,6 +61,7 @@
 .cal-g { display: flex; flex-wrap: wrap; gap: 1px 3px; margin-top: 2px; padding-left: 3px; border-left: 3px solid var(--acc); }
 .cal-g.rich { border-left-color: #3b7dd8; }
 .cal-g.off { border-left-color: #b5b5b5; color: #777; }
+.cal-st { display: none; }
 .cal-p { white-space: nowrap; }
 .cal-t { font-size: 8px; color: #555; margin-left: 1px; }
 .cal-p.help { text-decoration: underline dotted; }
@@ -57,7 +90,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<p style="margin-bottom:8px"><a href="/">← トップにもどる</a></p>
+<p class="back-link" style="margin-bottom:8px"><a href="/">← トップにもどる</a></p>
 <div class="sh-top">
   <h1>出勤スケジュール</h1>
   <div class="sh-nav">
@@ -68,7 +101,7 @@
 </div>
 <div class="sh-bar">
   <div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}</div>
-  {% if staff %}<button type="button" id="ent-btn" class="ent-btn">休み希望を入れる ▾</button>{% endif %}
+  <span style="display:flex;gap:6px">{% if staff %}<button type="button" id="ent-btn" class="ent-btn">休み希望を入れる ▾</button>{% endif %}<button type="button" class="ent-btn" onclick="window.print()">A4で印刷</button></span>
 </div>
 {% if staff %}
 <div id="ent-list" class="ent-list" hidden>
@@ -87,6 +120,7 @@
       <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
       {% for store, people in day.groups %}{% if people %}
       <div class="cal-g{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">
+        <span class="cal-st">{{ store }}</span>
         {% for p in people %}<span class="cal-p{% if p.help %} help{% endif %}" data-sid="{{ p.id }}">{{ p.name }}{% if p.time_s %}<span class="cal-t">{{ p.time_s }}</span>{% endif %}</span>{% endfor %}
       </div>
       {% endif %}{% endfor %}

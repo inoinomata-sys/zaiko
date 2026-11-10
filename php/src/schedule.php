@@ -83,7 +83,7 @@ function h_schedule(): void
         $day['events'] = schedule_on($rules, $d);
         $days[] = $day;
     }
-    render('schedule', ['nav' => shift_nav($first), 'days' => $days]);
+    render('schedule', ['nav' => shift_nav($first), 'days' => $days, 'weeks' => shift_weeks($days)]);
 }
 
 function h_schedule_rules(): void
