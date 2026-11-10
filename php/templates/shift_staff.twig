@@ -9,10 +9,11 @@
 .st-wrap { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
 .st-wrap.off { opacity: .55; }
 .st-wrap .st-card { border: 0; padding: 0; margin: 0 0 8px; background: transparent; }
-.st-days { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.st-days label { display: inline-flex; flex-direction: column; align-items: center; font-size: 12px; gap: 2px; min-width: 34px; }
-.st-days input { width: 20px; height: 20px; }
-.st-days .lbl { font-size: 12px; color: var(--fg2); margin-right: 4px; }
+.st-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px 2px; align-items: center; }
+.st-days label { display: flex; flex-direction: column; align-items: center; font-size: 13px; gap: 3px; }
+.st-days input { width: 22px; height: 22px; margin: 0; }
+.st-days .lbl { grid-column: 1 / -1; font-size: 12px; color: var(--fg2); }
+.st-days .btn { grid-column: 1 / -1; justify-self: end; margin-top: 4px; }
 .st-add { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .st-add input, .st-add select { font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
 .st-add input { flex: 1; min-width: 140px; }
@@ -37,7 +38,7 @@
   <form class="st-days" method="post" action="/shift/staff/{{ s.id }}/off">
     <span class="lbl">毎週の休み</span>
     {% for w in week %}<label>{{ w }}<input type="checkbox" name="off[]" value="{{ loop.index0 }}"{% if loop.index0 in s.offs %} checked{% endif %}></label>{% endfor %}
-    <button class="btn btn-ghost btn-sm" type="submit" style="margin-left:auto">保存</button>
+    <button class="btn btn-ghost btn-sm" type="submit">保存</button>
   </form>
 </div>
 {% endfor %}
