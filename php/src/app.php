@@ -71,7 +71,8 @@ function request_path(): string
 function routes(): array
 {
     return [
-        ['GET', '/', 'h_inventory'],
+        ['GET', '/', 'h_menu'],
+        ['GET', '/stock', 'h_inventory'],
         ['POST', '/api/stock', 'h_api_stock'],
         ['POST', '/api/stock/check_category', 'h_api_check_category'],
         ['GET', '/usage', 'h_usage'],
@@ -110,7 +111,7 @@ function routes(): array
         ['POST', '/settings/contacts/<int:id>/update', 'h_contact_update'],
         ['POST', '/settings/contacts/<int:id>/delete', 'h_contact_delete'],
         ['GET', '/menu', 'h_menu_redirect'],
-        ['GET', '/portal', 'h_menu'],
+        ['GET', '/portal', 'h_menu_redirect'],
         ['GET', '/schedule', 'h_schedule'],
         ['GET', '/schedule/rules', 'h_schedule_rules'],
         ['POST', '/schedule/rules/add', 'h_schedule_add'],

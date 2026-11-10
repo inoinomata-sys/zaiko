@@ -15,7 +15,7 @@
 </style>
 {% endblock %}
 {% block content %}
-<p style="margin-bottom:8px"><a href="/menu">← 総合管理にもどる</a></p>
+<p style="margin-bottom:8px"><a href="/">← 総合管理にもどる</a></p>
 <div class="sc-top"><h1>予定</h1>
   <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}">›</a></div></div>
 {% for day in days %}{% if day.events %}
