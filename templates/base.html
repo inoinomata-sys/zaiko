@@ -216,6 +216,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   {% elseif request.path starts with '/shift' or request.path starts with '/schedule' %}
   <span class="brand">{{ '出勤スケジュール' if request.path starts with '/shift' else '予定' }}</span>
   <a href="/" class="nav-link"><span>トップ</span></a>
+  {% if request.path starts with '/shift' %}<a href="/shift/log" class="nav-link {% if request.path == '/shift/log' %}active{% endif %}"><span>記入履歴</span></a>{% endif %}
   {% else %}
   <span class="brand">在庫管理</span>
   <a href="/" class="nav-link"><span>トップ</span></a>

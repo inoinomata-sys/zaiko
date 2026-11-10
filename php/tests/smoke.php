@@ -406,7 +406,7 @@ ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE id={$sid}") ===
 page_ok('/shift/staff', 'checked');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'テスト太郎');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, '休(定休)');
-page_ok('/shift?month=' . $m, 'スケジュールを入れる');
+page_ok('/shift?month=' . $m, '休み希望を入れる');
 [$st] = http('GET', '/shift/edit?staff=999999');
 ok($st === 404, 'シフト: いないスタッフの入力画面は 404');
 page_ok('/shift/edit?month=' . $m, '休(定休)');
