@@ -241,11 +241,11 @@ function shift_nav(DateTimeImmutable $first): array
     ];
 }
 
-/** カレンダー：日曜はじまりの週ごとに並べる（月の前後の空きは null） */
+/** カレンダー：月曜はじまりの週ごとに並べる（月の前後の空きは null） */
 function shift_weeks(array $days): array
 {
     $weeks = [];
-    $row = array_fill(0, (int)$days[0]['dow'], null);
+    $row = array_fill(0, ((int)$days[0]['dow'] + 6) % 7, null);
     foreach ($days as $day) {
         $row[] = $day;
         if (count($row) === 7) {
@@ -259,6 +259,49 @@ function shift_weeks(array $days): array
     return $weeks;
 }
 
+const SHIFT_COLORS = ['#7b5ea7', '#2f7fb5', '#c0392b', '#b8860b', '#2e8b57', '#d2691e', '#008b8b', '#a0507a', '#6b6b6b', '#c2185b'];
+
+/** 1週間ぶんの、スタッフごとの帯（同じ内容が続く日は1本にまとめる）と、帯を重ならないように並べた段数 */
+function shift_week_bars(array $row, array $staff): array
+{
+    $bars = [];
+    foreach ($staff as $s) {
+        $id = (int)$s['id'];
+        $cur = null;
+        foreach ($row as $c => $day) {
+            $it = $day['items'][$id] ?? null;
+            $key = $it === null ? null : $it['store'] . '|' . $it['time'] . '|' . (int)$it['help'] . '|' . (int)$it['dflt'];
+            if ($cur !== null && $key === $cur['key']) {
+                $cur['n']++;
+                continue;
+            }
+            if ($cur !== null) {
+                $bars[] = $cur;
+                $cur = null;
+            }
+            if ($it !== null) {
+                $cur = ['key' => $key, 'id' => $id, 'name' => $s['name'], 'color' => $s['color'], 'c' => $c + 1, 'n' => 1, 'date' => $day['date'],
+                    'store' => $it['store'], 'time' => $it['time'], 'help' => $it['help'], 'dflt' => $it['dflt']];
+            }
+        }
+        if ($cur !== null) {
+            $bars[] = $cur;
+        }
+    }
+    usort($bars, static fn($a, $b) => $a['c'] <=> $b['c'] ?: $b['n'] <=> $a['n']);
+    $lanes = [];   // 段ごとの、使っている最後の列
+    foreach ($bars as &$b) {
+        $r = 0;
+        while (isset($lanes[$r]) && $lanes[$r] >= $b['c']) {
+            $r++;
+        }
+        $lanes[$r] = $b['c'] + $b['n'] - 1;
+        $b['r'] = $r;
+    }
+    unset($b);
+    return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
+}
+
 /** 見る画面：日ごとに、イノ・リッチ・休みの人が並ぶ。ヘルプ（本店と違う店に入る人）には印が付く */
 function h_shift(): void
 {
@@ -269,11 +312,13 @@ function h_shift(): void
     $days = shift_days($first);
     foreach ($days as &$day) {
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
+        $day['items'] = [];
         foreach ($staff as $s) {
             $e = $entries[(int)$s['id']][$day['date']] ?? null;
             if ($e === null) {   // 入れていない日でも、毎週の休みの曜日なら「休」
                 if (in_array((int)$day['dow'], shift_off_days($s), true)) {
                     $day['groups'][SHIFT_OFF][] = ['id' => (int)$s['id'], 'name' => $s['name'], 'help' => false, 'from' => $s['home_store'], 'changed' => false];
+                    $day['items'][(int)$s['id']] = ['store' => SHIFT_OFF, 'help' => false, 'dflt' => true, 'time' => ''];
                 }
                 continue;
             }
@@ -285,12 +330,22 @@ function h_shift(): void
                 'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
             ];
+            $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => false,
+                'time' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : ''];
         }
         $day['any'] = array_filter($day['groups']) !== [];
     }
     unset($day);
+    foreach ($staff as &$s) {
+        $s['color'] = SHIFT_COLORS[(int)$s['id'] % count(SHIFT_COLORS)];
+    }
+    unset($s);
+    $weeks = [];
+    foreach (shift_weeks($days) as $row) {
+        $weeks[] = shift_week_bars($row, $staff);
+    }
     $last = val('SELECT MAX(at) FROM shift_log');
-    render('shift', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'staff' => $staff,
+    render('shift', ['nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff,
         'last_at' => $last ? (new DateTimeImmutable((string)$last))->format('n/j H:i') : '']);
 }
 

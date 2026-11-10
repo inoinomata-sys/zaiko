@@ -16,8 +16,6 @@
   .cal-cell { min-height: 27mm; font-size: 10pt; border-color: #999; break-inside: avoid; box-shadow: none !important; background: #fff !important; }
   .cal-d { font-size: 12pt; }
   .cal-hol { font-size: 8pt; }
-  .cal-p { font-size: 10pt; }
-  .cal-t { font-size: 8pt; }
   .cal-ev { font-size: 9pt; }
   .cal-head div { font-size: 10pt; }
   h1 { font-size: 16pt !important; }
@@ -28,13 +26,9 @@
   .cal-cell.today { border-width: 2px !important; }
   .cal-d.sun { background: #ddd !important; }
   .cal-d.sun .cal-hol, .cal-hol { font-weight: 700; }
-  .cal-g { border-left: 3px solid #000 !important; }
-  .cal-g.rich { border-left: 3px dashed #000 !important; }
-  .cal-g.off { border-left: 3px dotted #000 !important; }
-  .cal-g.off .cal-p { text-decoration: line-through; }
-  .cal-g.off .cal-p .cal-t { text-decoration: none; }
-  .cal-p.me { background: none !important; font-weight: 400 !important; }
-  .cal-st { display: inline !important; font-weight: 700; font-size: 8pt; }
+  .cal-bar { font-size: 9pt; background: #fff !important; border: 1px solid #000 !important; border-radius: 0 !important; overflow: visible; white-space: normal; opacity: 1 !important; outline: none !important; }
+  .cal-bar.rest { border-style: dashed !important; border-width: 2px !important; font-weight: 700; }
+  .cal-legend i { display: none !important; }
   .cal-ev { border-left: 3px solid #000 !important; }
 
   .sh-top { margin-bottom: 4mm; }
@@ -51,21 +45,19 @@
 .cal-head div { text-align: center; font-size: 12px; font-weight: 700; padding: 4px 0; color: var(--fg2); }
 .cal-head .sun { color: #c0392b; } .cal-head .sat { color: #2c6fb7; }
 .cal-week { margin-bottom: 2px; }
-.cal-cell { min-width: 0; min-height: 92px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 2px 3px; font-size: 10px; line-height: 1.25; cursor: pointer; overflow: hidden; }
+.cal-week { position: relative; align-content: start; }
+.cal-cell { min-width: 0; min-height: 64px; background: #fff; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; overflow: hidden; z-index: 0; }
+.cal-d { z-index: 1; padding: 2px 4px; cursor: pointer; align-self: start; }
+.cal-bar { z-index: 2; align-self: start; margin: 1px 3px; padding: 1px 5px; font-size: 11px; line-height: 1.35; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; background: var(--c); border: 1px solid var(--c); cursor: pointer; min-width: 0; }
+.cal-bar.work { background: #fff; color: var(--c); }
+.cal-bar.dflt { opacity: .4; }
+.cal-bar.me { outline: 2px solid #e0a020; outline-offset: 1px; }
 .cal-cell.blank { background: transparent; border-color: transparent; cursor: default; }
 .cal-cell.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
 .cal-cell.sel { background: #fffbe8; box-shadow: 0 0 0 2px #e0a020; }
-.cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; }
+.cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; min-width: 0; }
 .cal-d.sun { color: #c0392b; } .cal-d.sat { color: #2c6fb7; }
 .cal-hol { font-size: 9px; font-weight: 400; color: #c0392b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.cal-g { display: flex; flex-wrap: wrap; gap: 1px 3px; margin-top: 2px; padding-left: 3px; border-left: 3px solid var(--acc); }
-.cal-g.rich { border-left-color: #3b7dd8; }
-.cal-g.off { border-left-color: #b5b5b5; color: #777; }
-.cal-st { display: none; }
-.cal-p { white-space: nowrap; }
-.cal-t { font-size: 8px; color: #555; margin-left: 1px; }
-.cal-p.help { text-decoration: underline dotted; }
-.cal-p.me { background: #fff3a8; border-radius: 4px; font-weight: 700; }
 .cal-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--fg2); margin: 8px 2px; }
 .cal-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 3px; background: var(--acc); }
 .cal-legend i.rich { background: #3b7dd8; } .cal-legend i.off { background: #b5b5b5; }
@@ -86,7 +78,7 @@
 .sh-none { color: var(--fg2); font-size: 14px; }
 .sh-foot { display: flex; gap: 10px; margin: 14px 0 30px; }
 .sh-foot a { flex: 1; text-align: center; padding: 12px; border: 1px solid var(--acc); border-radius: 10px; color: var(--acc); text-decoration: none; font-weight: 600; background: #fff; }
-@media (max-width: 560px) { .cal-cell { min-height: 80px; padding: 1px; font-size: 9px; } .cal-d { font-size: 12px; } .cal-hol { font-size: 8px; } }
+@media (max-width: 560px) { .cal-cell { min-height: 70px; } .cal-bar { font-size: 9px; margin: 1px 1px; padding: 0 2px; } .cal-d { font-size: 12px; padding: 1px 2px; } .cal-hol { font-size: 8px; } }
 </style>
 {% endblock %}
 {% block content %}
@@ -111,19 +103,12 @@
 <p style="color:var(--fg2);margin:14px 0">まだスタッフがいません。下の「スタッフ」から入れてください。</p>
 {% endif %}
 <div class="cal">
-  <div class="cal-head"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
-  {% for week in weeks %}
-  <div class="cal-week">
-    {% for day in week %}
+  <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
+  {% for w in weeks %}
+  <div class="cal-week" style="grid-template-rows: repeat({{ w.lanes + 1 }}, auto) 1fr">
+    {% for day in w.days %}
     {% if day %}
-    <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}">
-      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
-      {% for store, people in day.groups %}{% if people %}
-      <div class="cal-g{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">
-        <span class="cal-st">{{ store }}</span>
-        {% for p in people %}<span class="cal-p{% if p.help %} help{% endif %}" data-sid="{{ p.id }}">{{ p.name }}{% if p.time_s %}<span class="cal-t">{{ p.time_s }}</span>{% endif %}</span>{% endfor %}
-      </div>
-      {% endif %}{% endfor %}
+    <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1 / -1">
       <div class="cal-detail" hidden>
         <div class="sh-date">{{ nav.label|slice(5) }}{{ day.d }}日 <span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span>{% if day.hol %}<small>{{ day.hol }}</small>{% endif %}</div>
         {% for store, people in day.groups %}{% if people %}
@@ -137,11 +122,15 @@
         {% if not day.any %}<div class="sh-none">出勤はまだ入っていません</div>{% endif %}
       </div>
     </div>
-    {% else %}<div class="cal-cell blank"></div>{% endif %}
+    <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
+    {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
+    {% endfor %}
+    {% for b in w.bars %}
+    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + 2 }}">{% if b.store == '休' %}{{ b.name }}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.name }}（{{ b.store }}{% if b.help %}・ヘルプ{% endif %}）{% endif %}</div>
     {% endfor %}
   </div>
   {% endfor %}
-  <div class="cal-legend"><span><i></i>イノ</span><span><i class="rich"></i>リッチ</span><span><i class="off"></i>休み</span><span>点線の下線 = ヘルプ（本店と違う店）</span><span style="color:#c0392b">赤 = 日曜・祝日</span></div>
+  <div class="cal-legend">{% for st in staff %}<span><i style="background:{{ st.color }}"></i>{{ st.name }}</span>{% endfor %}<span>色つき＝休み</span><span>白＝出勤（店名つき）</span><span style="color:#c0392b">赤＝日曜・祝日</span></div>
   <div class="sh-detail" id="detail"><div class="sh-none">日をタップすると、くわしく出ます</div></div>
 </div>
 <div class="sh-foot">
@@ -154,17 +143,18 @@
   const btn = document.getElementById('ent-btn'), list = document.getElementById('ent-list');
   const detail = document.getElementById('detail');
   const cells = [...document.querySelectorAll('.cal-cell[data-date]')];
+  const cellOf = d => cells.find(x => x.dataset.date === d);
   let me = '';
   try { me = localStorage.getItem('shift:me') || ''; } catch (e) {}
   function paint() {
-    document.querySelectorAll('.cal-p, .sh-p').forEach(p => p.classList.toggle('me', me !== '' && p.dataset.sid === me));
+    document.querySelectorAll('.cal-bar, .sh-p').forEach(p => p.classList.toggle('me', me !== '' && p.dataset.sid === me));
   }
   function show(c) {
     cells.forEach(x => x.classList.toggle('sel', x === c));
     detail.innerHTML = c.querySelector('.cal-detail').innerHTML;
     paint();
   }
-  cells.forEach(c => c.addEventListener('click', () => show(c)));
+  document.querySelectorAll('.cal-cell[data-date], .cal-d[data-date], .cal-bar[data-date]').forEach(e => e.addEventListener('click', () => { const c = cellOf(e.dataset.date); if (c) show(c); }));
   if (btn) btn.addEventListener('click', () => { list.hidden = !list.hidden; });
   document.querySelectorAll('.ent-name').forEach(a => a.addEventListener('click', () => { try { localStorage.setItem('shift:me', a.dataset.sid); } catch (e) {} }));
   paint();
