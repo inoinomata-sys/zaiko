@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}シフトを入れる{% endblock %}
+{% block title %}出勤を入れる{% endblock %}
 {% block head %}
 <style>
 .se-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -24,9 +24,9 @@ table.se { border-collapse: separate; border-spacing: 0; }
 </style>
 {% endblock %}
 {% block content %}
-<p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← シフトにもどる</a></p>
+<p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← 出勤スケジュールにもどる</a></p>
 <div class="se-top">
-  <h1>シフトを入れる</h1>
+  <h1>出勤を入れる</h1>
   <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}">›</a></div>
 </div>
 <p class="se-hint">選ぶと、すぐ保存されます。入れたあとに変えた日には、見る画面で「変更」の印が3日間つきます。</p>

@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}シフト{% endblock %}
+{% block title %}出勤スケジュール{% endblock %}
 {% block head %}
 <style>
 .sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
@@ -51,7 +51,7 @@
 {% block content %}
 <p style="margin-bottom:8px"><a href="/">← トップにもどる</a></p>
 <div class="sh-top">
-  <h1>シフト</h1>
+  <h1>出勤スケジュール</h1>
   <div class="sh-nav">
     <a href="/shift?month={{ nav.prev }}">‹</a>
     <b>{{ nav.label }}</b>
@@ -89,7 +89,7 @@
           </span>
         </div>
         {% endif %}{% endfor %}
-        {% if not day.any %}<div class="sh-none">シフトはまだ入っていません</div>{% endif %}
+        {% if not day.any %}<div class="sh-none">出勤はまだ入っていません</div>{% endif %}
       </div>
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
@@ -100,7 +100,7 @@
   <div class="sh-detail" id="detail"><div class="sh-none">日をタップすると、くわしく出ます</div></div>
 </div>
 <div class="sh-foot">
-  <a href="/shift/edit?month={{ nav.month }}">シフトを入れる</a>
+  <a href="/shift/edit?month={{ nav.month }}">出勤を入れる</a>
   <a href="/shift/staff">スタッフ</a>
 </div>
 {% endblock %}

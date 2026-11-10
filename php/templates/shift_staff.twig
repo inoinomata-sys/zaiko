@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}シフトのスタッフ{% endblock %}
+{% block title %}スタッフ{% endblock %}
 {% block head %}
 <style>
 .st-card { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
@@ -19,9 +19,9 @@
 </style>
 {% endblock %}
 {% block content %}
-<p style="margin-bottom:10px"><a href="/shift">← シフトにもどる</a></p>
+<p style="margin-bottom:10px"><a href="/shift">← 出勤スケジュールにもどる</a></p>
 <h1 style="font-size:20px;font-weight:700;margin-bottom:6px">スタッフ</h1>
-<p style="font-size:13px;color:var(--fg2);margin-bottom:12px">「本店」は、ふだん入る店です。別の店に入る日は、シフトに「ヘルプ」の印が出ます。「毎週の休み」にチェックした曜日は、シフトを入れなくても、自動で「休」になります（その日だけ出勤にしたい時は、シフトを入れる画面で、店を選びます）。辞めた人は「外す」にすると、表から消えます（過去のシフトは残ります）。</p>
+<p style="font-size:13px;color:var(--fg2);margin-bottom:12px">「本店」は、ふだん入る店です。別の店に入る日は、出勤スケジュールに「ヘルプ」の印が出ます。「毎週の休み」にチェックした曜日は、出勤を入れなくても、自動で「休」になります（その日だけ出勤にしたい時は、出勤を入れる画面で、店を選びます）。辞めた人は「外す」にすると、表から消えます（過去の出勤は残ります）。</p>
 <form class="st-add" method="post" action="/shift/staff/add">
   <input name="name" placeholder="名前" required maxlength="40">
   <select name="home_store"><option>イノ</option><option>リッチ</option></select>

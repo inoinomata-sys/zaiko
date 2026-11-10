@@ -127,7 +127,7 @@ ok(($h['db'] ?? false) === true && ($h['extensions']['pdo_mysql'] ?? false), '/h
 ok(($h['font'] ?? false) === true, 'PDF のフォントが置かれている');
 page_ok('/stock', 'ホーユートリートメント');
 page_ok('/', '在庫管理');
-page_ok('/', 'シフト管理');
+page_ok('/', '出勤スケジュール');
 page_ok('/?store=' . rawurlencode('リッチ'));
 page_ok('/usage', 'NCSシャンプー');
 page_ok('/usage?supplier=' . rawurlencode('株式会社ワールド美容'));
@@ -337,7 +337,7 @@ if ($failures) {
 }
 
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
-page_ok('/', 'シフト');
+page_ok('/', '出勤スケジュール');
 page_ok('/prices', 'V3 エキサイティング ファンデーション レフィル');
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-02-v3-foundation'") === 1, 'データの書き換え: 記録が残る');
 ok((int)db_val("SELECT COUNT(*) FROM data_migrations WHERE name = '2026-11-04-cota-products'") === 1, 'データの書き換え: コタ商品の追加が済んでいる');
