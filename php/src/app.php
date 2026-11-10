@@ -123,6 +123,7 @@ function routes(): array
         ['GET', '/shift/staff', 'h_shift_staff'],
         ['POST', '/shift/staff/add', 'h_shift_staff_add'],
         ['POST', '/shift/staff/<int:id>/toggle', 'h_shift_staff_toggle'],
+        ['POST', '/shift/staff/<int:id>/off', 'h_shift_staff_off'],
         ['POST', '/line/webhook', 'h_line_webhook'],
         ['GET', '/pub/order', 'h_pub_order'],
         ['POST', '/order/<int:id>/line', 'h_order_line_send'],

@@ -18,6 +18,7 @@ table.se { border-collapse: separate; border-spacing: 0; }
 .se select.v-イノ { background: #fbe3ec; font-weight: 700; }
 .se select.v-リッチ { background: #e3f0fb; font-weight: 700; }
 .se select.v-休 { background: #eee; color: #777; }
+.se select.v-dflt { background: #f3f3f3; color: #888; }
 .se select.saving { opacity: .5; }
 .se select.err { outline: 2px solid #b3261e; }
 </style>
@@ -33,15 +34,16 @@ table.se { border-collapse: separate; border-spacing: 0; }
 <div class="se-wrap">
 <table class="se">
   <thead><tr><th class="nm">名前</th>
-    {% for day in days %}<th class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}{% if day.today %} today{% endif %}">{{ day.d }}<br>{{ day.w }}</th>{% endfor %}
+    {% for day in days %}<th class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}{% if day.today %} today{% endif %}"{% if day.hol %} title="{{ day.hol }}"{% endif %}>{{ day.d }}<br>{{ day.w }}{% if day.hol %}<br><span style="font-size:9px;font-weight:400">祝</span>{% endif %}</th>{% endfor %}
   </tr></thead>
   <tbody>
   {% for s in staff %}
     <tr><th class="nm">{{ s.name }}<span style="font-weight:400;color:var(--fg2);font-size:11px"> {{ s.home_store }}</span></th>
     {% for day in days %}
       {% set v = cells[s.id][day.date] %}
-      <td><select class="v-{{ v }}" data-sid="{{ s.id }}" data-date="{{ day.date }}" data-prev="{{ v }}">
-        <option value=""{% if v == '' %} selected{% endif %}>－</option>
+      {% set dd = dflt[s.id][day.date] %}
+      <td><select class="v-{{ v }}{% if dd %} v-dflt{% endif %}" data-sid="{{ s.id }}" data-date="{{ day.date }}" data-prev="{{ v }}"{% if dd %} data-dflt="1"{% endif %}>
+        <option value=""{% if v == '' %} selected{% endif %}>{% if dd %}休(定休){% else %}－{% endif %}</option>
         <option value="イノ"{% if v == 'イノ' %} selected{% endif %}>イノ</option>
         <option value="リッチ"{% if v == 'リッチ' %} selected{% endif %}>リッチ</option>
         <option value="休"{% if v == '休' %} selected{% endif %}>休</option>
@@ -67,6 +69,7 @@ document.querySelectorAll('.se select').forEach(sel => sel.addEventListener('cha
     const j = await res.json();
     if (!res.ok || !j.ok) throw 0;
     sel.className = v ? 'v-' + v : '';
+    if (!v && sel.dataset.dflt) { sel.classList.add('v-dflt'); }
     sel.dataset.prev = v;
   } catch (e) {
     sel.value = sel.dataset.prev; sel.classList.add('err');

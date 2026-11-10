@@ -30,7 +30,115 @@ function ensure_shift_tables(): void
         PRIMARY KEY (staff_id, work_date),
         KEY idx_shift_date (work_date)
     ) DEFAULT CHARSET=utf8mb4');
+    // スタッフごとの、毎週きまった休み（曜日の番号をカンマでつなぐ。0=日 … 6=土）
+    $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = 'off_days'");
+    if (!$has) {
+        run("ALTER TABLE shift_staff ADD COLUMN off_days VARCHAR(20) NOT NULL DEFAULT ''");
+    }
     $done = true;
+}
+
+/** そのスタッフの、毎週の休みの曜日（番号の配列） */
+function shift_off_days(array $s): array
+{
+    return array_values(array_filter(array_map('intval', explode(',', (string)($s['off_days'] ?? ''))), static fn($w) => $w >= 0 && $w <= 6));
+}
+
+/** 第n月曜日 */
+function nth_monday(int $y, int $m, int $n): DateTimeImmutable
+{
+    $d = new DateTimeImmutable(sprintf('%04d-%02d-01', $y, $m), new DateTimeZone('Asia/Tokyo'));
+    $d = $d->modify('+' . ((8 - (int)$d->format('N')) % 7) . ' days');   // 最初の月曜日
+    return $d->modify('+' . (($n - 1) * 7) . ' days');
+}
+
+/** 日本の祝日（その年の分）。[Y-m-d => 名前]。春分・秋分は計算式（1980〜2099年）。国民の休日・振替休日も入る */
+function jp_holidays(int $y): array
+{
+    static $cache = [];
+    if (isset($cache[$y])) {
+        return $cache[$y];
+    }
+    $h = [];
+    $add = static function (int $m, int $d, string $name) use (&$h, $y): void {
+        $h[sprintf('%04d-%02d-%02d', $y, $m, $d)] = $name;
+    };
+    $mon = static fn(int $m, int $n): string => nth_monday($y, $m, $n)->format('Y-m-d');
+    $add(1, 1, '元日');
+    if ($y >= 2000) {
+        $h[$mon(1, 2)] = '成人の日';
+    } else {
+        $add(1, 15, '成人の日');
+    }
+    $add(2, 11, '建国記念の日');
+    if ($y >= 2020) {
+        $add(2, 23, '天皇誕生日');
+    }
+    $n = $y - 1980;
+    $add(3, (int)floor(20.8431 + 0.242194 * $n - intdiv($n, 4)), '春分の日');
+    $add(4, 29, $y >= 2007 ? '昭和の日' : 'みどりの日');
+    $add(5, 3, '憲法記念日');
+    if ($y >= 2007) {
+        $add(5, 4, 'みどりの日');
+    }
+    $add(5, 5, 'こどもの日');
+    if ($y === 2019) {
+        $add(5, 1, '休日（天皇即位日）');
+    }
+    if ($y === 2020) {
+        $add(7, 23, '海の日');
+    } elseif ($y === 2021) {
+        $add(7, 22, '海の日');
+    } elseif ($y >= 2003) {
+        $h[$mon(7, 3)] = '海の日';
+    }
+    if ($y === 2020) {
+        $add(8, 10, '山の日');
+    } elseif ($y === 2021) {
+        $add(8, 9, '山の日');
+    } elseif ($y >= 2016) {
+        $add(8, 11, '山の日');
+    }
+    $h[$mon(9, 3)] = '敬老の日';
+    $add(9, (int)floor(23.2488 + 0.242194 * $n - intdiv($n, 4)), '秋分の日');
+    if ($y === 2020) {
+        $add(7, 24, 'スポーツの日');
+    } elseif ($y === 2021) {
+        $add(7, 23, 'スポーツの日');
+    } elseif ($y >= 2022) {
+        $h[$mon(10, 2)] = 'スポーツの日';
+    }
+    if ($y === 2019) {
+        $add(10, 22, '休日（即位礼正殿の儀）');
+    }
+    $add(11, 3, '文化の日');
+    $add(11, 23, '勤労感謝の日');
+    $tz = new DateTimeZone('Asia/Tokyo');
+    $dates = array_keys($h);
+    sort($dates);
+    foreach ($dates as $ds) {   // 国民の休日：祝日にはさまれた平日
+        $d = new DateTimeImmutable($ds, $tz);
+        $mid = $d->modify('+1 day')->format('Y-m-d');
+        if (isset($h[$d->modify('+2 days')->format('Y-m-d')]) && !isset($h[$mid]) && $d->modify('+1 day')->format('w') !== '0') {
+            $h[$mid] = '国民の休日';
+        }
+    }
+    $dates = array_keys($h);
+    sort($dates);
+    foreach ($dates as $ds) {   // 振替休日：日曜が祝日のとき、次の祝日でない日
+        $d = new DateTimeImmutable($ds, $tz);
+        if ($d->format('w') === '0') {
+            $x = $d->modify('+1 day');
+            while (isset($h[$x->format('Y-m-d')])) {
+                $x = $x->modify('+1 day');
+            }
+            if ((int)$x->format('Y') === $y) {
+                $h[$x->format('Y-m-d')] = '振替休日';
+            }
+        }
+    }
+    ksort($h);
+    return $cache[$y] = $h;
 }
 
 function shift_month(?string $m): DateTimeImmutable
@@ -44,7 +152,7 @@ function shift_month(?string $m): DateTimeImmutable
 
 function shift_staff_list(bool $onlyActive = true): array
 {
-    return rows('SELECT id, name, home_store, is_active FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
+    return rows('SELECT id, name, home_store, is_active, off_days FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
 }
 
 /** その月の、スタッフ×日の出勤先 [staff_id][Y-m-d] => [store, changed] */
@@ -69,10 +177,12 @@ function shift_days(DateTimeImmutable $first): array
     $days = [];
     $n = (int)$first->format('t');
     $today = now_jst()->format('Y-m-d');
+    $hol = jp_holidays((int)$first->format('Y'));
     for ($d = 1; $d <= $n; $d++) {
         $dt = $first->setDate((int)$first->format('Y'), (int)$first->format('m'), $d);
         $w = (int)$dt->format('w');
-        $days[] = ['date' => $dt->format('Y-m-d'), 'd' => $d, 'w' => SHIFT_WEEK[$w], 'sun' => $w === 0, 'sat' => $w === 6, 'today' => $dt->format('Y-m-d') === $today];
+        $days[] = ['date' => $dt->format('Y-m-d'), 'd' => $d, 'w' => SHIFT_WEEK[$w], 'sun' => $w === 0 || isset($hol[$dt->format('Y-m-d')]), 'sat' => $w === 6, 'today' => $dt->format('Y-m-d') === $today,
+            'hol' => $hol[$dt->format('Y-m-d')] ?? '', 'dow' => $w];
     }
     return $days;
 }
@@ -99,7 +209,10 @@ function h_shift(): void
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         foreach ($staff as $s) {
             $e = $entries[(int)$s['id']][$day['date']] ?? null;
-            if ($e === null) {
+            if ($e === null) {   // 入れていない日でも、毎週の休みの曜日なら「休」
+                if (in_array((int)$day['dow'], shift_off_days($s), true)) {
+                    $day['groups'][SHIFT_OFF][] = ['id' => (int)$s['id'], 'name' => $s['name'], 'help' => false, 'from' => $s['home_store'], 'changed' => false];
+                }
                 continue;
             }
             $day['groups'][$e['store']][] = [
@@ -112,7 +225,20 @@ function h_shift(): void
         $day['any'] = array_filter($day['groups']) !== [];
     }
     unset($day);
-    render('shift', ['nav' => shift_nav($first), 'days' => $days, 'staff' => $staff]);
+    // カレンダー：日曜はじまりの週ごとに並べる（月の前後の空きは null）
+    $weeks = [];
+    $row = array_fill(0, (int)$days[0]['dow'], null);
+    foreach ($days as $day) {
+        $row[] = $day;
+        if (count($row) === 7) {
+            $weeks[] = $row;
+            $row = [];
+        }
+    }
+    if ($row) {
+        $weeks[] = array_pad($row, 7, null);
+    }
+    render('shift', ['nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff]);
 }
 
 /** 入れる画面：スタッフ×日の表。選ぶとすぐ保存される */
@@ -123,12 +249,15 @@ function h_shift_edit(): void
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
     $cells = [];
+    $dflt = [];
     foreach ($staff as $s) {
         foreach (shift_days($first) as $day) {
             $cells[(int)$s['id']][$day['date']] = $entries[(int)$s['id']][$day['date']]['store'] ?? '';
+            // 入れていない日が、毎週の休みの曜日なら、「休（定休）」として見せる
+            $dflt[(int)$s['id']][$day['date']] = $cells[(int)$s['id']][$day['date']] === '' && in_array((int)$day['dow'], shift_off_days($s), true);
         }
     }
-    render('shift_edit', ['nav' => shift_nav($first), 'days' => shift_days($first), 'staff' => $staff, 'cells' => $cells]);
+    render('shift_edit', ['nav' => shift_nav($first), 'days' => shift_days($first), 'staff' => $staff, 'cells' => $cells, 'dflt' => $dflt]);
 }
 
 function h_api_shift(): void
@@ -167,7 +296,12 @@ function h_api_shift(): void
 function h_shift_staff(): void
 {
     ensure_shift_tables();
-    render('shift_staff', ['staff' => shift_staff_list(false)]);
+    $staff = shift_staff_list(false);
+    foreach ($staff as &$s) {
+        $s['offs'] = shift_off_days($s);
+    }
+    unset($s);
+    render('shift_staff', ['staff' => $staff, 'week' => SHIFT_WEEK]);
 }
 
 function h_shift_staff_add(): void
@@ -180,6 +314,21 @@ function h_shift_staff_add(): void
     }
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM shift_staff');
     run('INSERT INTO shift_staff (name, home_store, sort_order) VALUES (?,?,?)', [$name, $home, $max + 1]);
+    redirect_to('/shift/staff');
+}
+
+/** スタッフの、毎週きまった休みの曜日を保存する */
+function h_shift_staff_off(int $id): void
+{
+    ensure_shift_tables();
+    $days = [];
+    foreach ((array)($_POST['off'] ?? []) as $w) {
+        if (is_numeric($w) && (int)$w >= 0 && (int)$w <= 6) {
+            $days[(int)$w] = (int)$w;
+        }
+    }
+    sort($days);
+    run('UPDATE shift_staff SET off_days = ? WHERE id = ?', [implode(',', $days), $id]);
     redirect_to('/shift/staff');
 }
 
