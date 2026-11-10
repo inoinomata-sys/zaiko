@@ -400,6 +400,7 @@ function h_api_shift(): void
 
 function h_shift_staff(): void
 {
+    require_admin();
     ensure_shift_tables();
     $staff = shift_staff_list(false);
     foreach ($staff as &$s) {
@@ -411,6 +412,7 @@ function h_shift_staff(): void
 
 function h_shift_staff_add(): void
 {
+    require_admin();
     ensure_shift_tables();
     $name = mb_substr(trim(nfkc((string)($_POST['name'] ?? '')) ?? ''), 0, 40);
     $home = in_array($_POST['home_store'] ?? '', SHIFT_STORES, true) ? $_POST['home_store'] : 'イノ';
@@ -419,12 +421,13 @@ function h_shift_staff_add(): void
     }
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM shift_staff');
     run('INSERT INTO shift_staff (name, home_store, sort_order) VALUES (?,?,?)', [$name, $home, $max + 1]);
-    redirect_to('/shift/staff');
+    redirect_to('/settings/staff');
 }
 
 /** スタッフの、毎週きまった休みの曜日を保存する */
 function h_shift_staff_off(int $id): void
 {
+    require_admin();
     ensure_shift_tables();
     $days = [];
     foreach ((array)($_POST['off'] ?? []) as $w) {
@@ -434,12 +437,13 @@ function h_shift_staff_off(int $id): void
     }
     sort($days);
     run('UPDATE shift_staff SET off_days = ? WHERE id = ?', [implode(',', $days), $id]);
-    redirect_to('/shift/staff');
+    redirect_to('/settings/staff');
 }
 
 function h_shift_staff_toggle(int $id): void
 {
+    require_admin();
     ensure_shift_tables();
     run('UPDATE shift_staff SET is_active = 1 - is_active WHERE id = ?', [$id]);
-    redirect_to('/shift/staff');
+    redirect_to('/settings/staff');
 }

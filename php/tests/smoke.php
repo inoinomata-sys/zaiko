@@ -387,12 +387,12 @@ ok((int)db_val("SELECT is_active FROM schedule_rules WHERE id={$rid}") === 0, '�
 http('POST', "/schedule/rules/{$rid}/delete", null, []);
 ok((int)db_val("SELECT COUNT(*) FROM schedule_rules WHERE id={$rid}") === 0, '予定: 消せる');
 page_ok('/shift');
-page_ok('/shift/staff');
+page_ok('/settings/staff');
 page_ok('/shift/edit');
-[$st] = http('POST', '/shift/staff/add', null, ['name' => 'テスト太郎', 'home_store' => 'イノ']);
+[$st] = http('POST', '/settings/staff/add', null, ['name' => 'テスト太郎', 'home_store' => 'イノ']);
 ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM shift_staff WHERE name='テスト太郎'") === 1, 'シフト: スタッフを足せる');
-http('POST', '/shift/staff/add', null, ['name' => 'テスト花子', 'home_store' => 'リッチ']);
-page_ok('/shift/staff', 'テスト太郎');
+http('POST', '/settings/staff/add', null, ['name' => 'テスト花子', 'home_store' => 'リッチ']);
+page_ok('/settings/staff', 'テスト太郎');
 $sid = (int)db_val("SELECT id FROM shift_staff WHERE name='テスト太郎'");
 $m = date('Y-m');
 page_ok('/shift/edit?month=' . $m, 'テスト花子');
@@ -401,9 +401,9 @@ page_ok('/shift?month=2026-05', '振替休日');
 page_ok('/shift?month=2026-09', '国民の休日');
 page_ok('/shift?month=2027-03', '振替休日');
 page_ok('/shift?month=2026-11', '勤労感謝の日');
-[$st] = http('POST', "/shift/staff/{$sid}/off", null, ['off' => ['2', '3']]);
+[$st] = http('POST', "/settings/staff/{$sid}/off", null, ['off' => ['2', '3']]);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE id={$sid}") === '2,3', 'シフト: 毎週の休みの曜日を保存できる');
-page_ok('/shift/staff', 'checked');
+page_ok('/settings/staff', 'checked');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'テスト太郎');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, '休(定休)');
 page_ok('/shift?month=' . $m, '休み希望を入れる');
@@ -433,7 +433,7 @@ ok($st === 400, 'シフト: 変な日付は断る');
 ok($st === 400, 'シフト: 変な店名は断る');
 [$st] = api('/api/shift', ['staff_id' => 999999, 'date' => $m . '-10', 'store' => 'イノ']);
 ok($st === 404, 'シフト: いないスタッフは断る');
-http('POST', "/shift/staff/{$sid}/toggle", null, []);
+http('POST', "/settings/staff/{$sid}/toggle", null, []);
 ok((int)db_val("SELECT is_active FROM shift_staff WHERE id={$sid}") === 0, 'シフト: スタッフを外せる');
 
 // 暗証番号を、3回まちがえると、鍵が開く（オーナーの指定）。1回目「残念！」、2回目「もう少し！」、3回目「正解！」
