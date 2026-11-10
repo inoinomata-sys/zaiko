@@ -7,6 +7,9 @@
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
 .sh-me { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fff; font-family: inherit; }
+.ent-list[hidden] { display: none; }
+.ent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: -2px 0 12px; }
+.ent-name { text-align: center; padding: 12px 6px; background: #fff; border: 1px solid var(--acc); border-radius: 10px; color: var(--acc); font-weight: 700; font-size: 16px; text-decoration: none; }
 .cal { max-width: 1000px; margin: 0 auto; }
 .cal-head, .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-head div { text-align: center; font-size: 12px; font-weight: 700; padding: 4px 0; color: var(--fg2); }
@@ -59,10 +62,10 @@
   </div>
 </div>
 {% if staff %}
-<select id="me" class="sh-me">
-  <option value="">自分の名前を選ぶ（色が付きます）</option>
-  {% for s in staff %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
-</select>
+<button type="button" id="ent-btn" class="sh-me" style="text-align:left;cursor:pointer;display:flex;justify-content:space-between"><span>スケジュールを入れる</span><span>▾</span></button>
+<div id="ent-list" class="ent-list" hidden>
+  {% for s in staff %}<a class="ent-name" data-sid="{{ s.id }}" href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a>{% endfor %}
+</div>
 {% else %}
 <p style="color:var(--fg2);margin:14px 0">まだスタッフがいません。下の「スタッフ」から入れてください。</p>
 {% endif %}
@@ -107,12 +110,13 @@
 {% block scripts %}
 <script>
 (function () {
-  const sel = document.getElementById('me');
+  const btn = document.getElementById('ent-btn'), list = document.getElementById('ent-list');
   const detail = document.getElementById('detail');
   const cells = [...document.querySelectorAll('.cal-cell[data-date]')];
+  let me = '';
+  try { me = localStorage.getItem('shift:me') || ''; } catch (e) {}
   function paint() {
-    const v = sel ? sel.value : '';
-    document.querySelectorAll('.cal-p, .sh-p').forEach(p => p.classList.toggle('me', v !== '' && p.dataset.sid === v));
+    document.querySelectorAll('.cal-p, .sh-p').forEach(p => p.classList.toggle('me', me !== '' && p.dataset.sid === me));
   }
   function show(c) {
     cells.forEach(x => x.classList.toggle('sel', x === c));
@@ -120,10 +124,8 @@
     paint();
   }
   cells.forEach(c => c.addEventListener('click', () => show(c)));
-  if (sel) {
-    try { const v = localStorage.getItem('shift:me'); if (v && [...sel.options].some(o => o.value === v)) sel.value = v; } catch (e) {}
-    sel.addEventListener('change', () => { try { localStorage.setItem('shift:me', sel.value); } catch (e) {} paint(); });
-  }
+  if (btn) btn.addEventListener('click', () => { list.hidden = !list.hidden; });
+  document.querySelectorAll('.ent-name').forEach(a => a.addEventListener('click', () => { try { localStorage.setItem('shift:me', a.dataset.sid); } catch (e) {} }));
   paint();
   const t = document.querySelector('.cal-cell.today');
   if (t) show(t);

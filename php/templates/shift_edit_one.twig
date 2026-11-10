@@ -1,0 +1,84 @@
+{% extends 'base.twig' %}
+{% block title %}{{ one.name }}のスケジュール{% endblock %}
+{% block head %}
+<style>
+.sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sh-top h1 { font-size: 20px; font-weight: 700; }
+.sh-nav { display: flex; align-items: center; gap: 6px; }
+.sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
+.who { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.who a { padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--fg); text-decoration: none; font-size: 14px; }
+.who a.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 700; }
+.eo-hint { font-size: 12px; color: var(--fg2); margin-bottom: 8px; }
+.cal { max-width: 1000px; margin: 0 auto; }
+.cal-head, .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal-head div { text-align: center; font-size: 12px; font-weight: 700; padding: 4px 0; color: var(--fg2); }
+.cal-head .sun { color: #c0392b; } .cal-head .sat { color: #2c6fb7; }
+.cal-week { margin-bottom: 2px; }
+.cal-cell { min-width: 0; min-height: 78px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px; display: flex; flex-direction: column; gap: 2px; }
+.cal-cell.blank { background: transparent; border-color: transparent; }
+.cal-cell.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
+.cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; }
+.cal-d.sun { color: #c0392b; } .cal-d.sat { color: #2c6fb7; }
+.cal-hol { font-size: 9px; font-weight: 400; color: #c0392b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cal-cell select { width: 100%; min-width: 0; flex: 1; border: 1px solid var(--border); border-radius: 6px; background: #fafafa; font-size: 12px; font-family: inherit; padding: 0; text-align-last: center; }
+.cal-cell select.v-イノ { background: #fbe3ec; font-weight: 700; }
+.cal-cell select.v-リッチ { background: #e3f0fb; font-weight: 700; }
+.cal-cell select.v-休 { background: #eee; color: #777; }
+.cal-cell select.v-dflt { background: #f3f3f3; color: #888; }
+.cal-cell select.saving { opacity: .5; }
+.cal-cell select.err { outline: 2px solid #b3261e; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← 出勤スケジュールにもどる</a></p>
+<div class="sh-top">
+  <h1>{{ one.name }}</h1>
+  <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}&staff={{ one.id }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}&staff={{ one.id }}">›</a></div>
+</div>
+<div class="who">
+  {% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on"{% endif %}>{{ s.name }}</a>{% endfor %}
+</div>
+<p class="eo-hint">日ごとに、イノ・リッチ・休みを選びます。選ぶと、すぐ保存されます。「休(定休)」は、毎週の休みの曜日です。</p>
+<div class="cal">
+  <div class="cal-head"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
+  {% for week in weeks %}
+  <div class="cal-week">
+    {% for day in week %}
+    {% if day %}
+    <div class="cal-cell{% if day.today %} today{% endif %}">
+      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
+      <select class="v-{{ day.v }}{% if day.dflt %} v-dflt{% endif %}" data-sid="{{ one.id }}" data-date="{{ day.date }}" data-prev="{{ day.v }}"{% if day.dflt %} data-dflt="1"{% endif %}>
+        <option value=""{% if day.v == '' %} selected{% endif %}>{% if day.dflt %}休(定休){% else %}－{% endif %}</option>
+        <option value="イノ"{% if day.v == 'イノ' %} selected{% endif %}>イノ</option>
+        <option value="リッチ"{% if day.v == 'リッチ' %} selected{% endif %}>リッチ</option>
+        <option value="休"{% if day.v == '休' %} selected{% endif %}>休</option>
+      </select>
+    </div>
+    {% else %}<div class="cal-cell blank"></div>{% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p style="margin:16px 0 30px"><a class="btn" href="/shift/staff" style="display:block;text-align:center">毎週の休みを決める（スタッフ）</a></p>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListener('change', async () => {
+  const v = sel.value;
+  sel.classList.add('saving'); sel.classList.remove('err');
+  try {
+    const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: v})});
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw 0;
+    sel.className = v ? 'v-' + v : '';
+    if (!v && sel.dataset.dflt) { sel.classList.add('v-dflt'); }
+    sel.dataset.prev = v;
+  } catch (e) {
+    sel.value = sel.dataset.prev; sel.classList.add('err');
+    alert('保存できませんでした。もう一度お試しください');
+  } finally { sel.classList.remove('saving'); }
+}));
+</script>
+{% endblock %}

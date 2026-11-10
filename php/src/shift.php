@@ -197,6 +197,24 @@ function shift_nav(DateTimeImmutable $first): array
     ];
 }
 
+/** カレンダー：日曜はじまりの週ごとに並べる（月の前後の空きは null） */
+function shift_weeks(array $days): array
+{
+    $weeks = [];
+    $row = array_fill(0, (int)$days[0]['dow'], null);
+    foreach ($days as $day) {
+        $row[] = $day;
+        if (count($row) === 7) {
+            $weeks[] = $row;
+            $row = [];
+        }
+    }
+    if ($row) {
+        $weeks[] = array_pad($row, 7, null);
+    }
+    return $weeks;
+}
+
 /** 見る画面：日ごとに、イノ・リッチ・休みの人が並ぶ。ヘルプ（本店と違う店に入る人）には印が付く */
 function h_shift(): void
 {
@@ -225,20 +243,7 @@ function h_shift(): void
         $day['any'] = array_filter($day['groups']) !== [];
     }
     unset($day);
-    // カレンダー：日曜はじまりの週ごとに並べる（月の前後の空きは null）
-    $weeks = [];
-    $row = array_fill(0, (int)$days[0]['dow'], null);
-    foreach ($days as $day) {
-        $row[] = $day;
-        if (count($row) === 7) {
-            $weeks[] = $row;
-            $row = [];
-        }
-    }
-    if ($row) {
-        $weeks[] = array_pad($row, 7, null);
-    }
-    render('shift', ['nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff]);
+    render('shift', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'staff' => $staff]);
 }
 
 /** 入れる画面：スタッフ×日の表。選ぶとすぐ保存される */
@@ -248,6 +253,26 @@ function h_shift_edit(): void
     $first = shift_month($_GET['month'] ?? null);
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
+    if (isset($_GET['staff'])) {   // ひとりぶんを、カレンダーで入れる
+        $one = null;
+        foreach ($staff as $s) {
+            if ((int)$s['id'] === (int)$_GET['staff']) {
+                $one = $s;
+            }
+        }
+        if ($one === null) {
+            throw new HttpError(404);
+        }
+        $days = shift_days($first);
+        foreach ($days as &$day) {
+            $v = $entries[(int)$one['id']][$day['date']]['store'] ?? '';
+            $day['v'] = $v;
+            $day['dflt'] = $v === '' && in_array((int)$day['dow'], shift_off_days($one), true);
+        }
+        unset($day);
+        render('shift_edit_one', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'one' => $one, 'staff' => $staff]);
+        return;
+    }
     $cells = [];
     $dflt = [];
     foreach ($staff as $s) {
