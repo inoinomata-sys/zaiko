@@ -1,0 +1,28 @@
+{% extends 'base.twig' %}
+{% block title %}ふだんの出勤{% endblock %}
+{% block head %}
+<style>
+.df-wrap { overflow-x: auto; }
+.df { border-collapse: collapse; width: 100%; background: #fff; }
+.df th, .df td { border: 1px solid var(--border); padding: 8px 4px; text-align: center; font-size: 14px; }
+.df th.nm, .df td.nm { text-align: left; padding-left: 10px; white-space: nowrap; font-weight: 600; }
+.df .sun { color: #c0392b; }
+.df .off { background: #eee; color: #555; }
+.df small { font-weight: 400; color: var(--fg2); margin-left: 4px; }
+@media print { @page { size: A4 landscape; margin: 8mm; } nav, .no-print { display: none !important; } .df .off { background: #ddd; } }
+</style>
+{% endblock %}
+{% block content %}
+<p class="no-print" style="margin-bottom:8px"><a href="/shift">← 出勤スケジュールにもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:6px">ふだんの出勤（デフォルト）</h1>
+<p class="no-print" style="font-size:13px;color:var(--fg2);margin-bottom:12px">「休」は、毎週の決まった休みです。曜日の直しかたは、設定の「スタッフ設定」です。</p>
+<div class="df-wrap"><table class="df">
+<tr><th class="nm">名前</th>{% for w in week %}<th{% if loop.first %} class="sun"{% endif %}>{{ w }}</th>{% endfor %}</tr>
+{% for s in staff %}
+<tr><td class="nm">{{ s.name }}<small>{{ s.home_store }}</small></td>
+{% for w in week %}{% if loop.index0 in s.offs %}<td class="off">休</td>{% else %}<td>{{ s.home_store }}</td>{% endif %}{% endfor %}</tr>
+{% else %}
+<tr><td colspan="8">スタッフがいません</td></tr>
+{% endfor %}
+</table></div>
+{% endblock %}

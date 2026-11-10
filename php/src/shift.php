@@ -447,3 +447,15 @@ function h_shift_staff_toggle(int $id): void
     run('UPDATE shift_staff SET is_active = 1 - is_active WHERE id = ?', [$id]);
     redirect_to('/settings/staff');
 }
+
+/** スタッフごとの、ふだんの休み（曜日）の一覧（見るだけ） */
+function h_shift_default(): void
+{
+    ensure_shift_tables();
+    $staff = shift_staff_list(true);
+    foreach ($staff as &$s) {
+        $s['offs'] = shift_off_days($s);
+    }
+    unset($s);
+    render('shift_default', ['staff' => $staff, 'week' => SHIFT_WEEK]);
+}

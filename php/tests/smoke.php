@@ -389,6 +389,7 @@ ok((int)db_val("SELECT COUNT(*) FROM schedule_rules WHERE id={$rid}") === 0, '�
 page_ok('/shift');
 page_ok('/settings/staff');
 page_ok('/shift/edit');
+page_ok('/shift/default');
 [$st] = http('POST', '/settings/staff/add', null, ['name' => 'テスト太郎', 'home_store' => 'イノ']);
 ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM shift_staff WHERE name='テスト太郎'") === 1, 'シフト: スタッフを足せる');
 http('POST', '/settings/staff/add', null, ['name' => 'テスト花子', 'home_store' => 'リッチ']);
