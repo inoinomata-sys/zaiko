@@ -7,7 +7,9 @@
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
 .sh-me { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fff; font-family: inherit; }
-.sh-stamp { font-size: 13px; color: var(--fg2); margin: -4px 0 10px; }
+.sh-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: -4px 0 10px; }
+.sh-stamp { font-size: 13px; color: var(--fg2); }
+.ent-btn { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg2); font-family: inherit; cursor: pointer; }
 .sh-stamp a { margin-left: 4px; }
 .ent-list[hidden] { display: none; }
 .ent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: -2px 0 12px; }
@@ -64,9 +66,11 @@
     <a href="/shift?month={{ nav.next }}">›</a>
   </div>
 </div>
-<div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}　<a href="/shift/log">記入履歴</a></div>
+<div class="sh-bar">
+  <div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}　<a href="/shift/log">記入履歴</a></div>
+  {% if staff %}<button type="button" id="ent-btn" class="ent-btn">休み希望を入れる ▾</button>{% endif %}
+</div>
 {% if staff %}
-<button type="button" id="ent-btn" class="sh-me" style="text-align:left;cursor:pointer;display:flex;justify-content:space-between"><span>スケジュールを入れる</span><span>▾</span></button>
 <div id="ent-list" class="ent-list" hidden>
   {% for s in staff %}<a class="ent-name" data-sid="{{ s.id }}" href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a>{% endfor %}
 </div>

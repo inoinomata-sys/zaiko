@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}{{ one.name }}のスケジュール{% endblock %}
+{% block title %}{{ one.name }}の休み希望{% endblock %}
 {% block head %}
 <style>
 .sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
@@ -42,13 +42,13 @@
 {% block content %}
 <p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← 出勤スケジュールにもどる</a></p>
 <div class="sh-top">
-  <h1>{{ one.name }}</h1>
+  <h1>{{ one.name }}　休み希望</h1>
   <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}&staff={{ one.id }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}&staff={{ one.id }}">›</a></div>
 </div>
 <div class="who">
   {% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on"{% endif %}>{{ s.name }}</a>{% endfor %}
 </div>
-<p class="eo-hint">日ごとに、イノ・リッチ・休みを選びます。選ぶと、すぐ保存されます。「休(定休)」は、毎週の休みの曜日です。</p>
+<p class="eo-hint">休みの希望がある日を、「休み希望」にします。一部の時間だけ休みたい日は、「休み希望」にして、下の「時間」を押して、時間を入れます。選ぶと、すぐ保存されます。「休(定休)」は、毎週の休みの曜日です。別の店にヘルプに入る日だけ、店を選びます。</p>
 <div class="cal">
   <div class="cal-head"><div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div></div>
   {% for week in weeks %}
@@ -61,9 +61,9 @@
         <option value=""{% if day.v == '' %} selected{% endif %}>{% if day.dflt %}休(定休){% else %}－{% endif %}</option>
         <option value="イノ"{% if day.v == 'イノ' %} selected{% endif %}>イノ</option>
         <option value="リッチ"{% if day.v == 'リッチ' %} selected{% endif %}>リッチ</option>
-        <option value="休"{% if day.v == '休' %} selected{% endif %}>休</option>
+        <option value="休"{% if day.v == '休' %} selected{% endif %}>休み希望</option>
       </select>
-      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v != '休' %} hidden{% endif %}>{{ day.time_s ?: '時間' }}</button>
+      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v != '休' %} hidden{% endif %}>{{ day.time_s ?: '一部だけ' }}</button>
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}
@@ -88,7 +88,7 @@ function paintTm(sel) {
   const btn = sel.parentElement.querySelector('.tm-btn');
   btn.hidden = sel.value !== '休';
   const l = tmLabel(sel.dataset.tf, sel.dataset.tt);
-  btn.textContent = l || '時間'; btn.classList.toggle('set', !!l);
+  btn.textContent = l || '一部だけ'; btn.classList.toggle('set', !!l);
 }
 document.querySelectorAll('.cal-cell select').forEach(sel => paintTm(sel));
 document.querySelectorAll('.tm-btn').forEach(btn => btn.addEventListener('click', () => {
