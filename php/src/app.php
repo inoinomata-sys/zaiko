@@ -120,6 +120,7 @@ function routes(): array
         ['GET', '/shift', 'h_shift'],
         ['GET', '/shift/edit', 'h_shift_edit'],
         ['GET', '/shift/log', 'h_shift_log'],
+        ['GET', '/shift/default', 'h_shift_default'],
         ['POST', '/api/shift', 'h_api_shift'],
         ['GET', '/settings/staff', 'h_shift_staff'],
         ['POST', '/settings/staff/add', 'h_shift_staff_add'],
