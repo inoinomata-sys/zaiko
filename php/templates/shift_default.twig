@@ -19,7 +19,7 @@
 <div class="df-wrap"><table class="df">
 <tr><th class="nm">名前</th>{% for w in week %}<th{% if loop.first %} class="sun"{% endif %}>{{ w }}</th>{% endfor %}</tr>
 {% for s in staff %}
-<tr><td class="nm">{{ s.name }}<small>{{ s.home_store }}</small></td>
+<tr><td class="nm">{{ s.name }}<small>{{ s.home_store }}{% if s.work_from or s.work_to %}　{{ s.work_from }}〜{{ s.work_to }}{% endif %}</small></td>
 {% for w in week %}{% if loop.index0 in s.offs %}<td class="off">休</td>{% else %}<td>{{ s.home_store }}</td>{% endif %}{% endfor %}</tr>
 {% else %}
 <tr><td colspan="8">スタッフがいません</td></tr>

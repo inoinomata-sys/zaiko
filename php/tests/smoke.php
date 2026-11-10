@@ -402,7 +402,7 @@ page_ok('/shift?month=2026-05', '振替休日');
 page_ok('/shift?month=2026-09', '国民の休日');
 page_ok('/shift?month=2027-03', '振替休日');
 page_ok('/shift?month=2026-11', '勤労感謝の日');
-[$st] = http('POST', "/settings/staff/{$sid}/off", null, ['off' => ['2', '3']]);
+[$st] = http('POST', "/settings/staff/{$sid}/off", null, ['work' => ['0', '1', '4', '5', '6'], 'work_from' => '9:00', 'work_to' => '18:00']);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE id={$sid}") === '2,3', 'シフト: 毎週の休みの曜日を保存できる');
 page_ok('/settings/staff', 'checked');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'テスト太郎');

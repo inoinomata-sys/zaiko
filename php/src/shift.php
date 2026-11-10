@@ -35,6 +35,13 @@ function ensure_shift_tables(): void
     if (!$has) {
         run("ALTER TABLE shift_staff ADD COLUMN off_days VARCHAR(20) NOT NULL DEFAULT ''");
     }
+    // スタッフごとの、ふだんの勤務時間（例 9:00〜18:00）
+    foreach (['work_from', 'work_to'] as $col) {
+        $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = '{$col}'");
+        if (!$has) {
+            run("ALTER TABLE shift_staff ADD COLUMN {$col} VARCHAR(5) NOT NULL DEFAULT ''");
+        }
+    }
     run('CREATE TABLE IF NOT EXISTS shift_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         at DATETIME NOT NULL,
@@ -188,7 +195,7 @@ function shift_month(?string $m): DateTimeImmutable
 
 function shift_staff_list(bool $onlyActive = true): array
 {
-    return rows('SELECT id, name, home_store, is_active, off_days FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
+    return rows('SELECT id, name, home_store, is_active, off_days, work_from, work_to FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
 }
 
 /** その月の、スタッフ×日の出勤先 [staff_id][Y-m-d] => [store, changed] */
@@ -420,7 +427,9 @@ function h_shift_staff_add(): void
         throw new HttpError(400);
     }
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM shift_staff');
-    run('INSERT INTO shift_staff (name, home_store, sort_order) VALUES (?,?,?)', [$name, $home, $max + 1]);
+    $wf = shift_time($_POST['work_from'] ?? '') ?? '';
+    $wt = shift_time($_POST['work_to'] ?? '') ?? '';
+    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to) VALUES (?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt]);
     redirect_to('/settings/staff');
 }
 
@@ -429,14 +438,21 @@ function h_shift_staff_off(int $id): void
 {
     require_admin();
     ensure_shift_tables();
-    $days = [];
-    foreach ((array)($_POST['off'] ?? []) as $w) {
+    $work = [];
+    foreach ((array)($_POST['work'] ?? []) as $w) {
         if (is_numeric($w) && (int)$w >= 0 && (int)$w <= 6) {
-            $days[(int)$w] = (int)$w;
+            $work[(int)$w] = true;
         }
     }
-    sort($days);
-    run('UPDATE shift_staff SET off_days = ? WHERE id = ?', [implode(',', $days), $id]);
+    $off = [];
+    for ($w = 0; $w <= 6; $w++) {
+        if (!isset($work[$w])) {
+            $off[] = $w;
+        }
+    }
+    $wf = shift_time($_POST['work_from'] ?? '') ?? '';
+    $wt = shift_time($_POST['work_to'] ?? '') ?? '';
+    run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $id]);
     redirect_to('/settings/staff');
 }
 
