@@ -119,6 +119,7 @@ function routes(): array
         ['POST', '/schedule/rules/<int:id>/delete', 'h_schedule_delete'],
         ['GET', '/shift', 'h_shift'],
         ['GET', '/shift/edit', 'h_shift_edit'],
+        ['GET', '/shift/log', 'h_shift_log'],
         ['POST', '/api/shift', 'h_api_shift'],
         ['GET', '/shift/staff', 'h_shift_staff'],
         ['POST', '/shift/staff/add', 'h_shift_staff_add'],

@@ -35,7 +35,43 @@ function ensure_shift_tables(): void
     if (!$has) {
         run("ALTER TABLE shift_staff ADD COLUMN off_days VARCHAR(20) NOT NULL DEFAULT ''");
     }
+    run('CREATE TABLE IF NOT EXISTS shift_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        at DATETIME NOT NULL,
+        staff_id INT NOT NULL,
+        work_date DATE NOT NULL,
+        old_text VARCHAR(40) NOT NULL DEFAULT \'\',
+        new_text VARCHAR(40) NOT NULL DEFAULT \'\',
+        KEY idx_shift_log_at (at)
+    ) DEFAULT CHARSET=utf8mb4');
+    // 休みの一部の時間（パートさんなど）：開始・終了の時刻（どちらか片方だけでもよい。空なら終日）
+    foreach (['time_from', 'time_to'] as $col) {
+        $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_entries' AND column_name = ?", [$col]);
+        if (!$has) {
+            run("ALTER TABLE shift_entries ADD COLUMN {$col} VARCHAR(5) NULL");
+        }
+    }
     $done = true;
+}
+
+/** 'H:i' に整える（正しくなければ null。空は ''） */
+function shift_time(mixed $v): ?string
+{
+    $v = trim((string)$v);
+    if ($v === '') {
+        return '';
+    }
+    return preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $v, $m) ? sprintf('%d:%02d', (int)$m[1], (int)$m[2]) : null;
+}
+
+/** 休みの時間の表示。$short なら「9〜13」のように短く */
+function shift_time_label(?string $from, ?string $to, bool $short): string
+{
+    $f = static fn(?string $t): string => $t === null || $t === '' ? '' : ($short ? preg_replace('/:00$/', '', $t) : $t);
+    if ($f($from) === '' && $f($to) === '') {
+        return '';
+    }
+    return $f($from) . '〜' . $f($to);
 }
 
 /** そのスタッフの、毎週の休みの曜日（番号の配列） */
@@ -161,12 +197,13 @@ function shift_entries_of(DateTimeImmutable $first): array
     $last = $first->modify('last day of this month');
     $limit = now_jst()->modify('-' . SHIFT_CHANGED_DAYS . ' days')->format('Y-m-d H:i:s');
     $map = [];
-    foreach (rows('SELECT staff_id, work_date, store, prev_store, changed_at FROM shift_entries WHERE work_date BETWEEN ? AND ?',
+    foreach (rows('SELECT staff_id, work_date, store, prev_store, changed_at, time_from, time_to FROM shift_entries WHERE work_date BETWEEN ? AND ?',
         [$first->format('Y-m-d'), $last->format('Y-m-d')]) as $r) {
         $map[(int)$r['staff_id']][$r['work_date']] = [
             'store' => $r['store'],
             'changed' => $r['changed_at'] !== null && $r['changed_at'] >= $limit,
             'prev' => $r['prev_store'],
+            'tf' => (string)($r['time_from'] ?? ''), 'tt' => (string)($r['time_to'] ?? ''),
         ];
     }
     return $map;
@@ -238,12 +275,16 @@ function h_shift(): void
                 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'],
                 'from' => $s['home_store'],
                 'changed' => $e['changed'],
+                'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
+                'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
             ];
         }
         $day['any'] = array_filter($day['groups']) !== [];
     }
     unset($day);
-    render('shift', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'staff' => $staff]);
+    $last = val('SELECT MAX(at) FROM shift_log');
+    render('shift', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'staff' => $staff,
+        'last_at' => $last ? (new DateTimeImmutable((string)$last))->format('n/j H:i') : '']);
 }
 
 /** 入れる画面：スタッフ×日の表。選ぶとすぐ保存される */
@@ -267,6 +308,9 @@ function h_shift_edit(): void
         foreach ($days as &$day) {
             $v = $entries[(int)$one['id']][$day['date']]['store'] ?? '';
             $day['v'] = $v;
+            $day['tf'] = $entries[(int)$one['id']][$day['date']]['tf'] ?? '';
+            $day['tt'] = $entries[(int)$one['id']][$day['date']]['tt'] ?? '';
+            $day['time_s'] = $v === SHIFT_OFF ? shift_time_label($day['tf'], $day['tt'], true) : '';
             $day['dflt'] = $v === '' && in_array((int)$day['dow'], shift_off_days($one), true);
         }
         unset($day);
@@ -283,6 +327,19 @@ function h_shift_edit(): void
         }
     }
     render('shift_edit', ['nav' => shift_nav($first), 'days' => shift_days($first), 'staff' => $staff, 'cells' => $cells, 'dflt' => $dflt]);
+}
+
+/** 記入履歴：いつ、だれの、どの日を、どう変えたか（新しい順） */
+function h_shift_log(): void
+{
+    ensure_shift_tables();
+    $list = [];
+    foreach (rows('SELECT l.at, l.work_date, l.old_text, l.new_text, s.name FROM shift_log l LEFT JOIN shift_staff s ON s.id = l.staff_id ORDER BY l.id DESC LIMIT 300') as $r) {
+        $d = new DateTimeImmutable((string)$r['work_date']);
+        $list[] = ['at' => (new DateTimeImmutable((string)$r['at']))->format('n/j H:i'), 'name' => $r['name'] ?? '（削除済み）',
+            'date' => $d->format('n/j') . '（' . SHIFT_WEEK[(int)$d->format('w')] . '）', 'old' => $r['old_text'], 'new' => $r['new_text']];
+    }
+    render('shift_log', ['list' => $list]);
 }
 
 function h_api_shift(): void
@@ -303,16 +360,39 @@ function h_api_shift(): void
         respond_json(['ok' => false, 'error' => 'スタッフが見つかりません'], 404);
     }
     $now = now_jst()->format('Y-m-d H:i:s');
-    transaction(function () use ($sid, $date, $store, $now) {
-        $cur = row('SELECT store FROM shift_entries WHERE staff_id = ? AND work_date = ? FOR UPDATE', [$sid, $date]);
+    // 休みの時間（休のときだけ。送られてきたときだけ書き換える）
+    $hasTime = array_key_exists('time_from', $d) || array_key_exists('time_to', $d);
+    $tf = shift_time($d['time_from'] ?? '');
+    $tt = shift_time($d['time_to'] ?? '');
+    if ($tf === null || $tt === null) {
+        bad_input();
+    }
+    transaction(function () use ($sid, $date, $store, $now, $hasTime, $tf, $tt) {
+        $cur = row('SELECT store, time_from, time_to FROM shift_entries WHERE staff_id = ? AND work_date = ? FOR UPDATE', [$sid, $date]);
+        $tfv = $store === SHIFT_OFF && $tf !== '' ? $tf : null;
+        $ttv = $store === SHIFT_OFF && $tt !== '' ? $tt : null;
+        $text = static fn(?string $st, ?string $a, ?string $b): string => $st === null || $st === '' ? '' : $st . ($st === SHIFT_OFF && shift_time_label($a, $b, false) !== '' ? '（' . shift_time_label($a, $b, false) . '）' : '');
+        $old = $cur ? $text($cur['store'], $cur['time_from'], $cur['time_to']) : '';
+        $changed = false;
         if ($store === '') {
             if ($cur) {
                 run('DELETE FROM shift_entries WHERE staff_id = ? AND work_date = ?', [$sid, $date]);
+                $changed = true;
             }
         } elseif (!$cur) {
-            run('INSERT INTO shift_entries (staff_id, work_date, store) VALUES (?,?,?)', [$sid, $date, $store]);
+            run('INSERT INTO shift_entries (staff_id, work_date, store, time_from, time_to) VALUES (?,?,?,?,?)', [$sid, $date, $store, $tfv, $ttv]);
+            $changed = true;
         } elseif ($cur['store'] !== $store) {
-            run('UPDATE shift_entries SET prev_store = ?, store = ?, changed_at = ? WHERE staff_id = ? AND work_date = ?', [$cur['store'], $store, $now, $sid, $date]);
+            run('UPDATE shift_entries SET prev_store = ?, store = ?, changed_at = ?, time_from = ?, time_to = ? WHERE staff_id = ? AND work_date = ?',
+                [$cur['store'], $store, $now, $tfv, $ttv, $sid, $date]);
+            $changed = true;
+        } elseif ($hasTime && $store === SHIFT_OFF) {
+            run('UPDATE shift_entries SET changed_at = ?, time_from = ?, time_to = ? WHERE staff_id = ? AND work_date = ?', [$now, $tfv, $ttv, $sid, $date]);
+            $changed = true;
+        }
+        $new = $store === '' ? '' : $text($store, $tfv, $ttv);
+        if ($changed && $old !== $new) {   // いつ・だれの・何を入れたかの履歴
+            run('INSERT INTO shift_log (at, staff_id, work_date, old_text, new_text) VALUES (?,?,?,?,?)', [$now, $sid, $date, mb_substr($old, 0, 40), mb_substr($new, 0, 40)]);
         }
     });
     respond_json(['ok' => true]);

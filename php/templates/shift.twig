@@ -7,6 +7,8 @@
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
 .sh-me { width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fff; font-family: inherit; }
+.sh-stamp { font-size: 13px; color: var(--fg2); margin: -4px 0 10px; }
+.sh-stamp a { margin-left: 4px; }
 .ent-list[hidden] { display: none; }
 .ent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: -2px 0 12px; }
 .ent-name { text-align: center; padding: 12px 6px; background: #fff; border: 1px solid var(--acc); border-radius: 10px; color: var(--acc); font-weight: 700; font-size: 16px; text-decoration: none; }
@@ -26,6 +28,7 @@
 .cal-g.rich { border-left-color: #3b7dd8; }
 .cal-g.off { border-left-color: #b5b5b5; color: #777; }
 .cal-p { white-space: nowrap; }
+.cal-t { font-size: 8px; color: #555; margin-left: 1px; }
 .cal-p.help { text-decoration: underline dotted; }
 .cal-p.me { background: #fff3a8; border-radius: 4px; font-weight: 700; }
 .cal-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--fg2); margin: 8px 2px; }
@@ -61,6 +64,7 @@
     <a href="/shift?month={{ nav.next }}">›</a>
   </div>
 </div>
+<div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}　<a href="/shift/log">記入履歴</a></div>
 {% if staff %}
 <button type="button" id="ent-btn" class="sh-me" style="text-align:left;cursor:pointer;display:flex;justify-content:space-between"><span>スケジュールを入れる</span><span>▾</span></button>
 <div id="ent-list" class="ent-list" hidden>
@@ -79,7 +83,7 @@
       <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
       {% for store, people in day.groups %}{% if people %}
       <div class="cal-g{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">
-        {% for p in people %}<span class="cal-p{% if p.help %} help{% endif %}" data-sid="{{ p.id }}">{{ p.name }}</span>{% endfor %}
+        {% for p in people %}<span class="cal-p{% if p.help %} help{% endif %}" data-sid="{{ p.id }}">{{ p.name }}{% if p.time_s %}<span class="cal-t">{{ p.time_s }}</span>{% endif %}</span>{% endfor %}
       </div>
       {% endif %}{% endfor %}
       <div class="cal-detail" hidden>
@@ -88,7 +92,7 @@
         <div class="sh-row">
           <span class="sh-store{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">{{ store }}</span>
           <span class="sh-people">
-            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
+            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.time_l %}<span class="sh-tag help">{{ p.time_l }}だけ休み</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
           </span>
         </div>
         {% endif %}{% endfor %}

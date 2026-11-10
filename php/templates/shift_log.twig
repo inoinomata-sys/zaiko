@@ -1,0 +1,25 @@
+{% extends 'base.twig' %}
+{% block title %}記入履歴{% endblock %}
+{% block head %}
+<style>
+.lg-row { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+.lg-at { font-size: 12px; color: var(--fg2); }
+.lg-main { font-size: 15px; margin-top: 2px; overflow-wrap: anywhere; }
+.lg-main b { font-weight: 700; }
+.lg-arrow { color: var(--fg2); margin: 0 4px; }
+.lg-old { color: var(--fg2); text-decoration: line-through; }
+</style>
+{% endblock %}
+{% block content %}
+<p style="margin-bottom:8px"><a href="/shift">← 出勤スケジュールにもどる</a></p>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:4px">記入履歴</h1>
+<p style="font-size:12px;color:var(--fg2);margin-bottom:10px">いつ入れた（変えた）かの記録です。新しい順に、300件まで出ます。</p>
+{% for r in list %}
+<div class="lg-row">
+  <div class="lg-at">{{ r.at }} に入力</div>
+  <div class="lg-main"><b>{{ r.name }}</b>　{{ r.date }}　{% if r.old %}<span class="lg-old">{{ r.old }}</span>{% else %}<span class="lg-old">なし</span>{% endif %}<span class="lg-arrow">→</span><b>{{ r.new ?: '消した' }}</b></div>
+</div>
+{% else %}
+<p style="color:var(--fg2)">まだ履歴はありません。</p>
+{% endfor %}
+{% endblock %}

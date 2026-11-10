@@ -26,6 +26,15 @@
 .cal-cell select.v-リッチ { background: #e3f0fb; font-weight: 700; }
 .cal-cell select.v-休 { background: #eee; color: #777; }
 .cal-cell select.v-dflt { background: #f3f3f3; color: #888; }
+.tm-btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; font-size: 10px; padding: 1px 0; font-family: inherit; color: var(--fg2); cursor: pointer; }
+.tm-btn[hidden] { display: none; }
+.tm-btn.set { background: #fff3a8; color: var(--fg); font-weight: 700; }
+.tp { background: #fff; border: 1px solid var(--acc); border-radius: 12px; padding: 12px; margin: 12px 0; }
+.tp[hidden] { display: none; }
+.tp h3 { font-size: 15px; margin: 0 0 8px; }
+.tp .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.tp input[type=time] { font-size: 18px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
+.tp .hint { font-size: 12px; color: var(--fg2); margin-top: 6px; }
 .cal-cell select.saving { opacity: .5; }
 .cal-cell select.err { outline: 2px solid #b3261e; }
 </style>
@@ -48,22 +57,59 @@
     {% if day %}
     <div class="cal-cell{% if day.today %} today{% endif %}">
       <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
-      <select class="v-{{ day.v }}{% if day.dflt %} v-dflt{% endif %}" data-sid="{{ one.id }}" data-date="{{ day.date }}" data-prev="{{ day.v }}"{% if day.dflt %} data-dflt="1"{% endif %}>
+      <select class="v-{{ day.v }}{% if day.dflt %} v-dflt{% endif %}" data-sid="{{ one.id }}" data-date="{{ day.date }}" data-prev="{{ day.v }}" data-tf="{{ day.tf }}" data-tt="{{ day.tt }}"{% if day.dflt %} data-dflt="1"{% endif %}>
         <option value=""{% if day.v == '' %} selected{% endif %}>{% if day.dflt %}休(定休){% else %}－{% endif %}</option>
         <option value="イノ"{% if day.v == 'イノ' %} selected{% endif %}>イノ</option>
         <option value="リッチ"{% if day.v == 'リッチ' %} selected{% endif %}>リッチ</option>
         <option value="休"{% if day.v == '休' %} selected{% endif %}>休</option>
       </select>
+      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v != '休' %} hidden{% endif %}>{{ day.time_s ?: '時間' }}</button>
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}
   </div>
   {% endfor %}
 </div>
+<div class="tp" id="tp" hidden>
+  <h3 id="tp-title">休みの時間</h3>
+  <div class="row"><input type="time" id="tp-from"><span>から</span><input type="time" id="tp-to"><span>まで 休み</span></div>
+  <div class="row"><button class="btn" type="button" id="tp-save">保存</button><button class="btn btn-ghost" type="button" id="tp-clear">終日休みにする</button><button class="btn btn-ghost" type="button" id="tp-close">閉じる</button></div>
+  <div class="hint">どちらか片方だけでも入れられます（例：「15:00から」だけ）。空のときは、終日休みです。</div>
+</div>
 <p style="margin:16px 0 30px"><a class="btn" href="/shift/staff" style="display:block;text-align:center">毎週の休みを決める（スタッフ）</a></p>
 {% endblock %}
 {% block scripts %}
 <script>
+const tp = document.getElementById('tp');
+let tpSel = null, tpBtn = null;
+const compact = t => (t || '').replace(/:00$/, '');
+function tmLabel(tf, tt) { return (tf || tt) ? compact(tf) + '〜' + compact(tt) : ''; }
+function paintTm(sel) {
+  const btn = sel.parentElement.querySelector('.tm-btn');
+  btn.hidden = sel.value !== '休';
+  const l = tmLabel(sel.dataset.tf, sel.dataset.tt);
+  btn.textContent = l || '時間'; btn.classList.toggle('set', !!l);
+}
+document.querySelectorAll('.cal-cell select').forEach(sel => paintTm(sel));
+document.querySelectorAll('.tm-btn').forEach(btn => btn.addEventListener('click', () => {
+  tpSel = btn.parentElement.querySelector('select'); tpBtn = btn;
+  document.getElementById('tp-title').textContent = '{{ nav.label|slice(5) }}' + btn.dataset.label + '日　{{ one.name }}　休みの時間';
+  document.getElementById('tp-from').value = (tpSel.dataset.tf || '').padStart(5, '0');
+  document.getElementById('tp-to').value = (tpSel.dataset.tt || '').padStart(5, '0');
+  tp.hidden = false; tp.scrollIntoView({block: 'center', behavior: 'smooth'});
+}));
+async function saveTime(tf, tt) {
+  const sel = tpSel; if (!sel) return;
+  try {
+    const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: '休', time_from: tf, time_to: tt})});
+    const j = await res.json(); if (!res.ok || !j.ok) throw 0;
+    sel.dataset.tf = tf; sel.dataset.tt = tt; paintTm(sel); tp.hidden = true;
+  } catch (e) { alert('保存できませんでした。もう一度お試しください'); }
+}
+document.getElementById('tp-save').addEventListener('click', () => saveTime(document.getElementById('tp-from').value, document.getElementById('tp-to').value));
+document.getElementById('tp-clear').addEventListener('click', () => saveTime('', ''));
+document.getElementById('tp-close').addEventListener('click', () => { tp.hidden = true; });
 document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListener('change', async () => {
   const v = sel.value;
   sel.classList.add('saving'); sel.classList.remove('err');
@@ -75,6 +121,8 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
     sel.className = v ? 'v-' + v : '';
     if (!v && sel.dataset.dflt) { sel.classList.add('v-dflt'); }
     sel.dataset.prev = v;
+    if (v !== '休') { sel.dataset.tf = ''; sel.dataset.tt = ''; }
+    paintTm(sel);
   } catch (e) {
     sel.value = sel.dataset.prev; sel.classList.add('err');
     alert('保存できませんでした。もう一度お試しください');
