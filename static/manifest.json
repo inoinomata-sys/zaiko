@@ -4,8 +4,8 @@
   "description": "美容室の総合管理（在庫・発注・予定・シフト）",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f7f8fa",
-  "theme_color": "#f7f8fa",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "orientation": "portrait-primary",
   "lang": "ja",
   "icons": [

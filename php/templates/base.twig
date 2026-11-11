@@ -5,17 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}在庫・発注管理{% endblock %} — イノ</title>
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#f7f8fa">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="総合管理">
 <link rel="apple-touch-icon" href="/static/icons/ino7-180.png">
 <style>
 :root {
-  --bg: #f7f8fa;
+  --bg: #fff;
   --surface: #fff;
   --soft: #eef2f6;
-  --border: #e2e7ed;
+  --border: #d6c28c;
+  --gold: #9c7a2f;
   --fg: #29323d;
   --fg2: #687585;
   --acc: #435366;
@@ -65,7 +66,7 @@ nav a.nav-link {
   white-space: nowrap;
 }
 nav a.nav-link:hover { background: var(--surface); text-decoration: none; color: var(--fg); }
-nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
+nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: var(--gold); }
 @media (max-width: 700px) {
   /* 文字数に応じてボタン幅を配分し、長いラベルも枠内に収める。 */
   :root { --nav-h: 56px; }
@@ -73,7 +74,7 @@ nav a.nav-link.active { background: var(--surface); color: var(--fg); border-col
   nav .brand, nav .spacer, nav .store-badge { display: none; }
   nav a.nav-link { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; height: 100%;
                    padding: 0 5px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; text-align: center; white-space: nowrap; }
-  nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
+  nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: var(--gold); }
   main { padding: 12px; }
 }
 nav .spacer { flex: 1; }
@@ -145,7 +146,7 @@ td.out  { color: var(--danger); font-weight: 700; }
 .btn-primary:hover { background: var(--acc-h); }
 .btn-success { background: var(--ok); color: #fff; }
 .btn-danger  { background: var(--danger); color: #fff; }
-.btn-ghost   { background: transparent; color: var(--acc); border: 1px solid var(--acc); }
+.btn-ghost   { background: transparent; color: var(--acc); border: 1px solid var(--gold); }
 .btn-ghost:hover { background: #eef2f6; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 
@@ -167,7 +168,7 @@ input[type=text], input[type=number], select {
   font-family: inherit; font-size: 14px; background: #fff; color: var(--fg);
   min-width: 0;
 }
-input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--acc); }
+input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--gold); }
 
 /* TOAST */
 #toast {
@@ -187,7 +188,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
   background: var(--surface); color: var(--fg2); font: inherit; font-size: 14px; font-weight: 600;
   cursor: pointer; white-space: nowrap; touch-action: manipulation;
 }
-.cat-scroll button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.cat-scroll button.on { background: var(--acc); border-color: var(--gold); color: #fff; }
 #to-top {
   position: fixed; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer;

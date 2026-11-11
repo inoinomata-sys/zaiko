@@ -1,4 +1,4 @@
-const CACHE = 'zaiko-v6-clear-calendars';
+const CACHE = 'zaiko-v7-white-gold';
 const OFFLINE_URLS = [
   '/',
   '/order',
