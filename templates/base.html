@@ -5,20 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}在庫・発注管理{% endblock %} — イノ</title>
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#89630e">
+<meta name="theme-color" content="#f7f8fa">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="総合管理">
 <link rel="apple-touch-icon" href="/static/icons/ino7-180.png">
 <style>
 :root {
-  --bg: #fff9e9;
+  --bg: #f7f8fa;
   --surface: #fff;
-  --border: #e7d39b;
-  --fg: #392c14;
-  --fg2: #75623c;
-  --acc: #89630e;
-  --acc-h: #6e4e09;
+  --soft: #eef2f6;
+  --border: #e2e7ed;
+  --fg: #29323d;
+  --fg2: #687585;
+  --acc: #435366;
+  --acc-h: #2e4054;
   --ok: #1a9e5a;
   --warn: #d4820a;
   --danger: #c0392b;
@@ -28,16 +29,15 @@
 button, a { touch-action: manipulation; }
 body { font-family: 'Hiragino Sans', 'Meiryo', system-ui, sans-serif;
        font-size: 14px; background: var(--bg); color: var(--fg);
-       background-image: radial-gradient(ellipse at 15% 0%, #f6df9d66, transparent 55%),
-                         radial-gradient(ellipse at 90% 30%, #fff0ba66, transparent 50%);
+       background-image: none;
        min-height: 100vh; }
 a { color: var(--acc); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* NAV */
 nav {
-  background: linear-gradient(115deg, #6e4e09, #89630e 40%, #966c12 65%, #735009);
-  color: #fff;
+  background: var(--bg);
+  color: var(--fg);
   height: var(--nav-h);
   display: flex;
   align-items: center;
@@ -46,34 +46,26 @@ nav {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  box-shadow: 0 1px 0 var(--border);
 }
-/* Decorative glints stay behind the navigation controls. */
-nav::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background-image: radial-gradient(ellipse 1px 6px at 12% 25%, #fff4c9 90%, transparent),
-    radial-gradient(ellipse 6px 1px at 12% 25%, #fff4c9 90%, transparent),
-    radial-gradient(ellipse 1px 5px at 64% 80%, #fff4c9 90%, transparent),
-    radial-gradient(ellipse 5px 1px at 64% 80%, #fff4c9 90%, transparent),
-    radial-gradient(circle at 88% 18%, #fff4c9 1px, transparent 2px);
-  opacity: .25; animation: gold-glints 5s ease-in-out infinite alternate;
-}
+/* Airy minimal: a quiet surface keeps the existing navigation controls. */
+nav::before { display: none; }
 nav > * { position: relative; }
 @keyframes gold-glints { from { opacity: .15; } to { opacity: .5; } }
 @media (prefers-reduced-motion: reduce) { nav::before { animation: none; opacity: .25; } }
-nav .brand { font-size: 16px; font-weight: 700; margin-right: 16px; color: #fff; white-space: nowrap; }
+nav .brand { font-size: 16px; font-weight: 700; margin-right: 16px; color: var(--fg); white-space: nowrap; }
 nav a.nav-link {
   padding: 8px 14px;
   border-radius: 14px;
-  border: 2px solid rgba(255,255,255,.75);
-  color: rgba(255,255,255,.85);
+  border: 2px solid var(--border);
+  color: var(--fg2);
   font-size: 14px;
   font-weight: 500;
   transition: background .15s;
   white-space: nowrap;
 }
-nav a.nav-link:hover { background: rgba(255,255,255,.15); text-decoration: none; color: #fff; }
-nav a.nav-link.active { background: rgba(255,255,255,.22); color: #fff; }
+nav a.nav-link:hover { background: var(--surface); text-decoration: none; color: var(--fg); }
+nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
 @media (max-width: 700px) {
   /* スマホ・タブレット: 文字を枠で囲んだ5つのボタンを、横いっぱいに並べる（今の画面は白く塗りつぶす） */
   :root { --nav-h: 56px; }
@@ -81,12 +73,13 @@ nav a.nav-link.active { background: rgba(255,255,255,.22); color: #fff; }
   nav .brand, nav .spacer, nav .store-badge { display: none; }
   nav a.nav-link { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; height: 100%;
                    padding: 0 1px; font-size: clamp(11px, 3.3vw, 15px); font-weight: 700; text-align: center; white-space: nowrap; }
-  nav a.nav-link.active { background: #fff; color: var(--acc); border-color: #fff; }
+  nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
   main { padding: 12px; }
 }
 nav .spacer { flex: 1; }
 nav .store-badge {
-  background: rgba(255,255,255,.2);
+  background: var(--soft);
+  color: var(--fg2);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 13px;
@@ -99,7 +92,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 20px; }
 /* CARD */
 .card {
   background: var(--surface);
-  box-shadow: 0 3px 12px #89630e0d;
+  box-shadow: 0 3px 14px #24324507;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
@@ -126,7 +119,7 @@ th {
   color: var(--fg2);
   border-bottom: 2px solid var(--border);
   white-space: nowrap;
-  background: #faf4e4;
+  background: #eef2f6;
 }
 th.r, td.r { text-align: right; }
 td {
@@ -135,7 +128,7 @@ td {
   font-variant-numeric: tabular-nums;
 }
 tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fff6df; }
+tr:hover td { background: #f2f5f8; }
 td.name { font-weight: 500; }
 td.low  { color: var(--warn); font-weight: 700; }
 td.out  { color: var(--danger); font-weight: 700; }
@@ -143,17 +136,17 @@ td.out  { color: var(--danger); font-weight: 700; }
 /* BUTTONS */
 .btn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 7px 14px; border-radius: 7px; border: none;
+  padding: 7px 14px; border-radius: 10px; border: none;
   font-family: inherit; font-size: 14px; font-weight: 600;
   cursor: pointer; transition: all .15s; white-space: nowrap;
   touch-action: manipulation;
 }
-.btn-primary { background: linear-gradient(115deg, #735009, #89630e 55%, #966c12); color: #fff; box-shadow: 0 2px 5px #89630e26; }
+.btn-primary { background: var(--acc); color: #fff; box-shadow: 0 2px 5px #24324512; }
 .btn-primary:hover { background: var(--acc-h); }
 .btn-success { background: var(--ok); color: #fff; }
 .btn-danger  { background: var(--danger); color: #fff; }
 .btn-ghost   { background: transparent; color: var(--acc); border: 1px solid var(--acc); }
-.btn-ghost:hover { background: #f7ebc9; }
+.btn-ghost:hover { background: #eef2f6; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 
 /* BADGE */
@@ -170,7 +163,7 @@ td.out  { color: var(--danger); font-weight: 700; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-size: 12px; font-weight: 600; color: var(--fg2); }
 input[type=text], input[type=number], select {
-  padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 10px;
   font-family: inherit; font-size: 14px; background: #fff; color: var(--fg);
   min-width: 0;
 }
@@ -206,6 +199,7 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--a
 #to-top[data-side="left"] { right: auto; left: 14px; }
 #to-top.show { opacity: .92; pointer-events: auto; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+h1, h2 { font-weight: 500 !important; }
 </style>
 {% block head %}{% endblock %}
 </head>
