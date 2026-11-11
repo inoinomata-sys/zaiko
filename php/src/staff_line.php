@@ -140,6 +140,11 @@ function sl_text(array $snapshot, ?array $before = null, string $stream = 'store
         }
         if ($part) { $lines[] = $date . '（' . SHIFT_WEEK[(int)(new DateTimeImmutable($date))->format('w')] . '）'; array_push($lines, ...$part); }
     }
+    if ($stream === 'store' && $before === null) {
+        array_unshift($lines, 'こんばんは🌙', '', '本日も一日お疲れ様でございました。', '', '明日以降の店舗スケジュールをお知らせいたします📅', '');
+        $lines[] = '';
+        $lines[] = 'いつもありがとうございます';
+    }
     return implode("\n", $lines);
 }
 
@@ -206,9 +211,9 @@ function sl_refresh(array $job, array $s): array
         if ($snapshot === $before) { run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE id = ?", [$job['id']]); return array_replace($job, ['state' => 'cancelled']); }
     }
     $hash = sl_hash([$snapshot, $before]);
-    if (!hash_equals($job['content_hash'], $hash)) {
+    $body = sl_text($snapshot, $before, $s['stream']);
+    if (!hash_equals($job['content_hash'], $hash) || $body !== $job['body']) {
         $state = $s['mode'] === 'auto' ? 'ready' : 'pending';
-        $body = sl_text($snapshot, $before, $s['stream']);
         try { sl_messages($body); } catch (LengthException) { $state = 'oversized'; }
         run('UPDATE staff_line_jobs SET snapshot = ?, before_snapshot = ?, body = ?, content_hash = ?, state = ?, approved_by = NULL WHERE id = ?',
             [sl_json($snapshot), $before === null ? null : sl_json($before), $body, $hash, $state, $job['id']]);
