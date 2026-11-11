@@ -43,7 +43,7 @@ require BASE_DIR . '/src/line.php';
 require BASE_DIR . '/src/admin.php';
 require BASE_DIR . '/src/staff_line.php';
 if (!$mysql) {
-    run("CREATE TABLE shift_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, home_store TEXT, sort_order INT DEFAULT 0, is_active INT DEFAULT 1, off_days TEXT DEFAULT '', work_from TEXT DEFAULT '', work_to TEXT DEFAULT '')");
+    run("CREATE TABLE shift_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, home_store TEXT, sort_order INT DEFAULT 0, is_active INT DEFAULT 1, off_days TEXT DEFAULT '', work_from TEXT DEFAULT '', work_to TEXT DEFAULT '', role TEXT DEFAULT '')");
     run('CREATE TABLE shift_entries (staff_id INT, work_date TEXT, store TEXT, time_from TEXT, time_to TEXT, PRIMARY KEY(staff_id,work_date))');
 }
 ensure_shift_tables();

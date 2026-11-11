@@ -35,6 +35,8 @@ function ensure_shift_tables(): void
     if (!$has) {
         run("ALTER TABLE shift_staff ADD COLUMN off_days VARCHAR(20) NOT NULL DEFAULT ''");
     }
+    $hasRole = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = 'role'");
+    if (!$hasRole) { run("ALTER TABLE shift_staff ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT ''"); }
     // スタッフごとの、ふだんの勤務時間（例 9:00〜18:00）
     foreach (['work_from', 'work_to'] as $col) {
         $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = '{$col}'");
@@ -210,7 +212,7 @@ function shift_month(?string $m): DateTimeImmutable
 
 function shift_staff_list(bool $onlyActive = true): array
 {
-    return rows('SELECT id, name, home_store, is_active, off_days, work_from, work_to FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
+    return rows('SELECT id, name, home_store, is_active, off_days, work_from, work_to, role FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
 }
 
 /** その月の、スタッフ×日の出勤先 [staff_id][Y-m-d] => [store, changed] */
@@ -573,6 +575,12 @@ function h_shift_staff(): void
     render('shift_staff', ['staff' => $staff, 'week' => SHIFT_WEEK]);
 }
 
+function shift_staff_role(mixed $value): string
+{
+    if (!is_string($value) || !in_array($value, ['', 'stylist', 'assistant'], true)) { throw new HttpError(400); }
+    return $value;
+}
+
 function h_shift_staff_add(): void
 {
     require_admin();
@@ -590,7 +598,8 @@ function h_shift_staff_add(): void
         $work = array_filter((array)($_POST['work'] ?? []), static fn($w) => is_scalar($w) && preg_match('/^[0-6]$/', (string)$w));
         $off = implode(',', array_diff(range(0, 6), array_map('intval', $work)));
     }
-    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to, off_days) VALUES (?,?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt, $off]);
+    $role = shift_staff_role($_POST['role'] ?? '');
+    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to, off_days, role) VALUES (?,?,?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt, $off, $role]);
     redirect_to('/settings/staff');
 }
 
@@ -613,7 +622,12 @@ function h_shift_staff_off(int $id): void
     }
     $wf = shift_time($_POST['work_from'] ?? '') ?? '';
     $wt = shift_time($_POST['work_to'] ?? '') ?? '';
-    run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $id]);
+    if (array_key_exists('role', $_POST)) {
+        $role = shift_staff_role($_POST['role']);
+        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ?, role = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $role, $id]);
+    } else {
+        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $id]);
+    }
     redirect_to('/settings/staff');
 }
 
@@ -712,7 +726,7 @@ function h_shift_customer_print(): void
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
     $store = 'イノ';
-    $staff = array_values(array_filter(shift_staff_list(), static fn($s) => $s['home_store'] === $store));
+    $staff = array_values(array_filter(shift_staff_list(), static fn($s) => $s['home_store'] === $store && ($s['role'] ?? '') === 'stylist'));
     $entries = shift_entries_of($first);
     $days = shift_days($first);
     foreach ($days as &$day) {
@@ -733,5 +747,5 @@ function h_shift_customer_print(): void
     unset($day);
     $month = (int)$first->format('n');
     render('shift_customer_print', ['nav'=>shift_nav($first), 'year'=>$first->format('Y'), 'month_number'=>$month,
-        'store'=>$store, 'stores'=>SHIFT_STORES, 'theme'=>shift_customer_themes()[$month], 'weeks'=>shift_weeks($days)]);
+        'store'=>$store, 'staff_count'=>count($staff), 'stores'=>SHIFT_STORES, 'theme'=>shift_customer_themes()[$month], 'weeks'=>shift_weeks($days)]);
 }

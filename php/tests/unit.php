@@ -173,6 +173,10 @@ check('お客様休み表 休日出勤は休みに載せない', shift_customer_
 check('お客様休み表 一部休み', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'休','tf'=>'9:00','tt'=>'10:00'])['note'], '9〜10時休み');
 check('お客様休み表 短縮勤務', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'イノ','tf'=>'','tt'=>'14:00'])['note'], '14時まで出勤');
 check('お客様休み表 12か月分のテーマ', count(shift_customer_themes()), 12);
+check('職種 スタイリスト', shift_staff_role('stylist'), 'stylist');
+check('職種 アシスタント', shift_staff_role('assistant'), 'assistant');
+check('職種 既存は未設定', shift_staff_role(''), '');
+try { shift_staff_role('unknown'); check('職種 不正な値を拒否', false, true); } catch (HttpError $e) { check('職種 不正な値を拒否', $e->status, 400); }
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
