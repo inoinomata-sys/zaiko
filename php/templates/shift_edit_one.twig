@@ -18,6 +18,16 @@
 .edit-times input{display:block;appearance:none;-webkit-appearance:none;width:100%;min-width:0;max-width:100%;height:50px;margin-top:7px;font-size:19px;font-family:inherit;padding:10px 6px;background:#fff;color:var(--fg);border:1px solid var(--border);border-radius:10px;box-sizing:border-box}.edit-times input::-webkit-date-and-time-value{min-width:0;text-align:left}.edit-times input::-webkit-datetime-edit{padding:0}
 .edit-note{font-size:12px;color:var(--fg2);line-height:1.8;margin:12px 0}.edit-actions{display:flex;gap:10px;margin-top:20px}.edit-actions button{flex:1;justify-content:center;padding:14px;font-size:16px}.edit-error{font-size:13px;color:var(--danger);line-height:1.7}
 [hidden]{display:none!important}@media(max-width:360px){.cal-head,.cal-week{gap:2px}.cal-cell{padding:5px 2px}.edit-dialog{padding:18px}}
+.edit-dialog{padding-bottom:max(20px,env(safe-area-inset-bottom));overscroll-behavior:contain}
+.edit-dialog .btn{white-space:normal;line-height:1.5;min-height:46px}
+.edit-dialog #time-reset{display:flex;margin-top:16px;padding:10px 14px;background:#f5f5f5;border-color:#d4d4d4;color:#555;font-size:13px}
+.edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+.edit-actions button{min-height:50px;padding:12px 8px;border-radius:12px}
+.edit-remove{margin-top:26px;padding-top:20px;border-top:1px solid #e2e2e2}
+.edit-remove #entry-reset{display:flex;width:100%;justify-content:center;min-height:46px;font-size:13px;background:#fff;border-color:#bbb;color:#666;padding:10px}
+.edit-remove p{font-size:11px;line-height:1.8;color:#777;margin:8px 0 0;text-align:center}
+.edit-options label{min-height:64px;cursor:pointer}.edit-options label:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+#rg-box input,#rg-box select,#rg-box button{min-height:46px}#rg-box .row{gap:12px;margin-bottom:16px}
 </style>{% endblock %}
 {% block content %}
 <p><a href="/shift?month={{ nav.month }}">← 出勤一覧にもどる</a></p>
@@ -25,12 +35,12 @@
 <div class="who">{% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on" aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</div>
 <p class="eo-hint">日付を押して、出勤・休みと時間を設定します。「保存」を押すまで変更されません。定休日も「出勤」を選んで登録できます。</p>
 <div class="rg">
-  <button type="button" class="rg-btn" id="rg-open">連休をまとめて入れる ▾</button>
+  <button type="button" class="rg-btn" id="rg-open">複数日をまとめて登録 ▾</button>
   <div id="rg-box" hidden>
     <div class="row"><input type="date" id="rg-from" value="{{ nav.month }}-01"><span>から</span><input type="date" id="rg-to" value="{{ nav.month }}-01"><span>まで</span></div>
-    <div class="row"><select id="rg-v"><option value="休">休み希望</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option><option value="">消す（空に戻す）</option></select>
+    <div class="row"><select id="rg-v"><option value="休">休み希望</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option><option value="">個別登録を取り消す</option></select>
       <span id="rg-tm" class="row" style="margin:0"><input type="time" id="rg-tf"><span>〜</span><input type="time" id="rg-tt"><span style="font-size:12px;color:var(--fg2)">（空なら出勤は基本時間・休みは終日）</span></span></div>
-    <div class="row"><button class="btn" type="button" id="rg-go">入れる</button><span id="rg-msg" style="font-size:13px;color:var(--fg2)"></span></div>
+    <div class="row"><button class="btn" type="button" id="rg-go">保存</button><span id="rg-msg" style="font-size:13px;color:var(--fg2)"></span></div>
   </div>
 </div>
 <div class="cal"><div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
@@ -43,7 +53,7 @@
 <h2 id="edit-title">勤務の登録</h2><fieldset><legend>勤務の種類</legend><div class="edit-options"><label><input type="radio" name="kind" value="work">出勤</label><label><input type="radio" name="kind" value="off">休み</label></div></fieldset>
 <div id="work-store"><label class="field-label" for="edit-store">勤務する店舗</label><select id="edit-store"><option>イノ</option><option>リッチ</option></select></div>
 <div id="time-area"><div class="edit-times"><label>開始<input type="time" id="edit-from"></label><label>終了<input type="time" id="edit-to"></label></div><p class="edit-note" id="time-note"></p><button type="button" class="btn btn-ghost btn-sm" id="time-reset">時間指定を外す</button></div>
-<button type="button" class="btn btn-ghost btn-sm" id="entry-reset">この日の登録を取り消す</button><p id="edit-error" class="edit-error" role="alert"></p><div class="edit-actions"><button type="button" class="btn btn-ghost" id="edit-cancel">キャンセル</button><button type="submit" class="btn btn-primary" id="edit-save">保存</button></div>
+<p id="edit-error" class="edit-error" role="alert"></p><div class="edit-actions"><button type="button" class="btn btn-ghost" id="edit-cancel">キャンセル</button><button type="submit" class="btn btn-primary" id="edit-save">保存する</button></div><div class="edit-remove"><button type="button" class="btn btn-ghost" id="entry-reset">この日の個別登録を取り消す</button><p>取り消すと、基本シフトに戻ります。</p></div>
 </form></dialog>
 {% endblock %}
 {% block scripts %}<script>
@@ -54,7 +64,7 @@
  const pad=v=>v ? v.padStart(5,'0') : '';
  const home={{ one.home_store|tojson|raw }};
  function fields(){const k=kind();document.getElementById('work-store').hidden=k!=='work';document.getElementById('time-area').hidden=k==='base';document.getElementById('time-note').textContent=k==='off'?'空欄なら終日休み。時間を入れると、その時間だけ休みです。':'空欄なら基本の勤務時間を使います。出勤できる時間だけ指定することもできます。';}
- document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>cell.addEventListener('click',()=>{active=cell;const v=cell.dataset.store;form.querySelector('input[value="'+(v==='休'||(!v&&cell.dataset.off==='1')?'off':'work')+'"]').checked=true;store.value=v&&v!=='休'?v:home;from.value=pad(cell.dataset.tf);to.value=pad(cell.dataset.tt);error.textContent='';document.getElementById('entry-reset').hidden=!v;document.getElementById('edit-title').textContent=cell.dataset.date.replaceAll('-','/')+' の勤務';fields();dialog.showModal();}));
+ document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>cell.addEventListener('click',()=>{active=cell;const v=cell.dataset.store;form.querySelector('input[value="'+(v==='休'||(!v&&cell.dataset.off==='1')?'off':'work')+'"]').checked=true;store.value=v&&v!=='休'?v:home;from.value=pad(cell.dataset.tf);to.value=pad(cell.dataset.tt);error.textContent='';document.querySelector('.edit-remove').hidden=!v;document.getElementById('edit-title').textContent=cell.dataset.date.replaceAll('-','/')+' の勤務';fields();dialog.showModal();}));
  form.querySelectorAll('[name=kind]').forEach(r=>r.addEventListener('change',()=>{from.value='';to.value='';error.textContent='';fields();}));
  document.getElementById('entry-reset').addEventListener('click',()=>{if(!busy&&confirm('この日の個別登録を取り消しますか？ 通常の勤務曜日・時間に戻ります。')){clearing=true;form.requestSubmit();}});
  document.getElementById('time-reset').addEventListener('click',()=>{from.value='';to.value='';});
@@ -64,7 +74,7 @@
  busy=true;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);save.textContent='保存中…';error.textContent='';
  try{const res=await fetch('/api/shift',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({staff_id:{{ one.id }},date:active.dataset.date,store:v,time_from:tf,time_to:tt})});const j=await res.json();if(!res.ok||!j.ok)throw new Error();active.dataset.store=v;active.dataset.tf=tf;active.dataset.tt=tt;active.classList.toggle('set',v!=='');active.querySelector('.day-value').textContent=v==='休'?'休み':v||(active.dataset.off==='1'?'定休':'基本');active.querySelector('.day-time').textContent=tf||tt?tf+'〜'+tt:'';dialog.close();toast('保存しました');}
  catch(e){error.textContent='保存できませんでした。内容はそのままなので、もう一度保存してください。';}
- finally{busy=false;clearing=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);save.textContent='保存';}
+ finally{busy=false;clearing=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);save.textContent='保存する';}
  });
 })();
 (function () {
