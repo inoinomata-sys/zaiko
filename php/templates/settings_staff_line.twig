@@ -5,7 +5,7 @@
 </style>{% endblock %}
 {% block content %}
 <h1>店舗スケジュールのLINE共有</h1><p>出勤スケジュールは共有対象に含めません。</p><div class="sl-steps">① 共有する店舗予定を選ぶ　→　② 内容を確認する　→　③ 承認する</div>
-<p>火〜土の毎朝8:55（日本時間）。日月の通常配信はありません。土曜は登録された日曜分、設定により登録された月曜分もまとめます。</p>
+<p>月〜金の夜20:00（日本時間）に翌日分を配信します。金曜は土曜分に加え、共有する予定や勤務変更がある日曜・月曜分もまとめます。土日の通常配信はありません。</p>
 <p>変更・削除通知は、共有済みの今日以降の予定を対象に毎分確認します。日月も変更通知は動きます。</p>
 {% if not delivery_enabled %}<p class="sl-note">実送信は停止中です。サーバー側の送信許可が必要です。</p>{% endif %}
 {% if not configured %}<p class="sl-note">スタッフ用LINE認証情報・専用管理パスワードが未設定です。</p>{% endif %}
@@ -16,7 +16,7 @@
 <label>モード <select name="mode"><option value="approval" {% if settings.mode == 'approval' %}selected{% endif %}>内容を確認して承認</option><option value="auto" {% if settings.mode == 'auto' %}selected{% endif %}>完全自動</option></select></label>
 <label>送信先グループ <select name="group_id"><option value="">未選択</option>{% for g in groups %}<option value="{{ g.group_id }}" {% if settings.group_id == g.group_id %}selected{% endif %}>グループ …{{ g.group_id|slice(-8) }}</option>{% endfor %}</select></label>
 <p>スタッフ専用公式アカウントを招待し、一言投稿すると候補に出ます。送信先は末尾の番号で管理者が照合してください。</p>
-<label><input type="checkbox" name="include_monday" {% if settings.include_monday %}checked{% endif %}> 土曜に登録された月曜分も含める</label>
+
 <label><input type="checkbox" name="notify_changes" {% if settings.notify_changes %}checked{% endif %}> 共有済み予定の変更・削除を通知する</label>
 <h3>LINEで共有を許可する店舗予定</h3>
 <p>予定名に顧客名や個人の事情を入力しないでください。日ごとの自由メモは共有しません。</p>
@@ -33,7 +33,7 @@
 <pre>{{ preview }}</pre><p>この表示では送信も予約も行いません。</p>
 <form method="post" action="/settings/staff-line/prepare"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><label>共有専用の管理パスワード <input type="password" name="staff_password" required></label><button class="btn">現在の配信待ちを作成（送信は定期処理）</button></form></div>
 <h2>3. 承認・送信状況を確認する</h2><p>最新100件を表示しています。</p>
-<p>「LINE受付」はAPIが受け付けた状態です。既読・全員への到達を示すものではありません。前もって承認すると8:55に送信します。8:55以降の承認は次の定期処理で送信します（当日中）。</p>
+<p>「LINE受付」はAPIが受け付けた状態です。既読・全員への到達を示すものではありません。前もって承認すると20:00に送信します。20:00以降の承認は次の定期処理で送信します（当日中）。</p>
 {% set labels = {'pending':'承認待ち','ready':'送信待ち','retry':'再送待ち','accepted':'LINE受付','failed':'失敗・設定確認','uncertain':'要確認・再送停止','cancelled':'取消','expired':'期限切れ','superseded':'設定変更で取消','oversized':'内容が長すぎます（共有対象を減らしてください）'} %}
 {% for j in jobs %}<details class="sl-card" {% if j.state in ['pending','ready','retry','failed','uncertain'] %}open{% endif %}><summary><b>#{{ j.id }} {{ labels[j.state]|default(j.state) }}</b> ／ {{ j.created_at }}</summary><p>{{ j.created_at }} ／ 配信予定 {{ j.scheduled_at }} ／ グループ …{{ j.group_id|slice(-8) }} ／ 試行 {{ j.attempts }}回 ／ HTTP {{ j.http_status|default('—') }}</p>
 {% if j.approved_by %}<p>承認者：{{ j.approved_by }}</p>{% endif %}<pre>{{ j.body }}</pre>

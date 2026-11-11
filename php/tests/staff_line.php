@@ -107,13 +107,13 @@ run("UPDATE shift_entries SET store='イノ',time_from=NULL,time_to=NULL WHERE s
 $_GET['stream'] = 'shift';
 try { sl_stream(); expect(false, 'shift sharing settings rejected'); } catch (HttpError $e) { expect($e->status === 400, 'shift sharing settings rejected'); }
 $_GET = [];
-foreach (['2026-11-15 08:55','2026-11-16 08:55','2026-11-17 08:54'] as $t) { expect(!sl_daily_due(at($t)), "no regular delivery {$t}"); }
-foreach (['2026-11-17 08:55','2026-11-18 08:55','2026-11-19 08:55','2026-11-20 08:55','2026-11-21 08:55'] as $t) { expect(sl_daily_due(at($t)), "regular delivery {$t}"); }
-expect(sl_daily_due(new DateTimeImmutable('2026-11-16 23:55:00+00:00')), 'UTC converted to JST');
-expect(sl_dates(at('2026-11-14'), false, fn($d) => true) === ['2026-11-14','2026-11-15'], 'Saturday includes registered Sunday');
-expect(sl_dates(at('2026-11-14'), true, fn($d) => true) === ['2026-11-14','2026-11-15','2026-11-16'], 'optional Monday');
-expect(sl_dates(at('2026-11-14'), true, fn($d) => false) === ['2026-11-14'], 'unregistered weekend days excluded');
-expect(sl_dates(at('2027-01-30'), true, fn($d) => true) === ['2027-01-30','2027-01-31','2027-02-01'], 'month boundary');
+foreach (['2026-11-14 20:00','2026-11-15 20:00','2026-11-16 19:59'] as $t) { expect(!sl_daily_due(at($t)), "no regular delivery {$t}"); }
+foreach (['2026-11-16 20:00','2026-11-17 20:00','2026-11-18 20:00','2026-11-19 20:00','2026-11-20 20:00'] as $t) { expect(sl_daily_due(at($t)), "regular delivery {$t}"); }
+expect(sl_daily_due(new DateTimeImmutable('2026-11-16 11:00:00+00:00')), 'UTC converted to JST');
+expect(sl_dates(at('2026-11-13'), false, fn($d) => true) === ['2026-11-14','2026-11-15','2026-11-16'], 'Friday includes registered Sunday and Monday');
+expect(sl_dates(at('2026-11-16'), true, fn($d) => true) === ['2026-11-17'], 'Monday evening sends Tuesday');
+expect(sl_dates(at('2026-11-13'), true, fn($d) => false) === ['2026-11-14'], 'unregistered weekend days excluded');
+expect(sl_dates(at('2027-01-29'), true, fn($d) => true) === ['2027-01-30','2027-01-31','2027-02-01'], 'month boundary');
 expect(sl_result(200, []) === 'accepted' && sl_result(409,['x-line-accepted-request-id'=>'abc']) === 'accepted', 'accepted response and duplicate acknowledgement');
 expect(sl_result(409,[]) === 'failed' && sl_result(401,[]) === 'failed' && sl_result(429,[]) === 'failed', 'permanent failures do not auto retry');
 expect(sl_result(0,[]) === 'retry' && sl_result(503,[]) === 'retry', 'transient failures retry');
@@ -142,7 +142,7 @@ try { sl_messages(str_repeat('あ',23000)); expect(false,'oversized message reje
 $deleted = sl_text(['2026-11-14'=>[]], ['2026-11-14'=>['private'=>['label'=>'非公開の氏名','value'=>'私的な予定']]]);
 expect(!str_contains($deleted,'非公開の氏名') && !str_contains($deleted,'私的な予定') && str_contains($deleted,'削除'), 'removed or private content never repeated');
 run("UPDATE staff_line_settings SET enabled = 1, mode = 'approval', group_id = ? WHERE stream = 'store'", [$group]);
-clock_at('2026-11-14 08:30:00');
+clock_at('2026-11-13 19:30:00');
 $calls = [];
 $transport = function($payload,$key) use (&$calls) { $calls[] = [$payload,$key]; return [200,[]]; };
 sl_tick($transport, sl_clock());
@@ -151,8 +151,8 @@ $j = row("SELECT * FROM staff_line_jobs WHERE stream = 'store'");
 expect($j['state'] === 'pending' && str_contains($j['body'],'店舗清掃') && !str_contains($j['body'],'花子'), 'separate store preview queued');
 run("UPDATE staff_line_jobs SET state = 'ready' WHERE id = ?",[$j['id']]);
 sl_tick($transport, sl_clock());
-expect(count($calls) === 0, 'early approval waits until 08:55 JST');
-clock_at('2026-11-14 08:55:00');
+expect(count($calls) === 0, 'early approval waits until 20:00 JST');
+clock_at('2026-11-13 20:00:00');
 run("UPDATE schedule_rules SET title = '店舗清掃の変更' WHERE id = 99001");
 sl_tick($transport, sl_clock());
 expect(count($calls) === 0 && val('SELECT state FROM staff_line_jobs WHERE id = ?',[$j['id']]) === 'pending', 'changed approved content requires approval again');
@@ -162,18 +162,18 @@ expect(count($calls) === 1, 'one send across repeated ticks');
 expect((int)val('SELECT COUNT(*) FROM staff_line_baselines') === 1, 'successful baseline stored');
 run("UPDATE schedule_rules SET title = '店舗清掃の再変更' WHERE id = 99001");
 run("UPDATE staff_line_settings SET mode = 'auto' WHERE stream = 'store'");
-clock_at('2026-11-14 09:00:00');
+clock_at('2026-11-13 20:05:00');
 $failCalls = [];
 $fail = function($payload,$key) use (&$failCalls) { $failCalls[] = [$payload,$key]; return [503,[]]; };
 sl_tick($fail, sl_clock());
 expect(count($failCalls) === 1, 'change notification tried');
 sl_tick($fail, sl_clock());
 expect(count($failCalls) === 1, 'exponential backoff respected');
-clock_at('2026-11-14 09:02:00');
+clock_at('2026-11-13 20:07:00');
 sl_tick($fail, sl_clock());
 expect(count($failCalls) === 2 && $failCalls[0] === $failCalls[1], 'retry freezes both recipient payload and UUID');
 $duplicate = fn($p,$k) => [409,['x-line-accepted-request-id'=>'first']];
-clock_at('2026-11-14 09:05:00'); sl_tick($duplicate, sl_clock());
+clock_at('2026-11-13 20:10:00'); sl_tick($duplicate, sl_clock());
 expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE state = 'accepted'") === 2, 'duplicate acknowledged as accepted');
 run('DELETE FROM schedule_rules WHERE id = 99001');
 sl_tick($transport, sl_clock());
@@ -185,10 +185,10 @@ $beforeShift = count($calls); sl_tick($transport, sl_clock());
 expect(count($calls) === $beforeShift && (int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE stream = 'shift' AND state <> 'cancelled'") === 0, 'legacy shift setting cannot generate any LINE jobs');
 expect((int)val("SELECT enabled FROM staff_line_settings WHERE stream = 'shift'") === 0, 'legacy shift sharing automatically disabled');
 run("INSERT INTO schedule_rules (id,title,store,kind,once_date) VALUES (99001,'公開確認','イノ','once','2026-11-14')");
-clock_at('2026-11-14 09:10:00'); sl_tick($fail, sl_clock());
+clock_at('2026-11-13 20:15:00'); sl_tick($fail, sl_clock());
 expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE state = 'retry'") === 1, 'failed store change queued');
 run("DELETE FROM staff_line_visibility WHERE kind = 'rule'");
-clock_at('2026-11-14 09:15:00'); sl_tick($transport, sl_clock());
+clock_at('2026-11-13 20:20:00'); sl_tick($transport, sl_clock());
 expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE state = 'uncertain'") === 1, 'privacy change stops retry of previously attempted payload');
 run('UPDATE staff_line_groups SET active = 0');
 run("INSERT INTO schedule_rules (id,title,store,kind,once_date) VALUES (99002,'連絡','イノ','once','2026-11-14')");

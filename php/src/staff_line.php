@@ -57,18 +57,18 @@ function sl_admin(): void
 function sl_daily_due(DateTimeImmutable $now): bool
 {
     $now = $now->setTimezone(new DateTimeZone('Asia/Tokyo'));
-    return in_array((int)$now->format('N'), [2,3,4,5,6], true) && $now->format('H:i') >= '08:55';
+    return in_array((int)$now->format('N'), [1,2,3,4,5], true) && $now->format('H:i') >= '20:00';
 }
 
 function sl_dates(DateTimeImmutable $now, bool $monday, callable $registered): array
 {
     $now = $now->setTimezone(new DateTimeZone('Asia/Tokyo'))->setTime(0, 0);
-    $dates = [$now->format('Y-m-d')];
-    if ($now->format('N') === '6') {
-        $sun = $now->modify('+1 day')->format('Y-m-d');
-        if ($registered($sun)) { $dates[] = $sun; }
-        $mon = $now->modify('+2 days')->format('Y-m-d');
-        if ($monday && $registered($mon)) { $dates[] = $mon; }
+    $dates = [$now->modify('+1 day')->format('Y-m-d')];
+    if ($now->format('N') === '5') {
+        foreach ([2, 3] as $offset) {
+            $date = $now->modify('+' . $offset . ' days')->format('Y-m-d');
+            if ($registered($date)) { $dates[] = $date; }
+        }
     }
     return $dates;
 }
@@ -173,9 +173,9 @@ function sl_generate(array $s, DateTimeImmutable $now): void
 {
     $today = $now->format('Y-m-d');
     $expiry = $today . ' 23:59:59';
-    if (sl_daily_due($now->setTime(8, 55))) {
+    if (sl_daily_due($now->setTime(20, 0))) {
         $dates = sl_dates($now, (bool)$s['include_monday'], static fn($date) => sl_snapshot($date, $s['stream']) !== []);
-        sl_enqueue('daily:' . $s['stream'] . ':' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'daily', sl_bundle($dates, $s['stream']), null, $s, $expiry, $today . ' 08:55:00');
+        sl_enqueue('daily:' . $s['stream'] . ':' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'daily', sl_bundle($dates, $s['stream']), null, $s, $expiry, $today . ' 20:00:00');
     }
     if (!$s['notify_changes']) { return; }
     $baselines = rows('SELECT * FROM staff_line_baselines WHERE stream = ? AND group_id = ? AND work_date >= ? ORDER BY work_date', [$s['stream'], $s['group_id'], $today]);
