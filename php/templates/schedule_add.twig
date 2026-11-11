@@ -8,10 +8,14 @@
 <h1 style="margin-top:20px">この日だけの予定を追加</h1><p class="once-note">日付は選択済みです。予定名を入れて保存してください。</p>
 <form class="once-card" method="post" action="/schedule/add" onsubmit="this.querySelector('button[type=submit]').disabled=true">
 <input type="hidden" name="form_key" value="{{ form_key }}">
-<label for="once-date">日付</label><input id="once-date" type="date" name="once_date" value="{{ date }}" required>
+<label class="once-share"><input type="checkbox" name="is_closure" id="is-closure">店休日として登録（正月休み・夏季休暇など）</label>
+<label for="once-date">開始日</label><input id="once-date" type="date" name="once_date" value="{{ date }}" required>
+<div id="closure-end" hidden><label for="end-date">終了日</label><input type="date" id="end-date" name="end_date" value="{{ date }}"><p class="once-note">開始日から終了日までを店休日として登録します。</p></div>
 <label for="once-title">予定名</label><input id="once-title" name="title" placeholder="例：ミーティング、大掃除" maxlength="80" required autofocus>
 <label for="once-store">店舗</label><select id="once-store" name="store"><option value="">両方の店舗</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option></select>
 <label class="once-share"><input type="checkbox" name="share_line"> この予定をスタッフLINEで共有する</label><p class="once-note">チェックした予定だけが自動配信の対象になります。</p>
 <button class="btn" type="submit">保存してカレンダーに戻る</button>
 </form><p class="once-note">毎週・毎月の予定は、<a href="/schedule/rules">繰り返し予定の管理</a>から登録できます。</p>
 </div>{% endblock %}
+
+{% block scripts %}<script>const closure=document.getElementById('is-closure'),end=document.getElementById('end-date'),start=document.getElementById('once-date');closure.addEventListener('change',()=>{document.getElementById('closure-end').hidden=!closure.checked;if(closure.checked&&!document.getElementById('once-title').value)document.getElementById('once-title').value='店休日';});start.addEventListener('change',()=>{if(end.value<start.value)end.value=start.value;});</script>{% endblock %}

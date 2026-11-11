@@ -220,7 +220,7 @@ function shift_staff_list(bool $onlyActive = true): array
 /** 週の定休と祝日休みを共通判定する。個別登録は呼び出し側で優先する。 */
 function shift_is_default_off(array $staff, array $day): bool
 {
-    if ((int)$day['dow'] === 1) { return true; }
+    if ((int)$day['dow'] === 1 || !empty($day['closed_stores'][$staff['home_store'] ?? '']) || !empty($GLOBALS['shift_closure_map'][$day['date'] ?? ''][$staff['home_store'] ?? ''])) { return true; }
     if (in_array((int)$day['dow'], shift_off_days($staff), true)) { return true; }
     if (empty($staff['holiday_off'])) { return false; }
     if (!empty($day['hol'])) { return true; }
@@ -410,6 +410,7 @@ function h_shift(): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
+    $GLOBALS['shift_closure_map'] = schedule_closure_map($first);
     $view = ($_GET['view'] ?? '') === 'changes' ? 'changes' : 'all';
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
@@ -419,7 +420,7 @@ function h_shift(): void
         $notes[substr((string)$n['work_date'], 0, 10)][] = $n;
     }
     foreach ($days as &$day) {
-        $day['closed'] = (int)$day['dow'] === 1;
+        $day['closed'] = (int)$day['dow'] === 1 || !empty($GLOBALS['shift_closure_map'][$day['date']]['イノ']);
         $day['notes'] = $notes[$day['date']] ?? [];
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         $day['items'] = [];
@@ -474,6 +475,7 @@ function h_shift_edit(): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
+    $GLOBALS['shift_closure_map'] = schedule_closure_map($first);
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
     if (isset($_GET['staff'])) {   // ひとりぶんを、カレンダーで入れる
@@ -743,13 +745,14 @@ function h_shift_customer_print(bool $asPdf = false): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
+    $GLOBALS['shift_closure_map'] = schedule_closure_map($first);
     $store = 'イノ';
     $staff = array_values(array_filter(shift_staff_list(), static fn($s) => $s['home_store'] === $store && ($s['role'] ?? '') === 'stylist'));
     $entries = shift_entries_of($first);
     $days = shift_days($first);
     foreach ($days as &$day) {
         $day['holidays'] = [];
-        $day['closed'] = (int)$day['dow'] === 1;
+        $day['closed'] = (int)$day['dow'] === 1 || !empty($GLOBALS['shift_closure_map'][$day['date']]['イノ']);
         if ($day['closed']) { continue; }
         // 日曜はお客様に既知のため、日付だけを残し休みの名前を省く。
         if ((int)$day['dow'] === 0) { continue; }

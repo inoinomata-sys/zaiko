@@ -21,8 +21,10 @@ function ensure_schedule_tables(): void
         day_of_month TINYINT NULL,
         once_date DATE NULL,
         is_active TINYINT NOT NULL DEFAULT 1,
+        is_closure TINYINT NOT NULL DEFAULT 0,
         sort_order INT NOT NULL DEFAULT 0
     ) DEFAULT CHARSET=utf8mb4');
+    if (!(int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'schedule_rules' AND column_name = 'is_closure'")) { run('ALTER TABLE schedule_rules ADD COLUMN is_closure TINYINT NOT NULL DEFAULT 0'); }
     if (!$existed) {   // 最初に表を作った時だけ、最初の予定を入れる
         $seed = [['発注日前日（トピー商事）', 2], ['発注日前日（アイテム）', 3], ['発注日前日（ワールド）', 4],
                  ['夜間清掃日', 3], ['ゴミ出し', 4], ['ゴミ出し', 0]];
@@ -31,6 +33,19 @@ function ensure_schedule_tables(): void
         }
     }
     $done = true;
+}
+
+/** 店舗カレンダーの登録を唯一の店休日データとして利用する。 */
+function schedule_closure_map(DateTimeImmutable $first): array
+{
+    ensure_schedule_tables();
+    $map = [];
+    $start = $first->format('Y-m-01'); $end = $first->format('Y-m-t');
+    foreach (rows("SELECT store, once_date FROM schedule_rules WHERE is_active = 1 AND is_closure = 1 AND kind = 'once' AND once_date BETWEEN ? AND ?", [$start,$end]) as $rule) {
+        $date = substr((string)$rule['once_date'],0,10);
+        foreach ($rule['store'] === '' ? SHIFT_STORES : [$rule['store']] as $store) { $map[$date][$store] = true; }
+    }
+    return $map;
 }
 
 function schedule_matches(array $r, DateTimeImmutable $d): bool
@@ -127,6 +142,27 @@ function h_schedule_once(): void
 function h_schedule_once_save(): void
 {
     if (!hash_equals(schedule_add_key(), (string)($_POST['form_key'] ?? ''))) { throw new HttpError(403); }
+    if (isset($_POST['is_closure'])) {
+        ensure_schedule_tables(); ensure_staff_line_tables();
+        $start = (string)($_POST['once_date'] ?? '');
+        $end = (string)($_POST['end_date'] ?? $start);
+        $a = DateTimeImmutable::createFromFormat('!Y-m-d', $start);
+        $b = DateTimeImmutable::createFromFormat('!Y-m-d', $end);
+        $store = (string)($_POST['store'] ?? '');
+        if (!$a || !$b || $a->format('Y-m-d') !== $start || $b->format('Y-m-d') !== $end || $b < $a || $a->diff($b)->days > 61 || !in_array($store, ['', ...SHIFT_STORES], true)) { throw new HttpError(400); }
+        $title = mb_substr(trim((string)($_POST['title'] ?? '')),0,80);
+        if ($title === '') { $title = '店休日'; }
+        transaction(function () use ($a,$b,$store,$title) {
+            for ($d=$a;$d<=$b;$d=$d->modify('+1 day')) {
+                $date=$d->format('Y-m-d');
+                if (val("SELECT id FROM schedule_rules WHERE is_active=1 AND is_closure=1 AND store=? AND once_date=?",[$store,$date])) { continue; }
+                run("INSERT INTO schedule_rules (title,store,kind,once_date,sort_order,is_closure) VALUES (?,?,'once',?,0,1)",[$title,$store,$date]);
+                $id=last_id();
+                if(isset($_POST['share_line'])) { run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('rule',?,1)",[$id]); }
+            }
+        });
+        redirect_to('/schedule?month=' . $a->format('Y-m'));
+    }
     $_POST['kind'] = 'once';
     h_schedule_add();
 }

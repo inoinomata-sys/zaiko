@@ -187,6 +187,8 @@ check('祝日休み 個別出勤を優先', shift_calendar_entry($holidayStaff,$
 check('祝日休み 個別出勤は休日出勤', shift_difference($holidayStaff,$holidayDay,['store'=>'イノ','tf'=>'','tt'=>'']), ['休日出勤']);
 check('祝日休み お客様の休み表に反映', shift_customer_holiday($holidayStaff,$holidayDay,null)['full'], true);
 check('店休日 月曜は勤務曜日設定にかかわらず通常休み', shift_is_default_off(['off_days'=>''],['dow'=>1]), true);
+check('店舗の店休日 曜日設定より優先', shift_is_default_off(['home_store'=>'イノ','off_days'=>''],['dow'=>4,'date'=>'2027-01-01','closed_stores'=>['イノ'=>true]]), true);
+check('店舗の店休日 別店舗には影響しない', shift_is_default_off(['home_store'=>'リッチ','off_days'=>''],['dow'=>4,'date'=>'2027-01-01','closed_stores'=>['イノ'=>true]]), false);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

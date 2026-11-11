@@ -75,9 +75,9 @@ function sl_dates(DateTimeImmutable $now, bool $monday, callable $registered): a
 
 /** 明示的に共有を許可したスタッフ・予定だけ。顧客、電話、メモ、休暇理由は取得しない。 */
 /** 基本の勤務と異なる個別登録だけを共有。理由・自由メモは含めない。 */
-function sl_work_exception(array $staff, array $entry, DateTimeImmutable $date): ?array
+function sl_work_exception(array $staff, array $entry, DateTimeImmutable $date, array $closedStores = []): ?array
 {
-    $off = shift_is_default_off($staff, ['dow'=>(int)$date->format('w'), 'date'=>$date->format('Y-m-d')]);
+    $off = shift_is_default_off($staff, ['dow'=>(int)$date->format('w'), 'date'=>$date->format('Y-m-d'), 'closed_stores'=>$closedStores]);
     $store = $entry['store'];
     if ($store === SHIFT_OFF) {
         if ($off) { return null; }
@@ -100,13 +100,14 @@ function sl_snapshot(string $date, string $stream = 'store'): array
     $d = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
     $items = [];
     if ($stream !== 'store') { return []; }
+    $closures = schedule_closure_map($d);
     if ($stream === 'store') {
     foreach (rows("SELECT r.* FROM schedule_rules r JOIN staff_line_visibility v ON v.kind = 'rule' AND v.entity_id = r.id AND v.is_public = 1 WHERE r.is_active = 1 ORDER BY r.sort_order, r.id") as $r) {
         if (schedule_matches($r, $d)) { $items['rule:' . $r['id']] = ['label' => $r['title'], 'value' => $r['store'] === '' ? '両店舗' : $r['store']]; }
     }
     }
     foreach (rows("SELECT s.*, e.store, e.time_from, e.time_to FROM shift_staff s JOIN shift_entries e ON e.staff_id = s.id JOIN staff_line_visibility v ON v.kind = 'exception' AND v.entity_id = s.id AND v.is_public = 1 WHERE s.is_active = 1 AND e.work_date = ? ORDER BY s.sort_order, s.id", [$date]) as $staff) {
-        $item = sl_work_exception($staff, $staff, $d);
+        $item = sl_work_exception($staff, $staff, $d, $closures[$date] ?? []);
         if ($item !== null) { $items['exception:' . $staff['id']] = $item; }
     }
     ksort($items);
