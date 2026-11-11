@@ -313,6 +313,28 @@ function shift_week_bars(array $row, array $staff): array
     return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
 }
 
+/** 基本勤務から一部休みの区間を引き、残る出勤時間を返す。 */
+function shift_remaining_hours(array $staff, array $entry): string
+{
+    $minute = static function ($v, int $fallback): int {
+        $t = shift_time($v);
+        if ($t === null || $t === '') { return $fallback; }
+        [$h,$m] = array_map('intval', explode(':', $t));
+        return $h * 60 + $m;
+    };
+    if (($entry['tf'] ?? '') === '' && ($entry['tt'] ?? '') === '') { return ''; }
+    $start = $minute($staff['work_from'] ?? '', 0);
+    $end = $minute($staff['work_to'] ?? '', 1440);
+    $offStart = $minute($entry['tf'] ?? '', 0);
+    $offEnd = $minute($entry['tt'] ?? '', 1440);
+    $fmt = static fn(int $v): string => sprintf('%02d:%02d', intdiv($v,60), $v%60);
+    $parts = [];
+    foreach ([[$start, min($end,$offStart)], [max($start,$offEnd),$end]] as [$a,$b]) {
+        if ($a < $b) { $parts[] = ($a === 0 && empty($staff['work_from']) ? '' : $fmt($a)) . '〜' . ($b === 1440 ? '' : $fmt($b)); }
+    }
+    return implode('／', $parts);
+}
+
 /** 個別登録を基本シフトと比較する。登録しただけの同じ勤務は変更扱いにしない。 */
 function shift_difference(array $staff, array $day, ?array $entry): array
 {
@@ -320,7 +342,7 @@ function shift_difference(array $staff, array $day, ?array $entry): array
     $off = in_array((int)$day['dow'], shift_off_days($staff), true);
     $tags = [];
     if ($entry['store'] === SHIFT_OFF) {
-        return $off ? [] : ['休み'];
+        return $off ? [] : [(($entry['tf'] ?? '') !== '' || ($entry['tt'] ?? '') !== '') ? '一部休み' : '休み'];
     }
     if ($off) { $tags[] = '休日出勤'; }
     if ($entry['store'] !== $staff['home_store']) { $tags[] = 'ヘルプ'; }
@@ -337,7 +359,11 @@ function shift_calendar_entry(array $staff, array $day, ?array $entry, string $v
         return $entry !== null && $entry['store'] === SHIFT_OFF ? $entry : null;
     }
     if ($entry !== null) {
-        return $entry['store'] === SHIFT_OFF ? null : $entry;
+        if ($entry['store'] !== SHIFT_OFF) { return $entry; }
+        if (in_array((int)$day['dow'], shift_off_days($staff), true)) { return null; }
+        $hours = shift_remaining_hours($staff, $entry);
+        if ($hours === '') { return null; }
+        return array_replace($entry, ['store' => $staff['home_store'], 'work_hours' => $hours, 'partial_off' => true]);
     }
     $off = in_array((int)$day['dow'], shift_off_days($staff), true);
     if ($off) { return null; }
@@ -382,10 +408,10 @@ function h_shift(): void
                 'changed' => $e['changed'],
                 'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
-                'hours' => $e['store'] !== SHIFT_OFF ? shift_time_label(($e['tf'] !== '' || $e['tt'] !== '') ? $e['tf'] : $s['work_from'], ($e['tf'] !== '' || $e['tt'] !== '') ? $e['tt'] : $s['work_to'], false) : '',
+                'hours' => $e['work_hours'] ?? ($e['store'] !== SHIFT_OFF ? shift_time_label(($e['tf'] !== '' || $e['tt'] !== '') ? $e['tf'] : $s['work_from'], ($e['tf'] !== '' || $e['tt'] !== '') ? $e['tt'] : $s['work_to'], false) : ''),
             ];
             $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => !empty($e['default']),
-                'time' => shift_time_label($e['tf'], $e['tt'], true), 'difference' => $difference];
+                'time' => $e['work_hours'] ?? shift_time_label($e['tf'], $e['tt'], true), 'difference' => $difference];
         }
         $day['any'] = array_filter($day['groups']) !== [];
     }

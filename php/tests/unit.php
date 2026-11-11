@@ -155,6 +155,14 @@ check('基本との差 定休は変更でない', shift_difference($differenceSt
 check('基本との差 休日出勤', shift_difference($differenceStaff,['dow'=>0],['store'=>'イノ','tf'=>'','tt'=>'']), ['休日出勤']);
 check('基本との差 ヘルプ', shift_difference($differenceStaff,['dow'=>2],['store'=>'リッチ','tf'=>'','tt'=>'']), ['ヘルプ']);
 check('基本との差 時間変更', shift_difference($differenceStaff,['dow'=>2],['store'=>'イノ','tf'=>'10:00','tt'=>'17:00']), ['時間変更']);
+$partStaff = ['home_store'=>'イノ','off_days'=>'0,1','work_from'=>'9:00','work_to'=>'17:00'];
+$partEntry = ['store'=>SHIFT_OFF,'tf'=>'9:00','tt'=>'10:00','changed'=>false];
+check('一部休み 朝の休み後は出勤', shift_remaining_hours($partStaff,$partEntry), '10:00〜17:00');
+check('一部休み 中抜けは前後の勤務', shift_remaining_hours($partStaff,['tf'=>'12:00','tt'=>'13:00']), '09:00〜12:00／13:00〜17:00');
+check('一部休み 午後は休み', shift_remaining_hours($partStaff,['tf'=>'15:00','tt'=>'']), '09:00〜15:00');
+check('一部休み 出勤側に勤務店舗を残す', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'all')['store'], 'イノ');
+check('一部休み 休み表示は元の時間', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'changes')['tt'], '10:00');
+check('一部休み 基本勤務全部を休むと出勤なし', shift_calendar_entry($partStaff,['dow'=>6],['store'=>SHIFT_OFF,'tf'=>'9:00','tt'=>'17:00'],'all'), null);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
