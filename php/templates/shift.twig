@@ -243,7 +243,30 @@
       {% else %}{% for tag in p.difference %}<small class="cal-change-tag">{{ tag }}</small>{% endfor %}{% if '時間変更' in p.difference and p.hours %}<small class="cal-change-time">{{ p.hours }}</small>{% endif %}{% endif %}</div>
       {% endfor %}{% endfor %}
       </div>
-      {% else %}<div class="cal-cell blank"></div>{% endif %}
+      <div class="cal-detail" hidden>
+        <div class="sh-date">{{ nav.label|slice(5) }}{{ day.d }}日 <span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span>{% if day.hol %}<small>{{ day.hol }}</small>{% endif %}</div>
+        {% if view == 'all' %}<div class="sh-counts">イノ {{ day.groups['イノ']|length }}人 ／ リッチ {{ day.groups['リッチ']|length }}人</div>{% endif %}
+        {% if day.exceptions %}<div class="sh-exceptions"><b>基本シフトからの変更</b>{% for e in day.exceptions %}<div>{{ e.name }}：{{ e.tags|join('・') }}{% if e.store != '休' %}（{{ e.store }}）{% endif %}{% if e.hours %} {{ e.hours }}{% endif %}</div>{% endfor %}</div>{% endif %}
+        {% for store, people in day.groups %}{% if people %}
+        <div class="sh-row">
+          <span class="sh-store{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">{{ store }}</span>
+          <span class="sh-people">
+            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.hours %}<span class="sh-hours">{{ p.hours }}</span>{% endif %}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.time_l %}<span class="sh-tag help">{{ p.time_l }}だけ休み</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
+          </span>
+        </div>
+        {% endif %}{% endfor %}
+        {% if not day.any %}<div class="sh-none">個別の予定はありません</div>{% endif %}
+        <div class="nt-box">
+          {% for n in day.notes %}<div class="nt"><span class="nt-by">{{ n.author ?: '—' }}</span><span class="nt-body">{{ n.body }}</span><button type="button" class="nt-del" data-id="{{ n.id }}" aria-label="メモを消す">×</button></div>{% endfor %}
+          <form class="nt-form" data-date="{{ day.date }}">
+            <select class="nt-who">{% for st in staff %}<option value="{{ st.name }}" data-sid="{{ st.id }}">{{ st.name }}</option>{% endfor %}</select>
+            <input class="nt-text" maxlength="300" placeholder="メモ（例: 12時半から出ます）" required>
+            <button type="submit" class="btn btn-sm">書く</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}
   </div>
   {% endfor %}
