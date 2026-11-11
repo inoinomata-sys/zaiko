@@ -36,6 +36,7 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
 
 
 {% block content %}
+<p style="margin-bottom:16px"><a class="btn btn-ghost" href="/settings" style="min-height:44px">← 設定に戻る</a></p>
 <h2 style="font-size:18px; font-weight:700; margin-bottom:16px">仕入先 担当者設定</h2>
 
 {% for sup in suppliers %}
@@ -85,6 +86,6 @@ input.ci { width: 100%; padding: 6px 8px; border: 1px solid var(--border); borde
   </div>
 </div>
 {% endfor %}
-
+<p style="margin:20px 0"><a class="btn btn-ghost" href="/settings" style="min-height:44px">← 設定に戻る</a></p>
 {% endblock %}
 
