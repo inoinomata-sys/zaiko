@@ -13,9 +13,9 @@
 @media print{.sheet{transform:none!important}.screen-scroll{height:auto!important;max-width:none!important;overflow:visible!important;margin:0}.print-actions{display:none!important}}
 .print-actions button:disabled{opacity:.55;cursor:wait}#share-status:empty{display:none}@media print{ #share-status{display:none!important}}
 </style></head><body>
-<div class="tools"><a href="/shift?month={{ nav.month }}">← 出勤一覧</a><form method="get"><label>月 <input type="month" name="month" value="{{ nav.month }}" required></label><button>表示</button></form><div class="print-actions"><button type="button" id="share-pdf" class="print-button" disabled>共有の準備中…</button><button type="button" class="print-button" onclick="window.print()">印刷する</button><a class="print-link" href="/shift/customer/pdf?month={{ nav.month }}" target="_blank" rel="noopener">PDFを開く</a><a class="print-link" href="/shift/customer/pdf?month={{ nav.month }}&download=1">PDFを保存する</a></div></div>
+<div class="tools"><a href="/shift?month={{ nav.month }}">← 出勤一覧</a><form method="get"><label>月 <input type="month" name="month" value="{{ nav.month }}" required></label><button>表示</button></form><div class="print-actions"><button type="button" id="share-pdf" class="print-button" disabled>PDFを準備中…</button></div></div>
 <p id="share-status" class="print-hint" role="status" aria-live="polite"></p>
-<p class="print-hint">「印刷する」を押してプリンターを選んでください。用紙はA5・横向きです。PDFを開いた場合は、共有ボタンから「プリント」を選べます。</p>
+<p class="print-hint">「PDF共有・印刷」から送信・保存・プリントを選べます。用紙はA5横です。</p>
 {% if staff_count is defined and staff_count == 0 %}<p class="print-hint" role="alert">掲載対象のスタイリストが未設定です。「設定」→「スタッフ登録・設定」で職種を選んでから印刷してください。</p>{% endif %}
 <div class="screen-scroll"><article class="sheet">
 <header class="page-head"><div class="month-no">{{ '%02d'|format(month_number) }}</div><div class="month-meta"><div class="month-en">{{ theme.en }}</div><div class="year">{{ year }}</div></div><div class="page-title"><h1>スタイリストのお休み</h1><p>{{ store }}店</p><div class="brand">INO Inc. / Store Management</div></div><div class="art" aria-label="{{ theme.name }}">{% include 'shift_season_art.twig' %}</div></header>
@@ -32,14 +32,14 @@
  async function prepare(){
   try{const response=await fetch(url,{credentials:'same-origin'});if(!response.ok||!(response.headers.get('content-type')||'').includes('application/pdf'))throw new Error();
    file=new File([await response.blob()],'INO_カレンダー_{{ nav.month }}.pdf',{type:'application/pdf'});
-   button.textContent='PDFを共有する';button.disabled=false;
+   button.textContent='PDF共有・印刷';button.disabled=false;
   }catch(e){button.textContent='PDFの準備をやり直す';button.disabled=false;status.textContent='PDFを準備できませんでした。職種の設定と通信状態を確認してください。';}
  }
  button.addEventListener('click',()=>{
   if(!file){button.disabled=true;status.textContent='';prepare();return;}
   if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-   navigator.share({files:[file],title:'イノ {{ nav.label }} スタイリストのお休み'}).then(()=>{status.textContent='共有操作が完了しました。';}).catch(error=>{if(error.name!=='AbortError')status.textContent='共有を開けませんでした。「PDFを保存する」で保存してから添付してください。';});
-  }else{status.textContent='この環境ではファイルの直接共有に対応していません。「PDFを保存する」で保存し、LINEやメールに添付してください。';}
+   navigator.share({files:[file],title:'イノ {{ nav.label }} スタイリストのお休み'}).then(()=>{status.textContent='共有操作が完了しました。';}).catch(error=>{if(error.name!=='AbortError')status.textContent='共有メニューを開けませんでした。もう一度お試しください。';});
+  }else{window.open(url,'_blank','noopener');status.textContent='PDF画面の共有メニューから送信・保存・プリントを選んでください。';}
  });
  prepare();
 })();
