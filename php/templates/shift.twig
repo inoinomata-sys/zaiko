@@ -192,7 +192,7 @@
           </span>
         </div>
         {% endif %}{% endfor %}
-        {% if not day.any %}<div class="sh-none">出勤はまだ入っていません</div>{% endif %}
+        {% if not day.any %}<div class="sh-none">個別の予定はありません</div>{% endif %}
         <div class="nt-box">
           {% for n in day.notes %}<div class="nt"><span class="nt-by">{{ n.author ?: '—' }}</span><span class="nt-body">{{ n.body }}</span><button type="button" class="nt-del" data-id="{{ n.id }}" aria-label="メモを消す">×</button></div>{% endfor %}
           <form class="nt-form" data-date="{{ day.date }}">
@@ -211,7 +211,7 @@
     {% endfor %}
   </div>
   {% endfor %}
-  <div class="cal-legend">{% for st in staff %}<span><i style="background:{{ st.color }}"></i>{{ st.name }}</span>{% endfor %}<span>色つき＝休み</span><span>白＝出勤（店名つき）</span><span>点線＝ふだんの出勤</span><span style="color:#c0392b">赤＝日曜・祝日</span></div>
+  <div class="cal-legend">{% for st in staff %}<span><i style="background:{{ st.color }}"></i>{{ st.name }}</span>{% endfor %}<span>色つき＝休み</span><span>白＝出勤（店名つき）</span><span style="color:#c0392b">赤＝日曜・祝日</span></div>
   <div class="sh-detail" id="detail"><div class="sh-none">日をタップすると、くわしく出ます</div></div>
 </div>
 <div class="sh-foot">

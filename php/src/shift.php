@@ -328,11 +328,8 @@ function h_shift(): void
         $day['items'] = [];
         foreach ($staff as $s) {
             $e = $entries[(int)$s['id']][$day['date']] ?? null;
-            if ($e === null) {   // 入れていない日でも、毎週の休みの曜日なら「休」
-                if (in_array((int)$day['dow'], shift_off_days($s), true)) {
-                    $day['groups'][SHIFT_OFF][] = ['id' => (int)$s['id'], 'name' => $s['name'], 'help' => false, 'from' => $s['home_store'], 'changed' => false];
-                    $day['items'][(int)$s['id']] = ['store' => SHIFT_OFF, 'help' => false, 'dflt' => true, 'time' => ''];
-                }
+            // 通常の勤務曜日・定休は設定として保持し、カレンダーには個別登録だけを載せる。
+            if ($e === null) {
                 continue;
             }
             $day['groups'][$e['store']][] = [
