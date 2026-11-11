@@ -313,6 +313,22 @@ function shift_week_bars(array $row, array $staff): array
     return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
 }
 
+/** カレンダーの個別勤務時間を、から・までが分かる言葉で示す。 */
+function shift_work_note(?string $from, ?string $to): string
+{
+    $clock = static function (?string $value): string {
+        $value = shift_time($value);
+        if ($value === null || $value === '') { return ''; }
+        [$h,$m] = explode(':', $value);
+        return (int)$h . '時' . ((int)$m === 0 ? '' : (int)$m . '分');
+    };
+    $a = $clock($from); $b = $clock($to);
+    if ($a !== '' && $b !== '') { return $a . '〜' . $b . '出勤'; }
+    if ($a !== '') { return $a . 'から出勤'; }
+    if ($b !== '') { return $b . 'まで出勤'; }
+    return '';
+}
+
 /** 基本勤務から一部休みの区間を引き、残る出勤時間を返す。 */
 function shift_remaining_hours(array $staff, array $entry): string
 {
@@ -409,6 +425,7 @@ function h_shift(): void
                 'difference' => $difference,
                 'partial_off' => !empty($e['partial_off']),
                 'default' => !empty($e['default']),
+                'work_note' => $e['store'] !== SHIFT_OFF && empty($e['partial_off']) ? shift_work_note($e['tf'], $e['tt']) : '',
                 'off_hours' => !empty($e['partial_off']) ? shift_time_label($raw['tf'], $raw['tt'], true) : '',
                 'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',

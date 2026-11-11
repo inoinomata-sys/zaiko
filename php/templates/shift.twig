@@ -240,7 +240,7 @@
       <div class="cal-bar {{ store == '休' ? 'rest' : 'work' }}{% if p.default %} dflt{% endif %}{% if p.difference %} exception{% endif %}" data-date="{{ day.date }}" data-sid="{{ p.id }}"><span class="cal-person">{{ p.name }}</span><small class="cal-location">{{ store == '休' ? '休み' : store }}</small>
       {% if p.partial_off %}<small class="cal-change-time">{{ p.off_hours }}時休み</small>
       {% elseif store == '休' and p.time_s %}<small class="cal-change-time">{{ p.time_s }}時</small>
-      {% else %}{% for tag in p.difference %}<small class="cal-change-tag">{{ tag }}</small>{% endfor %}{% if '時間変更' in p.difference and p.hours %}<small class="cal-change-time">{{ p.hours }}</small>{% endif %}{% endif %}</div>
+      {% else %}{% for tag in p.difference %}{% if not (p.work_note and tag in ['休日出勤','時間変更']) %}<small class="cal-change-tag">{{ tag }}</small>{% endif %}{% endfor %}{% if p.work_note %}<small class="cal-change-time">{{ p.work_note }}</small>{% endif %}{% endif %}</div>
       {% endfor %}{% endfor %}
       </div>
       <div class="cal-detail" hidden>

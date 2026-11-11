@@ -163,6 +163,10 @@ check('一部休み 午後は休み', shift_remaining_hours($partStaff,['tf'=>'1
 check('一部休み 出勤側に勤務店舗を残す', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'all')['store'], 'イノ');
 check('一部休み 休み表示は元の時間', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'changes')['tt'], '10:00');
 check('一部休み 基本勤務全部を休むと出勤なし', shift_calendar_entry($partStaff,['dow'=>6],['store'=>SHIFT_OFF,'tf'=>'9:00','tt'=>'17:00'],'all'), null);
+check('勤務表現 終了だけ', shift_work_note('', '14:00'), '14時まで出勤');
+check('勤務表現 開始だけ', shift_work_note('13:00', ''), '13時から出勤');
+check('勤務表現 両方', shift_work_note('09:30', '14:00'), '9時30分〜14時出勤');
+check('勤務表現 指定なし', shift_work_note('', ''), '');
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
