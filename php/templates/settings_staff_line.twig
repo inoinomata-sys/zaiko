@@ -8,7 +8,7 @@
 <p>月〜金の夜20:00（日本時間）に翌日分を配信します。金曜は土曜分に加え、共有する予定や勤務変更がある日曜・月曜分もまとめます。土日の通常配信はありません。</p>
 <p>変更・削除通知は、共有済みの今日以降の予定を対象に毎分確認します。日月も変更通知は動きます。</p>
 {% if not delivery_enabled %}<p class="sl-note">実送信は停止中です。サーバー側の送信許可が必要です。</p>{% endif %}
-{% if not configured %}<p class="sl-note">スタッフ用LINE認証情報・専用管理パスワードが未設定です。</p>{% endif %}
+{% if not configured %}<p class="sl-note">スタッフ用LINE認証情報または管理者ロックが未設定です。</p>{% endif %}
 <form method="post" action="/settings/staff-line/save" class="sl-card">
 <input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}">
 <h2>1. 共有する内容と送り先を選ぶ</h2>
@@ -25,19 +25,19 @@
 <p>選んだスタッフの「通常勤務日の休み」「通常休みの日の出勤」「別店舗へのヘルプ」を、店舗予定と一緒に共有します。個別に指定した時間を優先し、理由や自由メモは送りません。</p>
 {% for s in staff %}<label><input type="checkbox" name="exception[]" value="{{ s.id }}" {% if visibility['exception:' ~ s.id] is defined %}checked{% endif %}> {{ s.name }}（{{ s.home_store }}）</label>{% else %}<p>スタッフを先に登録してください。</p>{% endfor %}
 <p>設定保存時は未送信の承認を取り消します。送信を試行済みのものは要確認となります。</p>
-<label>共有専用の管理パスワード <input type="password" name="staff_password" required autocomplete="current-password"></label>
+
 <button class="btn">設定を保存</button>
 </form>
 <div class="sl-card"><h2>2. LINEに届く内容を確認する</h2>
 <form method="get"><input type="hidden" name="stream" value="{{ stream }}"><label>日付 <input type="date" name="date" value="{{ preview_date }}" required></label><button class="btn">表示</button></form>
 <pre>{{ preview }}</pre><p>この表示では送信も予約も行いません。</p>
-<form method="post" action="/settings/staff-line/prepare"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><label>共有専用の管理パスワード <input type="password" name="staff_password" required></label><button class="btn">現在の配信待ちを作成（送信は定期処理）</button></form></div>
+<form method="post" action="/settings/staff-line/prepare"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">現在の配信待ちを作成（送信は定期処理）</button></form></div>
 <h2>3. 承認・送信状況を確認する</h2><p>最新100件を表示しています。</p>
 <p>「LINE受付」はAPIが受け付けた状態です。既読・全員への到達を示すものではありません。前もって承認すると20:00に送信します。20:00以降の承認は次の定期処理で送信します（当日中）。</p>
 {% set labels = {'pending':'承認待ち','ready':'送信待ち','retry':'再送待ち','accepted':'LINE受付','failed':'失敗・設定確認','uncertain':'要確認・再送停止','cancelled':'取消','expired':'期限切れ','superseded':'設定変更で取消','oversized':'内容が長すぎます（共有対象を減らしてください）'} %}
 {% for j in jobs %}<details class="sl-card" {% if j.state in ['pending','ready','retry','failed','uncertain'] %}open{% endif %}><summary><b>#{{ j.id }} {{ labels[j.state]|default(j.state) }}</b> ／ {{ j.created_at }}</summary><p>{{ j.created_at }} ／ 配信予定 {{ j.scheduled_at }} ／ グループ …{{ j.group_id|slice(-8) }} ／ 試行 {{ j.attempts }}回 ／ HTTP {{ j.http_status|default('—') }}</p>
 {% if j.approved_by %}<p>承認者：{{ j.approved_by }}</p>{% endif %}<pre>{{ j.body }}</pre>
-{% if j.state in ['pending','ready','retry','failed'] %}<form method="post" action="/settings/staff-line/jobs/{{ j.id }}"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="content_hash" value="{{ j.content_hash }}"><label>共有専用の管理パスワード <input type="password" name="staff_password" required></label>
+{% if j.state in ['pending','ready','retry','failed'] %}<form method="post" action="/settings/staff-line/jobs/{{ j.id }}"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="content_hash" value="{{ j.content_hash }}">
 {% if j.state == 'pending' %}<button class="btn" name="action" value="approve">この内容を承認</button>{% endif %}
 {% if j.state in ['retry','failed'] %}<button class="btn" name="action" value="retry">同じ内容・送信番号で再送予約</button>{% endif %}
 <button class="btn btn-ghost" name="action" value="cancel">取り消す</button></form>{% endif %}</details>{% else %}<p>まだ履歴はありません。</p>{% endfor %}

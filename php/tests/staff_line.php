@@ -62,14 +62,14 @@ function at(string $time): DateTimeImmutable { return new DateTimeImmutable($tim
 function clock_at(string $time): void { $GLOBALS['staff_line_test_clock'] = at($time); }
 expect(file_get_contents(BASE_DIR . '/src/staff_line.mysql.sql') === file_get_contents(BASE_DIR . '/sql/staff_line.mysql.sql'), 'runtime and review schemas stay identical');
 $GLOBALS['CONFIG']['admin_pass'] = 'test-admin-only';
-$GLOBALS['CONFIG']['staff_line']['admin_password'] = 'dedicated-test-password';
 $_COOKIE['zadmin'] = admin_cookie_value('test-admin-only', time()+3600);
-$_POST = ['staff_password'=>'dedicated-test-password','csrf'=>hash_hmac('sha256','staff-line-form|'.$_COOKIE['zadmin'],'dedicated-test-password')];
-sl_admin(); expect(true, 'dedicated password and CSRF allow admin operation');
-$_POST['staff_password'] = 'wrong';
-try { sl_admin(); expect(false,'wrong dedicated password blocked'); } catch (HttpError $e) { expect($e->status === 403,'wrong dedicated password blocked'); }
-$_POST['staff_password'] = 'dedicated-test-password'; $_POST['csrf'] = 'wrong';
+$_POST = ['csrf'=>hash_hmac('sha256','staff-line-form|'.$_COOKIE['zadmin'],'test-admin-only')];
+sl_admin(); expect(true, 'existing admin unlock and CSRF allow operation without extra password');
+$_POST['csrf'] = 'wrong';
 try { sl_admin(); expect(false,'invalid CSRF blocked'); } catch (HttpError $e) { expect($e->status === 403,'invalid CSRF blocked'); }
+$_POST['csrf'] = hash_hmac('sha256','staff-line-form|other-cookie','test-admin-only');
+try { sl_admin(); expect(false,'CSRF from another admin session blocked'); } catch (HttpError $e) { expect($e->status === 403,'CSRF from another admin session blocked'); }
+expect(!admin_cookie_ok('test-admin-only', admin_cookie_value('test-admin-only',time()-1)), 'expired admin unlock rejected');
 $_POST = [];
 $group = 'C' . str_repeat('a', 32);
 run('INSERT INTO staff_line_groups (group_id, active, event_timestamp) VALUES (?,1,1)', [$group]);

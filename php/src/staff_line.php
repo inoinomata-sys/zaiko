@@ -46,9 +46,7 @@ function sl_lock(callable $fn): mixed
 function sl_admin(): void
 {
     require_admin();
-    // 既存の「3回間違えると解除」では外部送信を許可しない。専用の管理者パスワードを毎回確認する。
-    $pass = (string)(sl_config()['admin_password'] ?? '');
-    if ($pass === '' || !hash_equals($pass, (string)($_POST['staff_password'] ?? ''))) { throw new HttpError(403); }
+    $pass = admin_pass();
     $cookie = (string)($_COOKIE['zadmin'] ?? '');
     $expected = hash_hmac('sha256', 'staff-line-form|' . $cookie, $pass);
     if (!hash_equals($expected, (string)($_POST['csrf'] ?? ''))) { throw new HttpError(403); }
@@ -102,7 +100,7 @@ function sl_snapshot(string $date, string $stream = 'store'): array
     if ($stream !== 'store') { return []; }
     $closures = schedule_closure_map($d);
     if ($stream === 'store') {
-    foreach (rows("SELECT r.* FROM schedule_rules r JOIN staff_line_visibility v ON v.kind = 'rule' AND v.entity_id = r.id AND v.is_public = 1 WHERE r.is_active = 1 ORDER BY r.sort_order, r.id") as $r) {
+    foreach (rows("SELECT r.* FROM schedule_rules r JOIN staff_line_visibility v ON v.kind = 'rule' AND v.entity_id = r.id AND v.is_public = 1 WHERE r.is_active = 1 AND r.is_closure = 0 ORDER BY r.sort_order, r.id") as $r) {
         if (schedule_matches($r, $d)) { $items['rule:' . $r['id']] = ['label' => $r['title'], 'value' => $r['store'] === '' ? '両店舗' : $r['store']]; }
     }
     }
@@ -345,10 +343,10 @@ function h_staff_line(): void
     foreach (rows('SELECT * FROM staff_line_visibility WHERE is_public = 1') as $v) { $visibility[$v['kind'] . ':' . $v['entity_id']] = true; }
     render('settings_staff_line', [
         'stream' => $s['stream'], 'stream_title' => $s['stream'] === 'shift' ? '出勤スケジュール' : '店舗スケジュール', 'settings' => $s, 'groups' => rows('SELECT * FROM staff_line_groups WHERE active = 1'),
-        'rules' => schedule_rules_all(), 'staff' => shift_staff_list(), 'visibility' => $visibility,
-        'csrf' => hash_hmac('sha256', 'staff-line-form|' . (string)($_COOKIE['zadmin'] ?? ''), (string)(sl_config()['admin_password'] ?? '')),
+        'rules' => array_values(array_filter(schedule_rules_all(), static fn($r) => empty($r['is_closure']))), 'staff' => shift_staff_list(), 'visibility' => $visibility,
+        'csrf' => hash_hmac('sha256', 'staff-line-form|' . (string)($_COOKIE['zadmin'] ?? ''), admin_pass()),
         'delivery_enabled' => !empty(sl_config()['delivery_enabled']),
-        'configured' => !empty(sl_config()['admin_password']) && !empty(sl_config()['secret']) && !empty(sl_config()['token']),
+        'configured' => admin_pass() !== '' && !empty(sl_config()['secret']) && !empty(sl_config()['token']),
         'preview' => sl_text(sl_bundle($dates, $s['stream']), null, $s['stream']), 'preview_date' => $date,
         'jobs' => rows('SELECT * FROM staff_line_jobs WHERE stream = ? ORDER BY id DESC LIMIT 100', [$s['stream']]),
         'audit' => rows('SELECT * FROM staff_line_audit WHERE stream = ? ORDER BY id DESC LIMIT 30', [$s['stream']]),
@@ -368,6 +366,7 @@ function h_staff_line_save(): void
             run("DELETE FROM staff_line_visibility WHERE kind IN ('rule','exception')");
             foreach (['rule','exception'] as $kind) {
                 foreach (array_unique((array)($_POST[$kind] ?? [])) as $id) {
+                    if ($kind === 'rule' && val('SELECT is_closure FROM schedule_rules WHERE id = ?', [(int)$id])) { continue; }
                     if (ctype_digit((string)$id) && (int)$id > 0) { run('INSERT INTO staff_line_visibility (kind, entity_id, is_public) VALUES (?,?,1)', [$kind, (int)$id]); }
                 }
             }

@@ -159,7 +159,7 @@ function h_schedule_once_save(): void
                 if (val("SELECT id FROM schedule_rules WHERE is_active=1 AND is_closure=1 AND store=? AND once_date=?",[$store,$date])) { continue; }
                 run("INSERT INTO schedule_rules (title,store,kind,once_date,sort_order,is_closure) VALUES (?,?,'once',?,0,1)",[$title,$store,$date]);
                 $id=last_id();
-                if(isset($_POST['share_line'])) { run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('rule',?,1)",[$id]); }
+
             }
         });
         redirect_to('/schedule?month=' . $a->format('Y-m'));
