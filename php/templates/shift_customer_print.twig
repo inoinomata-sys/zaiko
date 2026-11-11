@@ -11,7 +11,7 @@
 .screen-scroll{max-width:794px;margin:0 auto 24px;overflow:hidden}
 .sheet{margin:0;transform-origin:top left}
 @media print{.sheet{transform:none!important}.screen-scroll{height:auto!important;max-width:none!important;overflow:visible!important;margin:0}.print-actions{display:none!important}}
-.print-actions button:disabled{opacity:.55;cursor:wait}#share-status:empty{display:none}@media print{#share-status{display:none!important}}
+.print-actions button:disabled{opacity:.55;cursor:wait}#share-status:empty{display:none}@media print{ #share-status{display:none!important}}
 </style></head><body>
 <div class="tools"><a href="/shift?month={{ nav.month }}">← 出勤一覧</a><form method="get"><label>月 <input type="month" name="month" value="{{ nav.month }}" required></label><button>表示</button></form><div class="print-actions"><button type="button" id="share-pdf" class="print-button" disabled>共有の準備中…</button><button type="button" class="print-button" onclick="window.print()">印刷する</button><a class="print-link" href="/shift/customer/pdf?month={{ nav.month }}" target="_blank" rel="noopener">PDFを開く</a><a class="print-link" href="/shift/customer/pdf?month={{ nav.month }}&download=1">PDFを保存する</a></div></div>
 <p id="share-status" class="print-hint" role="status" aria-live="polite"></p>
