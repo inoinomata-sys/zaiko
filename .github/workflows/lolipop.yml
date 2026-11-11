@@ -111,7 +111,16 @@ jobs:
           PHP
           mysql -h127.0.0.1 -uroot -proot zaiko < php/sql/schema.mysql.sql
           mysql -h127.0.0.1 -uroot -proot zaiko < php/tests/seed.sql
-          sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+          # 公式アーカイブを直接指定。ミラー一覧の名前解決待ちを避ける。
+          sudo tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<'APT'
+          Types: deb
+          URIs: https://archive.ubuntu.com/ubuntu
+          Suites: noble noble-updates noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          APT
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::https::Timeout=20 update -qq
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::https::Timeout=20 install -y -qq poppler-utils
 
       - name: 全部の画面・機能・PDFを通しで試す
         run: |
