@@ -4,8 +4,7 @@
 .sl-tabs{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.sl-tabs a{display:flex;align-items:center;justify-content:center;min-height:48px;flex:1;border:2px solid #7b5c26;border-radius:12px;background:#fff;color:#503b17;text-decoration:none;font-size:16px;font-weight:700;padding:8px 12px}.sl-tabs a[aria-current=page]{background:#503b17;color:#fff}.sl-card{background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin:14px 0}.sl-card label{display:block;margin:10px 0}.sl-card input[type=password],.sl-card select{padding:10px;max-width:100%;font-size:16px}.sl-card pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}.sl-card button{margin:8px 4px 0 0}.sl-note{color:var(--danger)}.sl-card button,.sl-card select{min-height:44px}.sl-card input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}h2{font-size:19px}h3{font-size:17px}.sl-card p{line-height:1.8}.sl-card summary{cursor:pointer;min-height:44px;padding:8px 0}.sl-steps{background:#fdf8fa;padding:12px 16px;border-radius:12px;line-height:1.9}
 </style>{% endblock %}
 {% block content %}
-<div class="sl-tabs"><a href="?stream=store" {% if stream == 'store' %}aria-current="page"{% endif %}>店舗スケジュール</a><a href="?stream=shift" {% if stream == 'shift' %}aria-current="page"{% endif %}>出勤スケジュール</a></div>
-<h1>{{ stream_title }}のLINE共有</h1><p>店舗の予定とスタッフの出勤は、別々に設定・配信します。</p><div class="sl-steps">① 共有する内容を選ぶ　→　② 内容を確認する　→　③ 承認する<br>慣れるまでは「内容を確認して承認」で使えます。</div>
+<h1>店舗スケジュールのLINE共有</h1><p>出勤スケジュールは共有対象に含めません。</p><div class="sl-steps">① 共有する店舗予定を選ぶ　→　② 内容を確認する　→　③ 承認する</div>
 <p>火〜土の毎朝8:55（日本時間）。日月の通常配信はありません。土曜は登録された日曜分、設定により登録された月曜分もまとめます。</p>
 <p>変更・削除通知は、共有済みの今日以降の予定を対象に毎分確認します。日月も変更通知は動きます。</p>
 {% if not delivery_enabled %}<p class="sl-note">実送信は停止中です。サーバー側の送信許可が必要です。</p>{% endif %}
@@ -19,13 +18,10 @@
 <p>スタッフ専用公式アカウントを招待し、一言投稿すると候補に出ます。送信先は末尾の番号で管理者が照合してください。</p>
 <label><input type="checkbox" name="include_monday" {% if settings.include_monday %}checked{% endif %}> 土曜に登録された月曜分も含める</label>
 <label><input type="checkbox" name="notify_changes" {% if settings.notify_changes %}checked{% endif %}> 共有済み予定の変更・削除を通知する</label>
-{% if stream == 'shift' %}<h3>LINEで共有を許可するスタッフ</h3>
-<p>チェックのないものは非公開です。新規登録も初期状態では非公開です。氏名・出勤先・勤務／休み時間だけを共有します。</p>
-{% for s in staff %}<label><input type="checkbox" name="staff[]" value="{{ s.id }}" {% if visibility['staff:' ~ s.id] is defined %}checked{% endif %}> {{ s.name }}</label>{% endfor %}
-{% else %}<h3>LINEで共有を許可する店舗予定</h3>
+<h3>LINEで共有を許可する店舗予定</h3>
 <p>予定名に顧客名や個人の事情を入力しないでください。日ごとの自由メモは共有しません。</p>
 {% for r in rules %}<label><input type="checkbox" name="rule[]" value="{{ r.id }}" {% if visibility['rule:' ~ r.id] is defined %}checked{% endif %}> {{ r.title }}{% if not r.is_active %}（停止中）{% endif %}</label>{% endfor %}
-{% endif %}<p>設定保存時は未送信の承認を取り消します。送信を試行済みのものは要確認となります。</p>
+<p>設定保存時は未送信の承認を取り消します。送信を試行済みのものは要確認となります。</p>
 <label>共有専用の管理パスワード <input type="password" name="staff_password" required autocomplete="current-password"></label>
 <button class="btn">設定を保存</button>
 </form>

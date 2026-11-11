@@ -451,7 +451,8 @@ $NO_ADMIN = false;
 
 // 店舗予定と出勤の共有画面と、外部からの入口。
 page_ok('/settings/staff-line?stream=store', '店舗スケジュールのLINE共有');
-page_ok('/settings/staff-line?stream=shift', '出勤スケジュールのLINE共有');
+[$st] = http('GET', '/settings/staff-line?stream=shift');
+ok($st === 400, '出勤のLINE共有画面は提供しない');
 [$st] = http('GET', '/settings/staff-line?stream=unknown');
 ok($st === 400, 'スタッフLINE: 不正な種類を拒否');
 [$st, $body] = http('POST', '/settings/staff-line/save', null, ['stream' => 'store', 'staff_password' => 'wrong']);

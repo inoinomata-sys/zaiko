@@ -12,7 +12,6 @@ function ensure_staff_line_tables(): void
 {
     static $done = false;
     if ($done) { return; }
-    ensure_shift_tables();
     ensure_schedule_tables();
     $sql = file_get_contents(__DIR__ . '/staff_line.mysql.sql');
     if ($sql === false) { throw new RuntimeException('共有設定のDB定義がありません'); }
@@ -25,12 +24,13 @@ function ensure_staff_line_tables(): void
 function sl_stream(): string
 {
     $stream = (string)($_POST['stream'] ?? $_GET['stream'] ?? 'store');
-    if (!in_array($stream, ['store', 'shift'], true)) { throw new HttpError(400); }
+    if ($stream !== 'store') { throw new HttpError(400); }
     return $stream;
 }
 
 function sl_settings(string $stream = 'store'): array
 {
+    if ($stream !== 'store') { throw new HttpError(400); }
     return row('SELECT * FROM staff_line_settings WHERE stream = ?', [$stream]) ?? [];
 }
 
@@ -77,17 +77,7 @@ function sl_snapshot(string $date, string $stream = 'store'): array
 {
     $d = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
     $items = [];
-    $entries = [];
-    if ($stream === 'shift') {
-    foreach (rows('SELECT staff_id, store, time_from, time_to FROM shift_entries WHERE work_date = ?', [$date]) as $e) { $entries[(int)$e['staff_id']] = $e; }
-    foreach (rows("SELECT s.* FROM shift_staff s JOIN staff_line_visibility v ON v.kind = 'staff' AND v.entity_id = s.id AND v.is_public = 1 WHERE s.is_active = 1 ORDER BY s.sort_order, s.id") as $s) {
-        $e = $entries[(int)$s['id']] ?? null;
-        if ($e === null && in_array((int)$d->format('w'), shift_off_days($s), true)) { $e = ['store' => SHIFT_OFF]; }
-        if ($e === null) { continue; }
-        $time = $e['store'] === SHIFT_OFF ? shift_time_label($e['time_from'] ?? '', $e['time_to'] ?? '', false) : shift_time_label($s['work_from'], $s['work_to'], false);
-        $items['staff:' . $s['id']] = ['label' => $s['name'], 'value' => $e['store'] . ($time !== '' ? ' ' . $time : '')];
-    }
-    }
+    if ($stream !== 'store') { return []; }
     if ($stream === 'store') {
     foreach (rows("SELECT r.* FROM schedule_rules r JOIN staff_line_visibility v ON v.kind = 'rule' AND v.entity_id = r.id AND v.is_public = 1 WHERE r.is_active = 1 ORDER BY r.sort_order, r.id") as $r) {
         if (schedule_matches($r, $d)) { $items['rule:' . $r['id']] = ['label' => $r['title'], 'value' => $r['store'] === '' ? '両店舗' : $r['store']]; }
@@ -144,6 +134,7 @@ function sl_messages(string $text): array
 
 function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before, array $s, string $expires, ?string $scheduled = null): void
 {
+    if ($s['stream'] !== 'store') { throw new HttpError(400); }
     $text = sl_text($snapshot, $before, $s['stream']);
     $state = $s['mode'] === 'auto' ? 'ready' : 'pending';
     try { sl_messages($text); } catch (LengthException) { $state = 'oversized'; }
@@ -224,6 +215,7 @@ function sl_http(string $payload, string $uuid): array
 
 function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transport): void
 {
+    if ($job['stream'] !== 'store' || $s['stream'] !== 'store') { return; }
     $job = sl_refresh($job, $s);
     if ($job['scheduled_at'] > $now->format('Y-m-d H:i:s')) { return; }
     if (!in_array($job['state'], ['ready', 'retry'], true)) { return; }
@@ -259,7 +251,10 @@ function sl_tick(?callable $transport = null, ?DateTimeImmutable $clock = null):
     sl_lock(function () use ($transport, $clock) {
         $now = ($clock ?? sl_clock())->setTimezone(new DateTimeZone('Asia/Tokyo'));
         run("UPDATE staff_line_jobs SET state = CASE WHEN attempts = 0 THEN 'expired' ELSE 'uncertain' END WHERE state IN ('pending','ready','retry','oversized') AND expires_at < ?", [$now->format('Y-m-d H:i:s')]);
-        foreach (rows('SELECT * FROM staff_line_settings ORDER BY stream') as $s) {
+        // 旧版に出勤共有の設定・配信待ちがあっても、実行できないようにする。
+        run("UPDATE staff_line_settings SET enabled = 0 WHERE stream <> 'store'");
+        run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE stream <> 'store' AND state IN ('pending','ready','retry','failed','oversized')");
+        foreach (rows("SELECT * FROM staff_line_settings WHERE stream = 'store'") as $s) {
             if (!$s['enabled'] || $s['group_id'] === '') { continue; }
             sl_generate($s, $now);
             if (empty(sl_config()['delivery_enabled']) && $transport === null) { continue; }
@@ -323,7 +318,7 @@ function h_staff_line(): void
     foreach (rows('SELECT * FROM staff_line_visibility WHERE is_public = 1') as $v) { $visibility[$v['kind'] . ':' . $v['entity_id']] = true; }
     render('settings_staff_line', [
         'stream' => $s['stream'], 'stream_title' => $s['stream'] === 'shift' ? '出勤スケジュール' : '店舗スケジュール', 'settings' => $s, 'groups' => rows('SELECT * FROM staff_line_groups WHERE active = 1'),
-        'staff' => shift_staff_list(), 'rules' => schedule_rules_all(), 'visibility' => $visibility,
+        'rules' => schedule_rules_all(), 'visibility' => $visibility,
         'csrf' => hash_hmac('sha256', 'staff-line-form|' . (string)($_COOKIE['zadmin'] ?? ''), (string)(sl_config()['admin_password'] ?? '')),
         'delivery_enabled' => !empty(sl_config()['delivery_enabled']),
         'configured' => !empty(sl_config()['admin_password']) && !empty(sl_config()['secret']) && !empty(sl_config()['token']),

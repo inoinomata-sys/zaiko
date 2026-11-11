@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS staff_line_settings (
  notify_changes TINYINT NOT NULL DEFAULT 1,
  revision INT NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-INSERT IGNORE INTO staff_line_settings (stream) VALUES ('store'), ('shift');
+INSERT IGNORE INTO staff_line_settings (stream) VALUES ('store');
 CREATE TABLE IF NOT EXISTS staff_line_groups (
  group_id VARCHAR(64) PRIMARY KEY,
  active TINYINT NOT NULL DEFAULT 1,
