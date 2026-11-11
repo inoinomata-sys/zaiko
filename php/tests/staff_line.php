@@ -9,6 +9,8 @@ $mysql = getenv('STAFF_LINE_TEST_MYSQL') === '1';
 if ($mysql) {
     if (getenv('CI') !== 'true') { exit("MySQL tests are restricted to CI\n"); }
     $GLOBALS['CONFIG'] = require BASE_DIR . '/config.php';
+    $testHost = (string)($GLOBALS['CONFIG']['db_host'] ?? '');
+    if ($testHost !== '127.0.0.1' && $testHost !== 'localhost;unix_socket=/private/tmp/ino-sl-01a1/mysql.sock') { exit("MySQL tests refuse remote databases\n"); }
     $GLOBALS['CONFIG']['staff_line'] = ['delivery_enabled' => false];
     require BASE_DIR . '/src/db.php';
 } else {
@@ -38,6 +40,7 @@ require BASE_DIR . '/src/util.php';
 require BASE_DIR . '/src/shift.php';
 require BASE_DIR . '/src/schedule.php';
 require BASE_DIR . '/src/line.php';
+require BASE_DIR . '/src/admin.php';
 require BASE_DIR . '/src/staff_line.php';
 if (!$mysql) {
     run("CREATE TABLE shift_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, home_store TEXT, sort_order INT DEFAULT 0, is_active INT DEFAULT 1, off_days TEXT DEFAULT '', work_from TEXT DEFAULT '', work_to TEXT DEFAULT '')");
@@ -46,12 +49,27 @@ if (!$mysql) {
 ensure_staff_line_tables();
 if ($mysql) {
     // Dedicated CI database only, and isolated fixture IDs.
+    run('DELETE FROM shift_entries WHERE staff_id = 99001');
+    run('DELETE FROM shift_staff WHERE id = 99001');
+    run('DELETE FROM schedule_rules WHERE id IN (99001,99002)');
     foreach (['staff_line_jobs','staff_line_baselines','staff_line_visibility','staff_line_attempts','staff_line_audit','staff_line_groups'] as $table) { run("DELETE FROM {$table}"); }
 }
+run("UPDATE staff_line_settings SET enabled = 0, mode = 'approval', group_id = '', include_monday = 0, notify_changes = 1, revision = 1");
 $n = 0;
 function expect(bool $ok, string $label): void { global $n; $n++; if (!$ok) { throw new RuntimeException("FAIL: {$label}"); } echo "OK {$label}\n"; }
 function at(string $time): DateTimeImmutable { return new DateTimeImmutable($time, new DateTimeZone('Asia/Tokyo')); }
 function clock_at(string $time): void { $GLOBALS['staff_line_test_clock'] = at($time); }
+expect(file_get_contents(BASE_DIR . '/src/staff_line.mysql.sql') === file_get_contents(BASE_DIR . '/sql/staff_line.mysql.sql'), 'runtime and review schemas stay identical');
+$GLOBALS['CONFIG']['admin_pass'] = 'test-admin-only';
+$GLOBALS['CONFIG']['staff_line']['admin_password'] = 'dedicated-test-password';
+$_COOKIE['zadmin'] = admin_cookie_value('test-admin-only', time()+3600);
+$_POST = ['staff_password'=>'dedicated-test-password','csrf'=>hash_hmac('sha256','staff-line-form|'.$_COOKIE['zadmin'],'dedicated-test-password')];
+sl_admin(); expect(true, 'dedicated password and CSRF allow admin operation');
+$_POST['staff_password'] = 'wrong';
+try { sl_admin(); expect(false,'wrong dedicated password blocked'); } catch (HttpError $e) { expect($e->status === 403,'wrong dedicated password blocked'); }
+$_POST['staff_password'] = 'dedicated-test-password'; $_POST['csrf'] = 'wrong';
+try { sl_admin(); expect(false,'invalid CSRF blocked'); } catch (HttpError $e) { expect($e->status === 403,'invalid CSRF blocked'); }
+$_POST = [];
 $group = 'C' . str_repeat('a', 32);
 run('INSERT INTO staff_line_groups (group_id, active, event_timestamp) VALUES (?,1,1)', [$group]);
 run("INSERT INTO shift_staff (id,name,home_store,off_days,work_from,work_to) VALUES (99001,'テスト花子','イノ','0','9:00','18:00')");

@@ -321,21 +321,6 @@ page_ok('/settings/contacts', '鈴木二郎');
 [$st] = http('POST', "/settings/contacts/{$cidc}/delete", null, []);
 ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM supplier_contacts WHERE id={$cidc}") === 0, '担当者を消す');
 
-echo "\n{$count} 件を確認、失敗 {$fail} 件\n";
-if ($failures) {
-    echo "=== 失敗の一覧 ===\n";
-    $seen = [];
-    foreach ($failures as $f) {
-        $b = brief($f['detail']);
-        $key = md5($f['label'] . $b);
-        if (isset($seen[$key])) {
-            continue;
-        }
-        $seen[$key] = true;
-        echo "NG {$f['label']} :: " . substr($b, 0, 600) . "\n";
-    }
-}
-
 // ── メニュー・シフト（新しい表だけを使う。在庫・発注には触らない） ──
 page_ok('/', '出勤スケジュール');
 page_ok('/prices', 'V3 エキサイティング ファンデーション レフィル');
@@ -464,6 +449,16 @@ foreach ($h3 as $h) {
 ok($st3 === 200 && $opened && str_contains($b3, '正解！'), '暗証番号: 3回目は「正解！」で開く', "status={$st3}");
 $NO_ADMIN = false;
 
+// 店舗予定と出勤の共有画面と、外部からの入口。
+page_ok('/settings/staff-line?stream=store', '店舗スケジュールのLINE共有');
+page_ok('/settings/staff-line?stream=shift', '出勤スケジュールのLINE共有');
+[$st] = http('GET', '/settings/staff-line?stream=unknown');
+ok($st === 400, 'スタッフLINE: 不正な種類を拒否');
+[$st, $body] = http('POST', '/settings/staff-line/save', null, ['stream' => 'store', 'staff_password' => 'wrong']);
+ok($st === 403 && str_contains($body, 'もう一度確認'), 'スタッフLINE: 専用パスワードなしの操作を拒否して案内');
+[$st] = http('POST', '/staff-line/webhook', ['events' => []]);
+ok($st === 403, 'スタッフLINE: 署名のないWebhookを拒否');
+
 // 新しい共有処理は、CI専用DBでLINE通信を完全に模擬して確認する。
 if (getenv('CI') === 'true') {
     putenv('STAFF_LINE_TEST_MYSQL=1');
@@ -471,4 +466,19 @@ if (getenv('CI') === 'true') {
     passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/staff_line.php'), $staffLineStatus);
     ok($staffLineStatus === 0, '店舗予定・出勤のLINE共有テスト');
 }
+echo "\n{$count} 件を確認、失敗 {$fail} 件\n";
+if ($failures) {
+    echo "=== 失敗の一覧 ===\n";
+    $seen = [];
+    foreach ($failures as $f) {
+        $b = brief($f['detail']);
+        $key = md5($f['label'] . $b);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        echo "NG {$f['label']} :: " . substr($b, 0, 600) . "\n";
+    }
+}
+
 exit($fail ? 1 : 0);
