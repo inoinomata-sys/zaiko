@@ -338,6 +338,7 @@ ok((int)db_val("SELECT COUNT(*) FROM price_items WHERE name = 'V3 エキサイ�
 [$st] = http('GET', '/menu');
 ok($st === 302, '/menu は、トップの画面に移す', "status={$st}");
 page_ok('/schedule');
+page_ok('/schedule?month=2026-11', 'sc-closed');
 $NO_ADMIN = true;
 [$st] = http('GET', '/settings/line');
 ok($st === 302, 'LINE設定: 鍵がかかっている（合言葉の画面へ）', "status={$st}");
