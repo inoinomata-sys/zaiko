@@ -13,7 +13,7 @@
 #rg-box{border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:10px}#rg-box .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}#rg-box input,#rg-box select{min-width:0;max-width:100%;font:inherit;padding:10px;border:1px solid var(--border);border-radius:8px;background:white}
 .edit-dialog{width:calc(100% - 24px);max-width:460px;max-height:90dvh;margin:auto;padding:22px;border:1px solid var(--border);border-radius:20px;overflow-y:auto;color:var(--fg);background:#fff}
 .edit-dialog::backdrop{background:#0006}.edit-dialog h2{font-size:20px;margin:0 0 20px}.edit-dialog fieldset{border:0;padding:0;margin:0 0 18px}.edit-dialog legend,.field-label{font-size:13px;font-weight:600;margin-bottom:9px;display:block}
-.edit-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.edit-options label{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 3px;background:#f5f5f5;border:1px solid #ddd;border-radius:12px;font-size:14px}.edit-options label:has(input:checked){background:#faf6eb;border-color:var(--gold)}.edit-options input{accent-color:var(--acc);width:20px;height:20px}
+.edit-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.edit-options label{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 3px;background:#f5f5f5;border:1px solid #ddd;border-radius:12px;font-size:14px}.edit-options label:has(input:checked){background:#faf6eb;border-color:var(--gold)}.edit-options input{accent-color:var(--acc);width:20px;height:20px}
 .edit-dialog select{width:100%;padding:12px;font-size:16px}.edit-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 12px}.edit-times label{min-width:0;font-size:13px;color:var(--fg2)}
 .edit-times input{display:block;appearance:none;-webkit-appearance:none;width:100%;min-width:0;max-width:100%;height:50px;margin-top:7px;font-size:19px;font-family:inherit;padding:10px 6px;background:#fff;color:var(--fg);border:1px solid var(--border);border-radius:10px;box-sizing:border-box}.edit-times input::-webkit-date-and-time-value{min-width:0;text-align:left}.edit-times input::-webkit-datetime-edit{padding:0}
 .edit-note{font-size:12px;color:var(--fg2);line-height:1.8;margin:12px 0}.edit-actions{display:flex;gap:10px;margin-top:20px}.edit-actions button{flex:1;justify-content:center;padding:14px;font-size:16px}.edit-error{font-size:13px;color:var(--danger);line-height:1.7}
@@ -40,30 +40,31 @@
 <span class="day-value">{{ day.v == '休' ? '休み' : (day.v ?: (day.dflt ? '定休' : '基本')) }}</span><span class="day-time">{{ day.time_s }}</span></button>
 {% else %}<div class="cal-cell blank"></div>{% endif %}{% endfor %}</div>{% endfor %}</div>
 <dialog id="day-editor" class="edit-dialog" aria-labelledby="edit-title"><form id="day-form">
-<h2 id="edit-title">勤務の登録</h2><fieldset><legend>勤務の種類</legend><div class="edit-options"><label><input type="radio" name="kind" value="base">基本設定</label><label><input type="radio" name="kind" value="work">出勤</label><label><input type="radio" name="kind" value="off">休み</label></div></fieldset>
+<h2 id="edit-title">勤務の登録</h2><fieldset><legend>勤務の種類</legend><div class="edit-options"><label><input type="radio" name="kind" value="work">出勤</label><label><input type="radio" name="kind" value="off">休み</label></div></fieldset>
 <div id="work-store"><label class="field-label" for="edit-store">勤務する店舗</label><select id="edit-store"><option>イノ</option><option>リッチ</option></select></div>
 <div id="time-area"><div class="edit-times"><label>開始<input type="time" id="edit-from"></label><label>終了<input type="time" id="edit-to"></label></div><p class="edit-note" id="time-note"></p><button type="button" class="btn btn-ghost btn-sm" id="time-reset">時間指定を外す</button></div>
-<p id="edit-error" class="edit-error" role="alert"></p><div class="edit-actions"><button type="button" class="btn btn-ghost" id="edit-cancel">キャンセル</button><button type="submit" class="btn btn-primary" id="edit-save">保存</button></div>
+<button type="button" class="btn btn-ghost btn-sm" id="entry-reset">この日の登録を取り消す</button><p id="edit-error" class="edit-error" role="alert"></p><div class="edit-actions"><button type="button" class="btn btn-ghost" id="edit-cancel">キャンセル</button><button type="submit" class="btn btn-primary" id="edit-save">保存</button></div>
 </form></dialog>
 {% endblock %}
 {% block scripts %}<script>
 (() => {
  const dialog=document.getElementById('day-editor'),form=document.getElementById('day-form'),store=document.getElementById('edit-store'),from=document.getElementById('edit-from'),to=document.getElementById('edit-to'),error=document.getElementById('edit-error'),save=document.getElementById('edit-save');
- let active=null,busy=false;
+ let active=null,busy=false,clearing=false;
  const kind=()=>form.querySelector('input[name=kind]:checked').value;
  const pad=v=>v ? v.padStart(5,'0') : '';
  const home={{ one.home_store|tojson|raw }};
  function fields(){const k=kind();document.getElementById('work-store').hidden=k!=='work';document.getElementById('time-area').hidden=k==='base';document.getElementById('time-note').textContent=k==='off'?'空欄なら終日休み。時間を入れると、その時間だけ休みです。':'空欄なら基本の勤務時間を使います。出勤できる時間だけ指定することもできます。';}
- document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>cell.addEventListener('click',()=>{active=cell;const v=cell.dataset.store;form.querySelector('input[value="'+(v==='休'?'off':v?'work':'base')+'"]').checked=true;store.value=v&&v!=='休'?v:home;from.value=pad(cell.dataset.tf);to.value=pad(cell.dataset.tt);error.textContent='';document.getElementById('edit-title').textContent=cell.dataset.date.replaceAll('-','/')+' の勤務';fields();dialog.showModal();}));
+ document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>cell.addEventListener('click',()=>{active=cell;const v=cell.dataset.store;form.querySelector('input[value="'+(v==='休'||(!v&&cell.dataset.off==='1')?'off':'work')+'"]').checked=true;store.value=v&&v!=='休'?v:home;from.value=pad(cell.dataset.tf);to.value=pad(cell.dataset.tt);error.textContent='';document.getElementById('entry-reset').hidden=!v;document.getElementById('edit-title').textContent=cell.dataset.date.replaceAll('-','/')+' の勤務';fields();dialog.showModal();}));
  form.querySelectorAll('[name=kind]').forEach(r=>r.addEventListener('change',()=>{from.value='';to.value='';error.textContent='';fields();}));
+ document.getElementById('entry-reset').addEventListener('click',()=>{if(!busy&&confirm('この日の個別登録を取り消しますか？ 通常の勤務曜日・時間に戻ります。')){clearing=true;form.requestSubmit();}});
  document.getElementById('time-reset').addEventListener('click',()=>{from.value='';to.value='';});
  document.getElementById('edit-cancel').addEventListener('click',()=>{if(!busy)dialog.close();});
  dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
- form.addEventListener('submit',async event=>{event.preventDefault();if(busy||!active)return;const k=kind(),v=k==='base'?'':k==='off'?'休':store.value;const tf=k==='base'?'':from.value,tt=k==='base'?'':to.value;if(tf&&tt&&tt<=tf){error.textContent='終了は開始より後の時間を選んでください。';return;}
+ form.addEventListener('submit',async event=>{event.preventDefault();if(busy||!active)return;const k=clearing?'base':kind(),v=k==='base'?'':k==='off'?'休':store.value;const tf=k==='base'?'':from.value,tt=k==='base'?'':to.value;if(tf&&tt&&tt<=tf){error.textContent='終了は開始より後の時間を選んでください。';return;}
  busy=true;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);save.textContent='保存中…';error.textContent='';
  try{const res=await fetch('/api/shift',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({staff_id:{{ one.id }},date:active.dataset.date,store:v,time_from:tf,time_to:tt})});const j=await res.json();if(!res.ok||!j.ok)throw new Error();active.dataset.store=v;active.dataset.tf=tf;active.dataset.tt=tt;active.classList.toggle('set',v!=='');active.querySelector('.day-value').textContent=v==='休'?'休み':v||(active.dataset.off==='1'?'定休':'基本');active.querySelector('.day-time').textContent=tf||tt?tf+'〜'+tt:'';dialog.close();toast('保存しました');}
  catch(e){error.textContent='保存できませんでした。内容はそのままなので、もう一度保存してください。';}
- finally{busy=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);save.textContent='保存';}
+ finally{busy=false;clearing=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);save.textContent='保存';}
  });
 })();
 (function () {
