@@ -220,8 +220,8 @@ h1, h2 { font-weight: 500 !important; }
   {% elseif request.path starts with '/shift' or request.path starts with '/schedule' %}
   <span class="brand">{{ '出勤スケジュール' if request.path starts with '/shift' else '予定' }}</span>
   <a href="/" class="nav-link"><span>トップ</span></a>
-  {% if request.path starts with '/shift' %}<a href="/shift/log" class="nav-link {% if request.path == '/shift/log' %}active{% endif %}"><span>記入履歴</span></a>{% endif %}
-  {% if request.path starts with '/shift' %}<a href="/shift/default" class="nav-link {% if request.path == '/shift/default' %}active{% endif %}"><span>ふだんの出勤</span></a>{% endif %}
+  {% if request.path starts with '/shift' %}<a href="/shift/log" class="nav-link {% if request.path == '/shift/log' %}active{% endif %}"><span>変更履歴</span></a>{% endif %}
+  {% if request.path starts with '/shift' %}<a href="/shift/default" class="nav-link {% if request.path == '/shift/default' %}active{% endif %}"><span>基本シフト</span></a>{% endif %}
   {% if request.path == '/shift' %}<a href="#" class="nav-link" onclick="window.print();return false"><span>シフト印刷</span></a>{% endif %}
   {% if request.path == '/schedule' %}<a href="#" class="nav-link" onclick="window.print();return false"><span>予定印刷</span></a>{% endif %}
   {% else %}

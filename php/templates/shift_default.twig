@@ -1,28 +1,35 @@
 {% extends 'base.twig' %}
-{% block title %}ふだんの出勤{% endblock %}
+{% block title %}基本シフト{% endblock %}
 {% block head %}
 <style>
-.df-wrap { overflow-x: auto; }
-.df { border-collapse: collapse; width: 100%; background: #fff; }
-.df th, .df td { border: 1px solid var(--border); padding: 8px 4px; text-align: center; font-size: 14px; }
-.df th.nm, .df td.nm { text-align: left; padding-left: 10px; white-space: nowrap; font-weight: 600; }
-.df .sun { color: #c0392b; }
-.df .off { background: #eee; color: #555; }
-.df small { font-weight: 400; color: var(--fg2); margin-left: 4px; }
-@media print { @page { size: A4 landscape; margin: 8mm; } nav, .no-print { display: none !important; } .df .off { background: #ddd; } }
+.df-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:14px;margin-top:20px}
+.df-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;break-inside:avoid}
+.df-person{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.df-name{font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.df-store{font-size:12px;color:#555;white-space:nowrap;padding:3px 10px;border:1px solid var(--border);border-radius:8px}
+.df-hours{font-size:14px;color:var(--fg2);margin-bottom:16px;font-variant-numeric:tabular-nums}
+.df-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.df-day{text-align:center;min-width:0}
+.df-weekday{display:block;font-size:12px;color:var(--fg2);margin-bottom:7px}
+.df-weekday.sun{color:#b34c44}.df-weekday.sat{color:#526f89}
+.df-state{display:block;font-size:12px;padding:9px 0;border-radius:8px;border:1px solid #d7d7d7;background:#f3f3f3;color:#3d3d3d;white-space:nowrap;font-weight:500}
+.df-state.off{background:#fff;color:#888;border-color:#e8e8e8}
+.df-intro{font-size:13px;line-height:1.8;color:var(--fg2);margin-top:12px}
+@media(max-width:360px){.df-card{padding:12px}.df-week{gap:3px}.df-state{font-size:11px}}
+@media print{@page{size:A4 landscape;margin:8mm}nav,.no-print{display:none!important}.df-list{grid-template-columns:repeat(2,1fr)}.df-state{color:#000!important}.df-state.off{border-style:dashed}}
 </style>
 {% endblock %}
 {% block content %}
-<p class="no-print" style="margin-bottom:8px"><a href="/shift">← 出勤スケジュールにもどる</a></p>
-<h1 style="font-size:20px;font-weight:700;margin-bottom:6px">ふだんの出勤（デフォルト）</h1>
-<p class="no-print" style="font-size:13px;color:var(--fg2);margin-bottom:12px">「休」は、毎週の決まった休みです。曜日の直しかたは、設定の「スタッフ設定」です。</p>
-<div class="df-wrap"><table class="df">
-<tr><th class="nm">名前</th>{% for w in week %}<th{% if loop.first %} class="sun"{% endif %}>{{ w }}</th>{% endfor %}</tr>
+<p class="no-print" style="margin-bottom:18px"><a href="/shift">← 出勤一覧にもどる</a></p>
+<h1 style="font-size:24px">基本シフト</h1>
+<p class="df-intro no-print">通常の勤務曜日・店舗・時間です。変更は「設定」→「スタッフ登録・設定」から行えます。</p>
+<div class="df-list">
 {% for s in staff %}
-<tr><td class="nm">{{ s.name }}<small>{{ s.home_store }}{% if s.work_from or s.work_to %}　{{ s.work_from }}〜{{ s.work_to }}{% endif %}</small></td>
-{% for w in week %}{% if loop.index0 in s.offs %}<td class="off">休</td>{% else %}<td>{{ s.home_store }}</td>{% endif %}{% endfor %}</tr>
-{% else %}
-<tr><td colspan="8">スタッフがいません</td></tr>
-{% endfor %}
-</table></div>
+<section class="df-card" aria-label="{{ s.name }}の基本シフト">
+<div class="df-person"><span class="df-name">{{ s.name }}</span><span class="df-store">{{ s.home_store }}</span></div>
+<div class="df-hours">勤務時間　{% if s.work_from or s.work_to %}{{ s.work_from|time_input }}〜{{ s.work_to|time_input }}{% else %}未設定{% endif %}</div>
+<div class="df-week">{% for w in week %}<div class="df-day"><span class="df-weekday{% if loop.first %} sun{% elseif loop.last %} sat{% endif %}">{{ w }}</span><span class="df-state{% if loop.index0 in s.offs %} off{% endif %}">{{ loop.index0 in s.offs ? '休み' : '出勤' }}</span></div>{% endfor %}</div>
+</section>
+{% else %}<p>スタッフが登録されていません。</p>{% endfor %}
+</div>
 {% endblock %}
