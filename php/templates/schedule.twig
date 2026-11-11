@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}予定{% endblock %}
+{% block title %}店舗スケジュール{% endblock %}
 {% block head %}
 <style>
 @page { size: A4 landscape; margin: 8mm; }
@@ -34,17 +34,17 @@
 
   .sh-top { margin-bottom: 4mm; }
 }
-.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sc-sharing{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin:12px 0}.sc-sharing p{font-size:13px;margin:5px 0 0;color:var(--fg2)}.sc-sharing a{white-space:nowrap;padding:10px 12px;border-radius:10px;background:#eaf5eb;color:#22633c;text-decoration:none;font-weight:700}.sc-state{font-size:12px;margin-left:8px;background:#f3eee0;padding:3px 8px;border-radius:999px}.sc-hint{font-size:13px;color:var(--fg2);margin:12px 0}.cal-d{text-decoration:none;color:inherit;min-height:28px}.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .sc-top h1 { font-size: 20px; font-weight: 700; }
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
 .ent-btn { font-size: 13px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg2); font-family: inherit; cursor: pointer; }
-.cal { max-width: 1000px; margin: 0 auto; }
+.cal { max-width: 1200px; margin: 0 auto; }
 .cal-head, .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .cal-head div { text-align: center; font-size: 12px; font-weight: 700; padding: 4px 0; color: var(--fg2); }
 .cal-head .sun { color: #c0392b; } .cal-head .sat { color: #2c6fb7; }
 .cal-week { margin-bottom: 2px; }
-.cal-cell { min-width: 0; min-height: 92px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 3px 3px; font-size: 10px; line-height: 1.3; overflow: hidden; }
+.cal-cell { min-width: 0; min-height: 112px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 3px 3px; font-size: 12px; line-height: 1.5; overflow: hidden; }
 .cal-cell.blank { background: transparent; border-color: transparent; }
 .cal-cell.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
 .cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; }
@@ -56,12 +56,12 @@
 </style>
 {% endblock %}
 {% block content %}
-<p><a href="/settings/staff-line?stream=store">店舗スケジュールのLINE共有</a></p>
+
 <p class="back-link" style="margin-bottom:8px"><a href="/">← 総合管理にもどる</a></p>
-<div class="sc-top"><h1>予定</h1>
+<div class="sc-top"><h1>店舗スケジュール</h1>
   <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}">›</a></div></div>
-<div class="sh-bar no-print" style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px">
-</div>
+<div class="sc-sharing no-print"><div><strong>LINE自動送信</strong> <span class="sc-state">{{ line_enabled ? (line_auto ? '自動配信中' : '承認して配信') : '準備中' }}</span><p>火〜土 朝8:55 ／ 土曜に日曜分もまとめて共有</p></div><a href="/settings/staff-line?stream=store">配信の設定</a></div>
+<p class="sc-hint no-print">日付を押すと、その日の予定を追加できます。出勤予定は別のカレンダーで管理します。</p>
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
   {% for week in weeks %}
@@ -69,7 +69,7 @@
     {% for day in week %}
     {% if day %}
     <div class="cal-cell{% if day.today %} today{% endif %}">
-      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
+      <a class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" href="/schedule/rules?date={{ day.date }}" aria-label="{{ day.date }}の予定を追加">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</a>
       {% for e in day.events %}<div class="cal-ev">{{ e.title }}{% if e.store %}<small>（{{ e.store }}）</small>{% endif %}</div>{% endfor %}
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}

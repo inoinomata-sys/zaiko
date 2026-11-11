@@ -71,7 +71,7 @@ function h_menu(): void
     render('menu', ['today' => schedule_on($rules, $today), 'tomorrow' => schedule_on($rules, $today->modify('+1 day'))]);
 }
 
-/** 月の表：予定のある日だけ並べる */
+/** 店舗予定の月間カレンダー。出勤シフトとは別の予定だけを表示する。 */
 function h_schedule(): void
 {
     ensure_schedule_tables();
@@ -83,7 +83,11 @@ function h_schedule(): void
         $day['events'] = schedule_on($rules, $d);
         $days[] = $day;
     }
-    render('schedule', ['nav' => shift_nav($first), 'days' => $days, 'weeks' => shift_weeks($days)]);
+    ensure_staff_line_tables();
+    $sharing = sl_settings('store');
+    render('schedule', ['nav' => shift_nav($first), 'days' => $days, 'weeks' => shift_weeks($days),
+        'line_enabled' => (bool)$sharing['enabled'] && !empty(sl_config()['delivery_enabled']),
+        'line_auto' => $sharing['mode'] === 'auto']);
 }
 
 function h_schedule_rules(): void
@@ -99,7 +103,12 @@ function h_schedule_rules(): void
         };
     }
     unset($r);
-    render('schedule_rules', ['rules' => $rules, 'week' => SHIFT_WEEK]);
+    $date = (string)($_GET['date'] ?? '');
+    if ($date !== '') {
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        if (!$parsed || $parsed->format('Y-m-d') !== $date) { throw new HttpError(400); }
+    }
+    render('schedule_rules', ['rules' => $rules, 'week' => SHIFT_WEEK, 'selected_date' => $date]);
 }
 
 function h_schedule_add(): void

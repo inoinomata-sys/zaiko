@@ -20,12 +20,12 @@
   <input name="title" placeholder="予定の名前（例：大掃除）" required maxlength="80">
   <select name="store"><option value="">両方の店</option><option>イノ</option><option>リッチ</option></select>
   <select name="kind" id="kind">
-    <option value="weekly">毎週</option><option value="nth">第○週</option><option value="monthly">毎月</option><option value="once">1回だけ</option>
+    <option value="weekly" {% if not selected_date %}selected{% endif %}>毎週</option><option value="nth">第○週</option><option value="monthly">毎月</option><option value="once" {% if selected_date %}selected{% endif %}>1回だけ</option>
   </select>
   <div class="opt on" id="o-w"><select name="weekday">{% for w in week %}<option value="{{ loop.index0 }}">{{ w }}曜日</option>{% endfor %}</select></div>
   <div class="opt" id="o-n"><select name="nth"><option value="1">第1</option><option value="2">第2</option><option value="3">第3</option><option value="4">第4</option><option value="5">第5</option></select></div>
   <div class="opt" id="o-m"><input type="number" name="day_of_month" min="1" max="31" placeholder="日（1〜31）"></div>
-  <div class="opt" id="o-d"><input type="date" name="once_date"></div>
+  <div class="opt" id="o-d"><input type="date" name="once_date" value="{{ selected_date }}"></div>
   <button class="btn" type="submit">足す</button>
 </form>
 {% for r in rules %}
