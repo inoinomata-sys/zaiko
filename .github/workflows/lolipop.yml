@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   test-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
       # パスワードなどは、GitHub の Settings → Secrets に入れる（コードには書かない）
