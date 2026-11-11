@@ -21,7 +21,7 @@
 <div class="warn">まだ、LINE とつながっていません。公式LINEで Messaging API を使えるようにして、シークレットとトークンを、サーバーの設定（config.php）に入れると、つながります。</div>
 {% endif %}
 <p style="font-size:13px;color:var(--fg2);margin-bottom:12px">業者さんが、発注専用LINEに、一言送ると、ここに出ます。仕入先を選ぶと、発注書の送り先になります（1つの仕入先に、1人だけ）。</p>
-<div class="warn">🔒 送信先はロックされています。変えたい相手の「送信先を変更」を押した時だけ変更できます。</div>
+<div class="warn">送信先はロックされています。変えたい相手の「送信先を変更」を押した時だけ変更できます。</div>
 {% for c in contacts %}
 <div class="ln">
   <div class="n">{{ c.display_name ?: '（名前なし）' }}</div>
@@ -29,7 +29,7 @@
   <form method="post" action="/settings/line/assign" class="ln-assignment" data-name="{{ c.display_name ?: '（名前なし）' }}">
     <input type="hidden" name="line_registration_key" value="{{ line_registration_key }}"><input type="hidden" name="user_id" value="{{ c.user_id }}">
     <input type="hidden" name="previous_supplier" value="{{ c.supplier }}"><input type="hidden" name="confirm_change" value="0">
-    <div class="ln-status" role="status">🔒 ロック中</div><button type="button" class="btn btn-ghost ln-open">送信先を変更</button>
+    <div class="ln-status" role="status">ロック中</div><button type="button" class="btn btn-ghost ln-open">送信先を変更</button>
     <fieldset disabled class="ln-fields"><select name="supplier" aria-label="送信先の仕入先">
       <option value="">仕入先を選ぶ</option>
       {% for s in supplier_names %}<option value="{{ s }}"{% if c.supplier == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
@@ -46,7 +46,7 @@
 <script>
 (() => {
  const forms=[...document.querySelectorAll('.ln-assignment')];
- function lock(f){f.querySelector('fieldset').disabled=true;f.querySelector('select').value=f.querySelector('[name=previous_supplier]').value;f.querySelector('[name=confirm_change]').value='0';f.querySelector('.ln-open').hidden=false;f.querySelector('.ln-status').textContent='🔒 ロック中';}
+ function lock(f){f.querySelector('fieldset').disabled=true;f.querySelector('select').value=f.querySelector('[name=previous_supplier]').value;f.querySelector('[name=confirm_change]').value='0';f.querySelector('.ln-open').hidden=false;f.querySelector('.ln-status').textContent='ロック中';}
  forms.forEach(f=>{f.querySelector('.ln-open').addEventListener('click',()=>{forms.forEach(lock);f.querySelector('fieldset').disabled=false;f.querySelector('.ln-open').hidden=true;f.querySelector('.ln-status').textContent='変更中（保存するまで変わりません）';});f.querySelector('.ln-cancel').addEventListener('click',()=>lock(f));f.addEventListener('submit',e=>{const select=f.querySelector('select');if(f.querySelector('fieldset').disabled||!confirm(`「${f.dataset.name}」の送信先を「${select.selectedOptions[0].textContent}」に変更しますか？`)){e.preventDefault();return;}f.querySelector('[name=confirm_change]').value='1';});});
  window.addEventListener('pageshow',e=>{forms.forEach(lock);if(e.persisted)location.replace('/settings/line');});
 })();
