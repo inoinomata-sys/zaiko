@@ -186,6 +186,18 @@
 .cal-change-tag{color:#705a27}
 .sh-exceptions{border:1px solid var(--border);border-radius:10px;background:#fcf9f0;padding:12px;margin-bottom:14px;font-size:14px;line-height:1.9}
 @media screen{.cal-bar.exception{background:#fcf8ed;border:1px solid var(--gold)}}
+/* 日付ごとに独立して積む。別の日の長い勤務表示で空白を作らない。 */
+.cal-week {align-items:stretch}
+.cal-cell {padding:3px;overflow:visible}
+.cal-people {display:flex;flex-direction:column;gap:5px}
+.cal-people .cal-bar {margin:0;padding:4px 3px;min-width:0;outline:none;font-size:11px;line-height:1.5}
+.cal-people .cal-location {font-size:10px}
+.cal-change-time {font-size:10px;font-weight:500;line-height:1.5}
+.cal-counts {padding:5px 0 7px;font-size:9px;line-height:1.5}
+.cal-counts span {margin-bottom:3px}
+.cal-counts b {display:block;font-size:12px}
+.cal-d {font-size:14px}
+@media(min-width:700px){.cal-people .cal-bar{font-size:13px;padding:6px}.cal-counts b{display:inline}.cal-counts{font-size:12px}.cal-counts span{display:inline-block;margin-right:10px}}
 </style>
 {% endblock %}
 {% block content %}
@@ -217,39 +229,21 @@
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
   {% for w in weeks %}
-  <div class="cal-week" style="grid-template-rows: repeat({{ w.lanes + (view == 'all' ? 2 : 1) }}, auto) 1fr">
+  <div class="cal-week">
     {% for day in w.days %}
     {% if day %}
-    <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1 / -1">
-      <div class="cal-detail" hidden>
-        <div class="sh-date">{{ nav.label|slice(5) }}{{ day.d }}日 <span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span>{% if day.hol %}<small>{{ day.hol }}</small>{% endif %}</div>
-        {% if view == 'all' %}<div class="sh-counts">イノ {{ day.groups['イノ']|length }}人 ／ リッチ {{ day.groups['リッチ']|length }}人</div>{% endif %}
-        {% if day.exceptions %}<div class="sh-exceptions"><b>基本シフトからの変更</b>{% for e in day.exceptions %}<div>{{ e.name }}：{{ e.tags|join('・') }}{% if e.store != '休' %}（{{ e.store }}）{% endif %}{% if e.hours %} {{ e.hours }}{% endif %}</div>{% endfor %}</div>{% endif %}
-        {% for store, people in day.groups %}{% if people %}
-        <div class="sh-row">
-          <span class="sh-store{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">{{ store }}</span>
-          <span class="sh-people">
-            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.hours %}<span class="sh-hours">{{ p.hours }}</span>{% endif %}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.time_l %}<span class="sh-tag help">{{ p.time_l }}だけ休み</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
-          </span>
-        </div>
-        {% endif %}{% endfor %}
-        {% if not day.any %}<div class="sh-none">個別の予定はありません</div>{% endif %}
-        <div class="nt-box">
-          {% for n in day.notes %}<div class="nt"><span class="nt-by">{{ n.author ?: '—' }}</span><span class="nt-body">{{ n.body }}</span><button type="button" class="nt-del" data-id="{{ n.id }}" aria-label="メモを消す">×</button></div>{% endfor %}
-          <form class="nt-form" data-date="{{ day.date }}">
-            <select class="nt-who">{% for st in staff %}<option value="{{ st.name }}" data-sid="{{ st.id }}">{{ st.name }}</option>{% endfor %}</select>
-            <input class="nt-text" maxlength="300" placeholder="メモ（例: 12時半から出ます）" required>
-            <button type="submit" class="btn btn-sm">書く</button>
-          </form>
-        </div>
+    <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}">
+      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.exceptions %}<span class="cal-change-count">変更{{ day.exceptions|length }}件</span>{% endif %}</div>
+      {% if view == 'all' %}<div class="cal-counts" data-date="{{ day.date }}"><span>イノ <b>{{ day.groups['イノ']|length }}人</b></span><span>リッチ <b>{{ day.groups['リッチ']|length }}人</b></span></div>{% endif %}
+      <div class="cal-people">
+      {% for store, people in day.groups %}{% for p in people %}
+      <div class="cal-bar {{ store == '休' ? 'rest' : 'work' }}{% if p.default %} dflt{% endif %}{% if p.difference %} exception{% endif %}" data-date="{{ day.date }}" data-sid="{{ p.id }}"><span class="cal-person">{{ p.name }}</span><small class="cal-location">{{ store == '休' ? '休み' : store }}</small>
+      {% if p.partial_off %}<small class="cal-change-time">{{ p.off_hours }}時休み</small>
+      {% elseif store == '休' and p.time_s %}<small class="cal-change-time">{{ p.time_s }}時</small>
+      {% else %}{% for tag in p.difference %}<small class="cal-change-tag">{{ tag }}</small>{% endfor %}{% if '時間変更' in p.difference and p.hours %}<small class="cal-change-time">{{ p.hours }}</small>{% endif %}{% endif %}</div>
+      {% endfor %}{% endfor %}
       </div>
-    </div>
-    <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1">{{ day.d }}{% if day.exceptions %}<span class="cal-change-count">変更{{ day.exceptions|length }}件</span>{% endif %}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.notes %}<span class="cal-nt">✎{{ day.notes|length }}</span>{% endif %}</div>
-    {% if view == 'all' %}<div class="cal-counts" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:2"><span>イノ<br><b>{{ day.groups['イノ']|length }}人</b></span><span>リッチ<br><b>{{ day.groups['リッチ']|length }}人</b></span></div>{% endif %}
-    {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
-    {% endfor %}
-    {% for b in w.bars %}
-    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}{% if b.difference %} exception{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + (view == 'all' ? 3 : 2) }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small>{% for tag in b.difference %}{% if not (tag == '休み' and b.store == '休') and not (tag == 'ヘルプ' and b.help) %}<small class="cal-change-tag">{{ tag }}</small>{% endif %}{% endfor %}{% if b.time and b.store != '休' %}<small class="cal-change-time">{{ b.time }}</small>{% endif %}</div>
+      {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}
   </div>
   {% endfor %}
