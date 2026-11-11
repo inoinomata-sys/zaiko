@@ -169,6 +169,10 @@
  .sh-tag.chg {background:#f0f0f0;border-color:#ccc;color:#4b4b4b}
  .sh-p.me {background:#f5f1e7}
 }
+.cal-bar {white-space:normal;overflow-wrap:anywhere;text-overflow:clip}
+.cal-person {display:block;font-weight:600}
+.cal-location {display:block;font-size:10px;font-weight:400;line-height:1.5}
+@media screen {.cal-bar {padding:4px 3px;line-height:1.5}}
 </style>
 {% endblock %}
 {% block content %}
@@ -229,7 +233,7 @@
     {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
     {% endfor %}
     {% for b in w.bars %}
-    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + 2 }}">{% if b.store == '休' %}{{ b.name }}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.name }}（{{ b.store }}{% if b.help %}・ヘルプ{% endif %}）{% endif %}</div>
+    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + 2 }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small></div>
     {% endfor %}
   </div>
   {% endfor %}

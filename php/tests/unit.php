@@ -142,6 +142,12 @@ check('時刻入力 1桁の時を2桁で表示', shift_time_input('9:00'), '09:0
 check('時刻入力 2桁の時刻', shift_time_input('17:00'), '17:00');
 check('時刻入力 空欄を維持', shift_time_input(''), '');
 check('時刻入力 不正値は表示しない', shift_time_input('25:00'), '');
+$dailyItem = ['store'=>'イノ','time'=>'','help'=>false,'dflt'=>true];
+$dailyRows = [['date'=>'2026-11-10','items'=>[1=>$dailyItem]],['date'=>'2026-11-11','items'=>[1=>$dailyItem]]];
+$dailyBars = shift_week_bars($dailyRows, [['id'=>1,'name'=>'テスト','color'=>'#555555']]);
+check('日別カレンダー 同じ勤務でも2日を結合しない', count($dailyBars['bars']), 2);
+check('日別カレンダー 各帯は1列だけ', array_column($dailyBars['bars'], 'n'), [1,1]);
+check('日別カレンダー 各日の列に配置', array_column($dailyBars['bars'], 'c'), [1,2]);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

@@ -276,7 +276,7 @@ function shift_weeks(array $days): array
 
 const SHIFT_COLORS = ['#7b5ea7', '#2f7fb5', '#c0392b', '#b8860b', '#2e8b57', '#d2691e', '#008b8b', '#a0507a', '#6b6b6b', '#c2185b'];
 
-/** 1週間ぶんの、スタッフごとの帯（同じ内容が続く日は1本にまとめる）と、帯を重ならないように並べた段数 */
+/** 各日付の枠内にスタッフを並べる。同じ勤務でも日をまたいで結合しない。 */
 function shift_week_bars(array $row, array $staff): array
 {
     $bars = [];
@@ -286,10 +286,6 @@ function shift_week_bars(array $row, array $staff): array
         foreach ($row as $c => $day) {
             $it = $day['items'][$id] ?? null;
             $key = $it === null ? null : $it['store'] . '|' . $it['time'] . '|' . (int)$it['help'] . '|' . (int)$it['dflt'];
-            if ($cur !== null && $key === $cur['key']) {
-                $cur['n']++;
-                continue;
-            }
             if ($cur !== null) {
                 $bars[] = $cur;
                 $cur = null;
