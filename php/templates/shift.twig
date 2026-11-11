@@ -205,6 +205,10 @@
 .ent-btn{min-height:48px;padding:12px 16px;font-size:14px;line-height:1.5}
 .ent-list{gap:10px;margin:4px 0 20px}.ent-name{min-height:48px;display:flex;align-items:center;justify-content:center;padding:12px}
 .sh-foot{flex-wrap:wrap;gap:12px}.sh-foot a{min-height:48px;flex:1 1 220px}
+/* 通常の名前・店舗の2行は同じ高さ。変更内容は省略せず必要な分を確保。 */
+.cal-people .cal-bar {min-height:44px;padding:5px 3px;box-sizing:border-box}
+.cal-people .cal-person,.cal-people .cal-location {min-height:16px;line-height:16px;margin:0}
+@media(min-width:700px){.cal-people .cal-bar{min-height:48px}.cal-people .cal-person,.cal-people .cal-location{min-height:18px;line-height:18px}}
 </style>
 {% endblock %}
 {% block content %}
