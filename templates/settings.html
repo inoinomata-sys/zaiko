@@ -6,12 +6,23 @@
 .set-link { display: block; padding: 18px 16px; background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; text-decoration: none; color: var(--fg); }
 .set-link b { display: block; font-size: 17px; margin-bottom: 4px; }
 .set-link span { font-size: 13px; color: var(--fg2); }
+.theme-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.theme-choice{display:flex;align-items:center;gap:8px;min-height:48px;padding:10px;border:1px solid var(--border);border-radius:10px;cursor:pointer}.theme-choice:has(input:checked){outline:2px solid var(--gold);outline-offset:1px}.theme-dot{width:20px;height:20px;border-radius:50%;flex:none}.theme-choice input{width:18px;height:18px;accent-color:var(--acc)}
 </style>
 {% endblock %}
 
 {% block content %}
 <p><a href="/settings/staff-line">店舗スケジュールのLINE配信設定・送信履歴</a></p>
 <h1 style="font-size:20px; font-weight:700; margin-bottom:14px">設定</h1>
+<section class="set-link" aria-labelledby="design-title">
+<h2 id="design-title" style="font-size:17px">デザインのカラー</h2>
+<p style="color:var(--fg2);margin-top:6px">白をベースに、枠線とボタンの色を変更します。この端末に保存されます。</p>
+<form id="design-form"><div class="theme-options">
+<label class="theme-choice"><input type="radio" name="design-color" value="gold"><span class="theme-dot" style="background:#b59a54" aria-hidden="true"></span>ゴールド</label>
+<label class="theme-choice"><input type="radio" name="design-color" value="silver"><span class="theme-dot" style="background:#929292" aria-hidden="true"></span>シルバー</label>
+<label class="theme-choice"><input type="radio" name="design-color" value="rose"><span class="theme-dot" style="background:#a47680" aria-hidden="true"></span>ローズ</label>
+<label class="theme-choice"><input type="radio" name="design-color" value="sage"><span class="theme-dot" style="background:#7b9276" aria-hidden="true"></span>セージ</label>
+<label class="theme-choice"><input type="radio" name="design-color" value="blue"><span class="theme-dot" style="background:#7d94a8" aria-hidden="true"></span>ブルーグレー</label>
+</div><button type="submit" class="btn">カラーを保存</button><p id="design-status" role="status" style="margin-top:10px"></p></form></section>
 <a class="set-link" href="/settings/staff"><b>スタッフ登録・設定</b><span>名前・所属店舗・勤務時間・ふだんの勤務曜日を登録する</span></a>
 <a class="set-link" href="/shift"><b>出勤スケジュール</b><span>イノ・リッチの出勤を見る・入れる（ヘルプの日も分かります）</span></a>
 <a class="set-link" href="/products"><b>商品マスター</b><span>商品を足す・名前を直す・基準の数を変える</span></a>
@@ -19,3 +30,10 @@
 <a class="set-link" href="/settings/line"><b>LINE（業者さん）</b><span>発注専用LINEの友だちを、仕入先にひも付ける</span></a>
 <a class="set-link" href="/settings/contacts"><b>仕入先の担当者</b><span>発注の連絡先を直す</span></a>
 {% endblock %}
+
+{% block scripts %}<script>
+(function(){const form=document.getElementById('design-form'),status=document.getElementById('design-status');
+form.querySelectorAll('input').forEach(input=>{input.checked=input.value===inoTheme.current;input.addEventListener('change',()=>{inoTheme.apply(input.value);status.textContent='色を確認して「カラーを保存」を押してください。';});});
+form.addEventListener('submit',event=>{event.preventDefault();const selected=form.querySelector('input:checked');if(!selected)return;try{localStorage.setItem('ino-design-color',selected.value);inoTheme.current=inoTheme.apply(selected.value);status.textContent='カラーを保存しました。';}catch(e){status.textContent='保存できませんでした。ブラウザの保存設定をご確認ください。';}});
+})();
+</script>{% endblock %}

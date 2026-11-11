@@ -180,7 +180,7 @@
 .cal-counts b {font-weight:700;color:#303030}
 .sh-counts {font-size:15px;padding:8px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--border);font-weight:600}
 @media(min-width:700px){.cal-counts{font-size:12px;padding:4px 6px 8px}}
-.cal-change-count{display:block;flex-basis:100%;font-size:9px;color:#705a27;background:#faf3df;border:1px solid var(--border);border-radius:4px;padding:1px 2px;line-height:1.5;white-space:normal}
+.cal-change-count{display:block;flex-basis:100%;min-width:0;box-sizing:border-box;font-size:9px;color:#705a27;background:#faf3df;border:1px solid var(--border);border-radius:4px;padding:1px;line-height:1.5;letter-spacing:0;white-space:nowrap}
 .cal-d{flex-wrap:wrap}
 .cal-change-tag,.cal-change-time{display:block;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
 .cal-change-tag{color:#705a27}
@@ -212,7 +212,7 @@
 /* 名前の長さではなく、その日の列幅いっぱいに枠をそろえる。 */
 .cal-people {align-items:stretch}
 .cal-people .cal-bar {align-self:stretch;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.cal-closed{display:block;flex-basis:100%;font-size:10px;color:#b23f3f;line-height:1.5}.cal-people .rest-name{color:#b23f3f}
+.cal-closed{display:block;flex-basis:100%;font-size:10px;color:#b23f3f;line-height:1.5}.cal-people .rest-name{color:#b23f3f;white-space:nowrap;letter-spacing:0;font-size:9px}.cal-people .cal-bar.rest{padding-left:1px;padding-right:1px}@media(min-width:700px){.cal-people .rest-name{font-size:12px}}
 </style>
 {% endblock %}
 {% block content %}

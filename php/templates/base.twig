@@ -35,8 +35,8 @@ body { font-family: 'Hiragino Sans', 'Meiryo', system-ui, sans-serif;
 /* Restrict decorative edging to large headings to keep small text crisp. */
 @media screen {
   h1, h2, .home-logo {
-    text-shadow: -.2px -.2px 0 #b79850, .2px -.2px 0 #b79850,
-                 -.2px .2px 0 #b79850, .2px .2px 0 #b79850;
+    text-shadow: -.2px -.2px 0 var(--gold), .2px -.2px 0 var(--gold),
+                 -.2px .2px 0 var(--gold), .2px .2px 0 var(--gold);
   }
   .home-section { text-shadow: none; }
 }
@@ -210,6 +210,13 @@ input:focus, select:focus { outline: 2px solid var(--acc); border-color: var(--g
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 h1, h2 { font-weight: 500 !important; }
 </style>
+<script>
+(function(){
+ const palettes={gold:['#d6c28c','#9c7a2f','#555555','#3d3d3d'],silver:['#c7c7c7','#777777','#555555','#3d3d3d'],rose:['#d8bfc2','#96626a','#74545b','#5a4147'],sage:['#bdcbbc','#60765e','#536950','#3f513d'],blue:['#bdcbd5','#607a90','#50697e','#3d5264']};
+ window.inoTheme={apply:function(name){if(!palettes[name])name='gold'; const r=document.documentElement; ['--border','--gold','--acc','--acc-h'].forEach((key,i)=>r.style.setProperty(key,palettes[name][i]));return name;},current:'gold'};
+ try{inoTheme.current=inoTheme.apply(localStorage.getItem('ino-design-color')||'gold');}catch(e){inoTheme.apply('gold');}
+})();
+</script>
 {% block head %}{% endblock %}
 </head>
 <body>

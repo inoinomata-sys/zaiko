@@ -2,7 +2,7 @@
 {% block title %}店舗スケジュール{% endblock %}
 {% block head %}
 <style>
-@page { size: A4 landscape; margin: 8mm; }
+@page { size: A5 portrait; margin: 6mm; }
 @media print {
   nav, #pwa-banner, #to-top, #toast, .no-print, .sh-bar, .ent-list, #detail, .sh-foot, .back-link, .sh-nav a { display: none !important; }
   body, main { background: #fff !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
@@ -116,6 +116,22 @@
  @media(max-width:560px){.cal-cell{min-height:104px;padding:1px 2px 5px;font-size:11px}.cal-ev{padding:3px 2px;margin:3px 0}.cal-ev small{font-size:10px}}
 }
 .sc-closed{font-size:11px;color:#b23f3f;line-height:1.6;margin:3px 0;font-weight:500}
+@media print {
+ html,body{width:136mm!important;margin:0!important;background:#fff!important}
+ main{width:136mm!important;padding:0!important;max-width:none!important}
+ .sc-top{display:flex!important;justify-content:space-between;align-items:center;margin-bottom:3mm!important;gap:3mm!important}
+ .sc-top h1{font-size:13pt!important;width:auto!important}.sh-nav b{font-size:11pt!important}
+ .cal{width:136mm!important;border:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important}
+ .cal-head,.cal-week{gap:0!important}.cal-head div{font-size:7pt!important;padding:1.5mm 0!important}
+ .cal-week{margin:0!important;break-inside:avoid;page-break-inside:avoid}
+ .cal-cell{min-height:25mm!important;padding:1mm .6mm!important;border:.2mm solid #777!important;border-radius:0!important;background:#fff!important;font-size:6.5pt!important;line-height:1.35!important;overflow:visible!important}
+ .cal-d{font-size:8pt!important;line-height:1.3!important;min-height:0!important;padding:0 0 .7mm!important;flex-wrap:wrap!important}
+ .cal-hol{font-size:5.5pt!important;white-space:normal!important}
+ .cal-ev{font-size:6.5pt!important;line-height:1.4!important;margin:.6mm 0!important;padding:0 0 0 .5mm!important;border-left:.35mm solid #555!important;border-radius:0!important;background:#fff!important;overflow-wrap:anywhere!important}
+ .cal-ev small{font-size:5.8pt!important;display:block!important;margin:0!important}
+ .sc-closed{font-size:7pt!important;color:#000!important}
+ *{text-shadow:none!important;color:#000!important}
+}
 </style>
 {% endblock %}
 {% block content %}
@@ -141,7 +157,7 @@
   </div>
   {% endfor %}
 </div>
-<p class="no-print" style="margin:16px 0 30px"><a class="btn" href="/schedule/add" style="display:block;text-align:center">＋ この日だけの予定を追加</a><a href="/schedule/rules" style="display:block;text-align:center;margin-top:14px">繰り返し予定・登録済みの予定を管理</a></p>
+<p class="no-print" style="margin:16px 0 30px"><a class="btn" href="/schedule/add" style="display:block;text-align:center">＋ 予定追加</a><a href="/schedule/rules" style="display:block;text-align:center;margin-top:14px">繰り返し予定・登録済みの予定を管理</a></p>
 {% endblock %}
 
 {% block scripts %}<script>document.querySelectorAll('[data-add-url]').forEach(cell=>cell.addEventListener('click',e=>{if(!e.target.closest('a,button,input,select'))location.href=cell.dataset.addUrl;}));</script>{% endblock %}
