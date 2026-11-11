@@ -1,29 +1,47 @@
 {% extends 'base.twig' %}
 {% block title %}総合管理{% endblock %}
-{% block head %}
-<style>
-.mn-wrap { max-width: 480px; margin: 18px auto; display: flex; flex-direction: column; gap: 14px; }
-.mn-card { display: block; padding: 22px 20px; background: #fff; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: var(--fg); box-shadow: 0 3px 14px #24324507; }
-.mn-card b { display: block; font-size: 22px; font-weight: 500; margin-bottom: 6px; color: var(--fg); }
-.mn-card span { font-size: 14px; color: var(--fg2); }
-.mn-today { background: var(--soft); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; }
-.mn-today h2 { font-size: 15px; margin: 0 0 6px; }
-.mn-today .sub { font-size: 13px; color: var(--fg2); margin-top: 8px; }
-.mn-ev { font-size: 17px; font-weight: 600; padding: 2px 0; }
-.mn-ev small { font-size: 11px; font-weight: 400; color: #fff; background: var(--acc); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
-.mn-none { font-size: 14px; color: var(--fg2); }
-</style>
-{% endblock %}
+{% block navigation %}{% endblock %}
+{% block head %}<style>
+.home {max-width:560px;margin:0 auto;padding:30px 10px 36px}
+main:has(.home) {padding:0 20px}
+.home-brand {display:flex;align-items:center;justify-content:space-between;margin-bottom:54px}
+.home-logo {font-size:24px;letter-spacing:.14em;font-weight:400}
+.home-tagline {font-size:10px;letter-spacing:.16em;color:var(--fg2);margin-top:7px}
+.home-settings {display:grid;place-items:center;width:44px;height:44px;border:1px solid #89939d;border-radius:50%;color:var(--fg)}
+.home svg {width:22px;height:22px;flex-shrink:0}
+.home a:hover {text-decoration:none;background:#fcfdff;border-color:#a8b4c2}
+.home a:focus-visible {outline:3px solid var(--acc);outline-offset:4px}
+.home-date {font-size:12px;letter-spacing:.06em;color:var(--fg2);margin-bottom:14px}
+.home h1 {font-size:29px;letter-spacing:.03em;margin:0 0 12px}
+.home-store {color:var(--fg2);font-size:13px;margin-bottom:34px}
+.home-section {display:flex;justify-content:space-between;align-items:center;margin:0 0 14px;font-size:13px;font-weight:500}
+.home-section span {color:var(--fg2);font-size:11px;font-weight:400;letter-spacing:.03em}
+.home-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.home-card {min-height:132px;padding:20px 16px;background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:0 2px 5px #24324503;color:var(--fg);display:flex;flex-direction:column;align-items:flex-start}
+.home-card b {font-size:16px;font-weight:500;margin:14px 0 6px}
+.home-card small,.home-schedule small {font-size:12px;color:var(--fg2);line-height:1.6}
+.home-schedule {display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:17px 18px;margin-bottom:12px;color:var(--fg);min-height:78px}
+.home-schedule b {display:block;font-size:16px;font-weight:500;margin-bottom:3px}
+.home-chevron {margin-left:auto;color:var(--fg2);font-size:24px;font-weight:300}
+.home-agenda {margin-top:28px;border-top:1px solid var(--border);padding-top:20px;color:var(--fg2);font-size:13px;line-height:1.9}
+.home-agenda h2 {font-size:14px;color:var(--fg);margin-bottom:8px}
+.home-event {color:var(--fg)}
+@media(min-width:800px){.home {padding-top:48px}.home-brand{margin-bottom:48px}}
+@media(max-width:350px){main:has(.home){padding:0 14px}.home-card{padding:18px 12px}.home-card small{font-size:11px}}
+</style>{% endblock %}
 {% block content %}
-<div class="mn-wrap">
-  <h1 style="font-size:20px;font-weight:700;margin-bottom:2px">総合管理</h1>
-  <div class="mn-today">
-    <h2>今日の予定</h2>
-    {% for e in today %}<div class="mn-ev">{{ e.title }}{% if e.store %}<small>{{ e.store }}</small>{% endif %}</div>{% else %}<div class="mn-none">ありません</div>{% endfor %}
-    <div class="sub"><b>明日</b>：{% for e in tomorrow %}{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}{% if not loop.last %}、{% endif %}{% else %}ありません{% endfor %}</div>
-  </div>
-  <a class="mn-card" href="/stock"><b>在庫管理</b><span>在庫・使用入力・発注・お客様注文</span></a>
-  <a class="mn-card" href="/schedule"><b>予定</b><span>発注日の前日・清掃・ゴミ出しなど</span></a>
-  <a class="mn-card" href="/shift"><b>出勤スケジュール</b><span>イノ・リッチの出勤（ヘルプの日も見えます）</span></a>
-</div>
-{% endblock %}
+<div class="home">
+<header class="home-brand"><div><div class="home-logo">INO</div><div class="home-tagline">STORE MANAGEMENT</div></div><a class="home-settings" href="/settings" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h7 M15 7h5 M4 17h3 M11 17h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></a></header>
+<div class="home-date">{{ display_date }}</div><h1>総合管理</h1><p class="home-store">イノ・リッチ</p>
+<h2 class="home-section">業務<span lang="en">DAILY WORK</span></h2><div class="home-grid">
+<a class="home-card" href="/stock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z M4 7.5l8 4.5 8-4.5 M12 12v9 M8 5.3l8 4.5"/></svg><b>在庫管理</b><small>在庫を確認・調整</small></a>
+<a class="home-card" href="/usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="5" width="12" height="16" rx="2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6 M9 16h6"/></svg><b>使用入力</b><small>使った商品を記録</small></a>
+<a class="home-card" href="/order"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="16" rx="3"/><path d="M8 3h8 M8 10c0 5 8 5 8 0"/></svg><b>発注</b><small>商品の発注・履歴</small></a>
+<a class="home-card" href="/customer-orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7 M3 10h3 M3 15h3 m6-2 1-4 6-6 3 3-6 6-4 1Z"/></svg><b>お客様注文</b><small>注文を確認・管理</small></a>
+</div><h2 class="home-section">スケジュール<span lang="en">CALENDAR</span></h2>
+<a class="home-schedule" href="/schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2 M14 17h2"/></svg><div><b>店舗スケジュール</b><small>店舗の予定・LINE共有</small></div><span class="home-chevron" aria-hidden="true">›</span></a>
+<a class="home-schedule" href="/shift"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21v-2a7 7 0 0 1 14 0v2 M17 4a4 4 0 0 1 0 8 M21 21v-2a7 7 0 0 0-3-5"/></svg><div><b>出勤スケジュール</b><small>スタッフの出勤・休み</small></div><span class="home-chevron" aria-hidden="true">›</span></a>
+<section class="home-agenda" aria-label="直近の店舗予定"><h2>今日の予定</h2>
+{% for e in today %}<div class="home-event">{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}</div>{% else %}<div>ありません</div>{% endfor %}
+<div>明日：{% for e in tomorrow %}{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}{% if not loop.last %}、{% endif %}{% else %}ありません{% endfor %}</div></section>
+</div>{% endblock %}

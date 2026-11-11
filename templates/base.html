@@ -204,6 +204,7 @@ h1, h2 { font-weight: 500 !important; }
 {% block head %}{% endblock %}
 </head>
 <body>
+{% block navigation %}
 <nav>
   {% if request.path == '/' %}
   <span class="brand">総合管理</span>
@@ -226,6 +227,7 @@ h1, h2 { font-weight: 500 !important; }
   <span class="spacer"></span>
   <span class="store-badge">イノ</span>
 </nav>
+{% endblock %}
 <div id="pwa-banner" style="display:none;background:#1a6fbf;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;">
   <span>ホーム画面に追加してアプリとして使えます</span>
   <button onclick="installPWA()" style="background:#fff;color:#1a6fbf;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">追加する</button>

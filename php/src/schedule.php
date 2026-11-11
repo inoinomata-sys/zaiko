@@ -68,7 +68,7 @@ function h_menu(): void
     ensure_schedule_tables();
     $rules = schedule_rules_all();
     $today = now_jst()->setTime(0, 0);
-    render('menu', ['today' => schedule_on($rules, $today), 'tomorrow' => schedule_on($rules, $today->modify('+1 day'))]);
+    render('menu', ['display_date' => $today->format('n月j日') . ' ' . ['日', '月', '火', '水', '木', '金', '土'][(int)$today->format('w')] . '曜日', 'today' => schedule_on($rules, $today), 'tomorrow' => schedule_on($rules, $today->modify('+1 day'))]);
 }
 
 /** 店舗予定の月間カレンダー。出勤シフトとは別の予定だけを表示する。 */
