@@ -111,7 +111,7 @@
   {% for s in staff %}<a class="ent-name" data-sid="{{ s.id }}" href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a>{% endfor %}
 </div>
 {% else %}
-<p style="color:var(--fg2);margin:14px 0">まだスタッフがいません。下の「スタッフ」から入れてください。</p>
+<p style="color:var(--fg2);margin:14px 0">まだスタッフが登録されていません。「設定」→「スタッフ登録・設定」から登録してください。</p>
 {% endif %}
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>

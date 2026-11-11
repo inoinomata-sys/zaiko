@@ -1,5 +1,5 @@
 {% extends 'base.twig' %}
-{% block title %}スタッフ設定{% endblock %}
+{% block title %}スタッフ登録・設定{% endblock %}
 {% block head %}
 <style>
 .st-card { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
@@ -23,13 +23,13 @@
 {% endblock %}
 {% block content %}
 <p style="margin-bottom:10px"><a href="/settings">← 設定にもどる</a></p>
-<h1 style="font-size:20px;font-weight:700;margin-bottom:6px">スタッフ設定</h1>
+<h1 style="font-size:20px;font-weight:700;margin-bottom:6px">スタッフ登録・設定</h1>
 <p style="font-size:13px;color:var(--fg2);margin-bottom:12px">「本店」は、ふだん入る店です。別の店に入る日は、出勤スケジュールに「ヘルプ」の印が出ます。「勤務日」にチェックのない曜日は、出勤を入れなくても、自動で「休」になります（その日だけ出勤にしたい時は、出勤を入れる画面で、店を選びます）。辞めた人は「外す」にすると、表から消えます（過去の出勤は残ります）。</p>
 <form class="st-add" method="post" action="/settings/staff/add">
-  <input name="name" placeholder="名前" required maxlength="40">
-  <select name="home_store"><option>イノ</option><option>リッチ</option></select>
+  <input name="name" placeholder="スタッフの名前" aria-label="スタッフの名前" required maxlength="40">
+  <select name="home_store" aria-label="所属店舗"><option>イノ</option><option>リッチ</option></select>
   <span class="st-tm">勤務時間 <input type="time" name="work_from"> 〜 <input type="time" name="work_to"></span>
-  <button class="btn" type="submit">足す</button>
+  <button class="btn" type="submit">スタッフを登録</button>
 </form>
 {% for s in staff %}
 <div class="st-wrap{% if not s.is_active %} off{% endif %}">
