@@ -54,13 +54,74 @@
 .cal-ev { margin-top: 2px; padding-left: 3px; border-left: 3px solid var(--acc); overflow-wrap: anywhere; }
 .cal-ev small { color: var(--fg2); margin-left: 2px; }
 @media (max-width: 560px) { .cal-cell { min-height: 80px; padding: 1px; font-size: 9px; } .cal-d { font-size: 12px; } .cal-hol { font-size: 8px; } }
+
+/* Screen-only calendar styling; the existing monochrome print layout is retained. */
+@media screen {
+ main:has(.cal) {max-width:1180px;padding:24px 20px 40px}
+ .back-link {font-size:13px;margin-bottom:20px!important}
+ .sc-top,.sh-top {flex-wrap:wrap;gap:18px;margin:0 0 22px}
+ .sc-top h1,.sh-top h1 {font-size:24px;letter-spacing:.03em}
+ .sh-nav {gap:14px}
+ .sh-nav b {font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;min-width:100px;text-align:center}
+ .sh-nav a {display:grid;place-items:center;width:42px;height:42px;padding:0;border-radius:50%;font-size:25px;line-height:1}
+ .sh-nav a:hover {background:var(--soft)}
+ .sh-nav a:focus-visible,.cal-d:focus-visible {outline:3px solid var(--acc);outline-offset:2px}
+ .cal {max-width:none;background:#fff;border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:0 4px 20px #24324504}
+ .cal-head {padding-bottom:8px}
+ .cal-head div {font-size:12px;font-weight:500;padding:8px 0;letter-spacing:.04em}
+ .cal-head,.cal-week {gap:4px}
+ .cal-week {margin-bottom:4px}
+ .cal-cell {border-color:#e6eaf0;border-radius:10px;background:#fff}
+ .cal-cell.blank {background:#f8f9fb;border-color:transparent}
+ .cal-cell.today {background:#f0f5f9;border-color:#73899f;box-shadow:inset 0 0 0 1px #73899f}
+ .cal-d {font-size:14px;font-weight:600;min-height:30px;padding:4px 5px;line-height:1.5}
+ .cal-hol {font-size:10px}
+ .cal-cell.sel {background:#e7eff7;border-color:#435f7a;box-shadow:inset 0 0 0 2px #435f7a}
+ .sc-sharing {padding:16px 18px;border-radius:16px;margin:0 0 16px;flex-wrap:wrap}
+ .sc-sharing strong {font-size:14px;font-weight:600}
+ .sc-state {background:var(--soft);color:var(--fg)}
+ .sc-sharing p {line-height:1.8}
+ .sc-sharing a {background:var(--soft);color:var(--acc);font-weight:500}
+ .sc-hint {line-height:1.8;margin-bottom:16px}
+ .sh-bar {gap:12px;margin:0 0 18px}
+ .ent-btn {background:#fff;padding:10px 14px;color:var(--fg);border-radius:12px}
+ .sh-detail {border-radius:14px;background:#f8fafc;padding:18px;margin:18px 0 0;line-height:1.8}
+ .sh-date {font-size:16px;margin-bottom:12px}
+ .sh-row {padding:5px 0}
+ .cal-legend {gap:8px 14px;line-height:1.8;padding:10px 4px;margin:8px 0 0}
+ .sh-foot a {border-color:var(--border);border-radius:14px;padding:16px;background:var(--acc);color:#fff}
+ .nt-form input {background:#fff}
+ @media(max-width:560px){
+  main:has(.cal){padding:18px 10px 30px}
+  .sc-top,.sh-top {gap:14px;margin-bottom:18px}
+  .sc-top h1,.sh-top h1 {font-size:22px;width:100%}
+  .sh-nav {width:100%;justify-content:space-between}
+  .sh-nav b {font-size:18px}
+  .cal {padding:6px;border-radius:16px}
+  .cal-head,.cal-week {gap:2px}
+  .cal-week {margin-bottom:2px}
+  .cal-cell {border-radius:6px}
+  .cal-d {font-size:13px;padding:3px 2px;min-height:27px;flex-wrap:wrap;gap:0 2px}
+  .cal-hol {font-size:9px;max-width:100%}
+  .sc-sharing {padding:14px;gap:10px}
+  .sc-sharing p {font-size:12px}
+  .sh-detail {padding:14px 10px}
+ }
+}
+
+@media screen {
+ .cal-cell {min-height:128px;padding:3px 4px 8px;font-size:13px;line-height:1.65}
+ .cal-ev {margin:4px 0;padding:4px 5px;border-left:2px solid #8193a6;border-radius:3px;background:#f1f4f7;color:#29323d;line-height:1.6}
+ .cal-ev small {display:block;font-size:11px;margin-left:0;color:#5c6876}
+ @media(max-width:560px){.cal-cell{min-height:104px;padding:1px 2px 5px;font-size:11px}.cal-ev{padding:3px 2px;margin:3px 0}.cal-ev small{font-size:10px}}
+}
 </style>
 {% endblock %}
 {% block content %}
 
 <p class="back-link" style="margin-bottom:8px"><a href="/">← 総合管理にもどる</a></p>
 <div class="sc-top"><h1>店舗スケジュール</h1>
-  <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}">›</a></div></div>
+  <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}" aria-label="前の月">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}" aria-label="次の月">›</a></div></div>
 <div class="sc-sharing no-print"><div><strong>LINE自動送信</strong> <span class="sc-state">{{ line_enabled ? (line_auto ? '自動配信中' : '承認して配信') : '準備中' }}</span><p>火〜土 朝8:55 ／ 土曜に日曜分もまとめて共有</p></div><a href="/settings/staff-line?stream=store">配信の設定</a></div>
 <p class="sc-hint no-print">日付を押すと、その日の予定を追加できます。出勤予定は別のカレンダーで管理します。</p>
 <div class="cal">

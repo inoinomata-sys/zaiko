@@ -1,4 +1,4 @@
-const CACHE = 'zaiko-v5-home-cards';
+const CACHE = 'zaiko-v6-clear-calendars';
 const OFFLINE_URLS = [
   '/',
   '/order',
