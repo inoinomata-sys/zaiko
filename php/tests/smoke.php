@@ -439,6 +439,7 @@ page_ok('/shift/edit?month=' . $m, 'テスト花子');
 page_ok('/shift?month=2026-05', 'こどもの日');
 page_ok('/shift/customer-print?month=2026-11&store=' . rawurlencode('イノ'), 'PDFを保存する');
 page_ok('/shift/customer-print?month=2027-03', 'March');
+page_ok('/shift/customer-print?month=2026-11', 'share-pdf');
 page_ok('/shift?month=2026-05', '振替休日');
 page_ok('/shift?month=2026-09', '国民の休日');
 page_ok('/shift?month=2027-03', '振替休日');
