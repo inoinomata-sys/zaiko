@@ -78,12 +78,20 @@ function schedule_rules_all(): array
     return rows('SELECT * FROM schedule_rules ORDER BY sort_order, id');
 }
 
+function schedule_rules_for_period(DateTimeImmutable $start, DateTimeImmutable $end): array
+{
+    return rows("SELECT * FROM schedule_rules WHERE is_active = 1
+        AND (kind <> 'once' OR once_date BETWEEN ? AND ?) ORDER BY sort_order, id",
+        [$start->format('Y-m-d'), $end->format('Y-m-d')]);
+}
+
 function h_menu(): void
 {
     ensure_schedule_tables();
-    $rules = schedule_rules_all();
     $today = now_jst()->setTime(0, 0);
-    render('menu', ['display_date' => $today->format('n月j日') . ' ' . ['日', '月', '火', '水', '木', '金', '土'][(int)$today->format('w')] . '曜日', 'today' => schedule_on($rules, $today), 'tomorrow' => schedule_on($rules, $today->modify('+1 day'))]);
+    $tomorrow = $today->modify('+1 day');
+    $rules = schedule_rules_for_period($today, $tomorrow);
+    render('menu', ['display_date' => $today->format('n月j日') . ' ' . ['日', '月', '火', '水', '木', '金', '土'][(int)$today->format('w')] . '曜日', 'today' => schedule_on($rules, $today), 'tomorrow' => schedule_on($rules, $tomorrow)]);
 }
 
 /** 店舗予定の月間カレンダー。出勤シフトとは別の予定だけを表示する。 */
@@ -91,7 +99,7 @@ function h_schedule(): void
 {
     ensure_schedule_tables();
     $first = shift_month($_GET['month'] ?? null);
-    $rules = schedule_rules_all();
+    $rules = schedule_rules_for_period($first, $first->modify('last day of this month'));
     $days = [];
     foreach (shift_days($first) as $day) {
         $d = new DateTimeImmutable($day['date'], new DateTimeZone('Asia/Tokyo'));
@@ -101,7 +109,7 @@ function h_schedule(): void
     }
     ensure_staff_line_tables();
     $sharing = sl_settings('store');
-    render('schedule', ['nav' => shift_nav($first), 'days' => $days, 'weeks' => shift_weeks($days),
+    render('schedule', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days),
         'line_enabled' => (bool)$sharing['enabled'] && !empty(sl_config()['delivery_enabled']),
         'line_auto' => $sharing['mode'] === 'auto']);
 }
@@ -158,8 +166,6 @@ function h_schedule_once_save(): void
                 $date=$d->format('Y-m-d');
                 if (val("SELECT id FROM schedule_rules WHERE is_active=1 AND is_closure=1 AND store=? AND once_date=?",[$store,$date])) { continue; }
                 run("INSERT INTO schedule_rules (title,store,kind,once_date,sort_order,is_closure) VALUES (?,?,'once',?,0,1)",[$title,$store,$date]);
-                $id=last_id();
-
             }
         });
         redirect_to('/schedule?month=' . $a->format('Y-m'));

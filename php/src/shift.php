@@ -292,45 +292,6 @@ function shift_weeks(array $days): array
     return $weeks;
 }
 
-const SHIFT_COLORS = ['#7b5ea7', '#2f7fb5', '#c0392b', '#b8860b', '#2e8b57', '#d2691e', '#008b8b', '#a0507a', '#6b6b6b', '#c2185b'];
-
-/** 各日付の枠内にスタッフを並べる。同じ勤務でも日をまたいで結合しない。 */
-function shift_week_bars(array $row, array $staff): array
-{
-    $bars = [];
-    foreach ($staff as $s) {
-        $id = (int)$s['id'];
-        $cur = null;
-        foreach ($row as $c => $day) {
-            $it = $day['items'][$id] ?? null;
-            $key = $it === null ? null : $it['store'] . '|' . $it['time'] . '|' . (int)$it['help'] . '|' . (int)$it['dflt'];
-            if ($cur !== null) {
-                $bars[] = $cur;
-                $cur = null;
-            }
-            if ($it !== null) {
-                $cur = ['key' => $key, 'id' => $id, 'name' => $s['name'], 'color' => $s['color'], 'c' => $c + 1, 'n' => 1, 'date' => $day['date'],
-                    'store' => $it['store'], 'time' => $it['time'], 'help' => $it['help'], 'dflt' => $it['dflt'], 'difference' => $it['difference'] ?? []];
-            }
-        }
-        if ($cur !== null) {
-            $bars[] = $cur;
-        }
-    }
-    usort($bars, static fn($a, $b) => $a['c'] <=> $b['c'] ?: $b['n'] <=> $a['n']);
-    $lanes = [];   // 段ごとの、使っている最後の列
-    foreach ($bars as &$b) {
-        $r = 0;
-        while (isset($lanes[$r]) && $lanes[$r] >= $b['c']) {
-            $r++;
-        }
-        $lanes[$r] = $b['c'] + $b['n'] - 1;
-        $b['r'] = $r;
-    }
-    unset($b);
-    return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
-}
-
 /** カレンダーの個別勤務時間を、から・までが分かる言葉で示す。 */
 function shift_work_note(?string $from, ?string $to): string
 {
@@ -423,7 +384,6 @@ function h_shift(): void
         $day['closed'] = (int)$day['dow'] === 1 || !empty($GLOBALS['shift_closure_map'][$day['date']]['イノ']);
         $day['notes'] = $notes[$day['date']] ?? [];
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
-        $day['items'] = [];
         $day['exceptions'] = [];
         foreach ($staff as $s) {
             $raw = $entries[(int)$s['id']][$day['date']] ?? null;
@@ -451,22 +411,12 @@ function h_shift(): void
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
                 'hours' => $e['work_hours'] ?? ($e['store'] !== SHIFT_OFF ? shift_time_label(($e['tf'] !== '' || $e['tt'] !== '') ? $e['tf'] : $s['work_from'], ($e['tf'] !== '' || $e['tt'] !== '') ? $e['tt'] : $s['work_to'], false) : ''),
             ];
-            $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => !empty($e['default']),
-                'time' => $e['work_hours'] ?? shift_time_label($e['tf'], $e['tt'], true), 'difference' => $difference];
         }
         $day['any'] = array_filter($day['groups']) !== [];
     }
     unset($day);
-    foreach ($staff as &$s) {
-        $s['color'] = SHIFT_COLORS[(int)$s['id'] % count(SHIFT_COLORS)];
-    }
-    unset($s);
-    $weeks = [];
-    foreach (shift_weeks($days) as $row) {
-        $weeks[] = shift_week_bars($row, $staff);
-    }
     $last = val('SELECT MAX(at) FROM shift_log');
-    render('shift', ['view' => $view, 'nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff,
+    render('shift', ['view' => $view, 'nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'staff' => $staff,
         'last_at' => $last ? (new DateTimeImmutable((string)$last))->format('n/j H:i') : '']);
 }
 

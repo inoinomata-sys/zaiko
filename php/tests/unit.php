@@ -142,12 +142,8 @@ check('時刻入力 1桁の時を2桁で表示', shift_time_input('9:00'), '09:0
 check('時刻入力 2桁の時刻', shift_time_input('17:00'), '17:00');
 check('時刻入力 空欄を維持', shift_time_input(''), '');
 check('時刻入力 不正値は表示しない', shift_time_input('25:00'), '');
-$dailyItem = ['store'=>'イノ','time'=>'','help'=>false,'dflt'=>true];
-$dailyRows = [['date'=>'2026-11-10','items'=>[1=>$dailyItem]],['date'=>'2026-11-11','items'=>[1=>$dailyItem]]];
-$dailyBars = shift_week_bars($dailyRows, [['id'=>1,'name'=>'テスト','color'=>'#555555']]);
-check('日別カレンダー 同じ勤務でも2日を結合しない', count($dailyBars['bars']), 2);
-check('日別カレンダー 各帯は1列だけ', array_column($dailyBars['bars'], 'n'), [1,1]);
-check('日別カレンダー 各日の列に配置', array_column($dailyBars['bars'], 'c'), [1,2]);
+$dailyRows = [['date'=>'2026-11-10','dow'=>2], ['date'=>'2026-11-11','dow'=>3]];
+check('日別カレンダー 火水を独立した列に置く', shift_weeks($dailyRows), [[null, ...$dailyRows, null, null, null, null]]);
 $differenceStaff = ['home_store'=>'イノ','off_days'=>'0,1','work_from'=>'9:00','work_to'=>'17:00'];
 check('基本との差 通常の登録は変更でない', shift_difference($differenceStaff,['dow'=>2],['store'=>'イノ','tf'=>'09:00','tt'=>'17:00']), []);
 check('基本との差 勤務日の休み', shift_difference($differenceStaff,['dow'=>2],['store'=>'休','tf'=>'','tt'=>'']), ['休み']);

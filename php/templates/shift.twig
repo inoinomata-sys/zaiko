@@ -243,9 +243,9 @@
 {% endif %}
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
-  {% for w in weeks %}
+  {% for week in weeks %}
   <div class="cal-week">
-    {% for day in w.days %}
+    {% for day in week %}
     {% if day %}
     <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}">
       <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}">{{ day.d }}{% if day.closed %}<span class="cal-closed">店休日</span>{% endif %}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.exceptions %}<span class="cal-change-count">変更{{ day.exceptions|length }}件</span>{% endif %}</div>

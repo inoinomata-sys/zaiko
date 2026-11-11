@@ -146,7 +146,7 @@ function h_settings_line_import(): void
             $ids[] = (string)$u;
         }
         $start = (string)($j['next'] ?? '');
-        if ($start === '') {
+        if ($start === '' || count($ids) >= 300) {
             break;
         }
     }
