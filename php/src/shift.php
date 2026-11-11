@@ -37,6 +37,8 @@ function ensure_shift_tables(): void
     }
     $hasRole = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = 'role'");
     if (!$hasRole) { run("ALTER TABLE shift_staff ADD COLUMN role VARCHAR(16) NOT NULL DEFAULT ''"); }
+    $hasHoliday = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = 'holiday_off'");
+    if (!$hasHoliday) { run("ALTER TABLE shift_staff ADD COLUMN holiday_off TINYINT NOT NULL DEFAULT 0"); }
     // スタッフごとの、ふだんの勤務時間（例 9:00〜18:00）
     foreach (['work_from', 'work_to'] as $col) {
         $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'shift_staff' AND column_name = '{$col}'");
@@ -212,7 +214,20 @@ function shift_month(?string $m): DateTimeImmutable
 
 function shift_staff_list(bool $onlyActive = true): array
 {
-    return rows('SELECT id, name, home_store, is_active, off_days, work_from, work_to, role FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
+    return rows('SELECT id, name, home_store, is_active, off_days, work_from, work_to, role, holiday_off FROM shift_staff' . ($onlyActive ? ' WHERE is_active = 1' : '') . ' ORDER BY sort_order, id');
+}
+
+/** 週の定休と祝日休みを共通判定する。個別登録は呼び出し側で優先する。 */
+function shift_is_default_off(array $staff, array $day): bool
+{
+    if (in_array((int)$day['dow'], shift_off_days($staff), true)) { return true; }
+    if (empty($staff['holiday_off'])) { return false; }
+    if (!empty($day['hol'])) { return true; }
+    if (!empty($day['date'])) {
+        $year = (int)substr($day['date'], 0, 4);
+        return isset(jp_holidays($year)[$day['date']]);
+    }
+    return false;
 }
 
 /** その月の、スタッフ×日の出勤先 [staff_id][Y-m-d] => [store, changed] */
@@ -357,7 +372,7 @@ function shift_remaining_hours(array $staff, array $entry): string
 function shift_difference(array $staff, array $day, ?array $entry): array
 {
     if ($entry === null) { return []; }
-    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    $off = shift_is_default_off($staff, $day);
     $tags = [];
     if ($entry['store'] === SHIFT_OFF) {
         return $off ? [] : [(($entry['tf'] ?? '') !== '' || ($entry['tt'] ?? '') !== '') ? '一部休み' : '休み'];
@@ -378,12 +393,12 @@ function shift_calendar_entry(array $staff, array $day, ?array $entry, string $v
     }
     if ($entry !== null) {
         if ($entry['store'] !== SHIFT_OFF) { return $entry; }
-        if (in_array((int)$day['dow'], shift_off_days($staff), true)) { return null; }
+        if (shift_is_default_off($staff, $day)) { return null; }
         $hours = shift_remaining_hours($staff, $entry);
         if ($hours === '') { return null; }
         return array_replace($entry, ['store' => $staff['home_store'], 'work_hours' => $hours, 'partial_off' => true]);
     }
-    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    $off = shift_is_default_off($staff, $day);
     if ($off) { return null; }
     return ['store' => $staff['home_store'], 'changed' => false,
         'tf' => '', 'tt' => '', 'default' => true];
@@ -476,7 +491,7 @@ function h_shift_edit(): void
             $day['tf'] = $entries[(int)$one['id']][$day['date']]['tf'] ?? '';
             $day['tt'] = $entries[(int)$one['id']][$day['date']]['tt'] ?? '';
             $day['time_s'] = shift_time_label($day['tf'], $day['tt'], true);
-            $day['dflt'] = $v === '' && in_array((int)$day['dow'], shift_off_days($one), true);
+            $day['dflt'] = $v === '' && shift_is_default_off($one, $day);
         }
         unset($day);
         render('shift_edit_one', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days), 'one' => $one, 'staff' => $staff]);
@@ -488,7 +503,7 @@ function h_shift_edit(): void
         foreach (shift_days($first) as $day) {
             $cells[(int)$s['id']][$day['date']] = $entries[(int)$s['id']][$day['date']]['store'] ?? '';
             // 入れていない日が、毎週の休みの曜日なら、「休（定休）」として見せる
-            $dflt[(int)$s['id']][$day['date']] = $cells[(int)$s['id']][$day['date']] === '' && in_array((int)$day['dow'], shift_off_days($s), true);
+            $dflt[(int)$s['id']][$day['date']] = $cells[(int)$s['id']][$day['date']] === '' && shift_is_default_off($s, $day);
         }
     }
     render('shift_edit', ['nav' => shift_nav($first), 'days' => shift_days($first), 'staff' => $staff, 'cells' => $cells, 'dflt' => $dflt]);
@@ -599,7 +614,7 @@ function h_shift_staff_add(): void
         $off = implode(',', array_diff(range(0, 6), array_map('intval', $work)));
     }
     $role = shift_staff_role($_POST['role'] ?? '');
-    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to, off_days, role) VALUES (?,?,?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt, $off, $role]);
+    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to, off_days, role, holiday_off) VALUES (?,?,?,?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt, $off, $role, isset($_POST['holiday_off']) ? 1 : 0]);
     redirect_to('/settings/staff');
 }
 
@@ -622,11 +637,12 @@ function h_shift_staff_off(int $id): void
     }
     $wf = shift_time($_POST['work_from'] ?? '') ?? '';
     $wt = shift_time($_POST['work_to'] ?? '') ?? '';
+    $holiday = isset($_POST['holiday_setting_present']) ? (isset($_POST['holiday_off']) ? 1 : 0) : (int)val('SELECT holiday_off FROM shift_staff WHERE id = ?', [$id]);
     if (array_key_exists('role', $_POST)) {
         $role = shift_staff_role($_POST['role']);
-        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ?, role = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $role, $id]);
+        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ?, role = ?, holiday_off = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $role, $holiday, $id]);
     } else {
-        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $id]);
+        run('UPDATE shift_staff SET off_days = ?, work_from = ?, work_to = ?, holiday_off = ? WHERE id = ?', [implode(',', $off), $wf, $wt, $holiday, $id]);
     }
     redirect_to('/settings/staff');
 }
@@ -690,7 +706,7 @@ function h_api_shift_note_delete(): void
 /** お客様向けには勤務に必要な名前・時間だけを出し、社内メモ・理由は取得しない。 */
 function shift_customer_holiday(array $staff, array $day, ?array $entry): ?array
 {
-    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    $off = shift_is_default_off($staff, $day);
     if ($entry === null) { return $off ? ['name'=>$staff['name'], 'note'=>'', 'full'=>true] : null; }
     if ($entry['store'] === SHIFT_OFF) {
         $time = shift_time_label(shift_time($entry['tf']), shift_time($entry['tt']), true);

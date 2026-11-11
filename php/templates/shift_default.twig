@@ -28,7 +28,7 @@
 <section class="df-card" aria-label="{{ s.name }}の基本シフト">
 <div class="df-person"><span class="df-name">{{ s.name }}</span><span class="df-store">{{ s.home_store }}</span></div>
 <div class="df-hours">勤務時間　{% if s.work_from or s.work_to %}{{ s.work_from|time_input }}〜{{ s.work_to|time_input }}{% else %}未設定{% endif %}</div>
-<div class="df-week">{% for w in week %}<div class="df-day"><span class="df-weekday{% if loop.first %} sun{% elseif loop.last %} sat{% endif %}">{{ w }}</span><span class="df-state{% if loop.index0 in s.offs %} off{% endif %}">{{ loop.index0 in s.offs ? '休み' : '出勤' }}</span></div>{% endfor %}</div>
+{% if s.holiday_off %}<p style="font-size:13px;color:var(--fg2);margin:0 0 12px">祝日は休み</p>{% endif %}<div class="df-week">{% for w in week %}<div class="df-day"><span class="df-weekday{% if loop.first %} sun{% elseif loop.last %} sat{% endif %}">{{ w }}</span><span class="df-state{% if loop.index0 in s.offs %} off{% endif %}">{{ loop.index0 in s.offs ? '休み' : '出勤' }}</span></div>{% endfor %}</div>
 </section>
 {% else %}<p>スタッフが登録されていません。</p>{% endfor %}
 </div>

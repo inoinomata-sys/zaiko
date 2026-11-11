@@ -77,7 +77,7 @@ function sl_dates(DateTimeImmutable $now, bool $monday, callable $registered): a
 /** 基本の勤務と異なる個別登録だけを共有。理由・自由メモは含めない。 */
 function sl_work_exception(array $staff, array $entry, DateTimeImmutable $date): ?array
 {
-    $off = in_array((int)$date->format('w'), shift_off_days($staff), true);
+    $off = shift_is_default_off($staff, ['dow'=>(int)$date->format('w'), 'date'=>$date->format('Y-m-d')]);
     $store = $entry['store'];
     if ($store === SHIFT_OFF) {
         if ($off) { return null; }

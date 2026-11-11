@@ -422,9 +422,10 @@ page_ok('/shift/default');
 [$st] = http('POST', '/settings/staff/add', null, ['name' => 'テスト太郎', 'home_store' => 'イノ']);
 ok($st === 302 && (int)db_val("SELECT COUNT(*) FROM shift_staff WHERE name='テスト太郎'") === 1, 'シフト: スタッフを足せる');
 http('POST', '/settings/staff/add', null, ['name' => 'テスト花子', 'home_store' => 'リッチ']);
-[$st] = http('POST', '/settings/staff/add', null, ['name' => '曜日登録テスト', 'role' => 'stylist', 'home_store' => 'イノ', 'work_days_present' => '1', 'work' => ['2','3','4','5','6'], 'work_from' => '09:00', 'work_to' => '17:00']);
+[$st] = http('POST', '/settings/staff/add', null, ['name' => '曜日登録テスト', 'holiday_off' => '1', 'role' => 'stylist', 'home_store' => 'イノ', 'work_days_present' => '1', 'work' => ['2','3','4','5','6'], 'work_from' => '09:00', 'work_to' => '17:00']);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE name='曜日登録テスト'") === '0,1', 'スタッフ新規登録で勤務曜日を保存できる');
 ok(db_val("SELECT role FROM shift_staff WHERE name='曜日登録テスト'") === 'stylist', 'スタッフ新規登録で職種を保存できる');
+ok((int)db_val("SELECT holiday_off FROM shift_staff WHERE name='曜日登録テスト'") === 1, 'スタッフ新規登録で祝日休みを保存できる');
 [$st] = http('POST', '/settings/staff/add', null, ['name' => '曜日未選択テスト', 'work_days_present' => '1']);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE name='曜日未選択テスト'") === '0,1,2,3,4,5,6', 'スタッフ新規登録で勤務曜日なしも保持できる');
 foreach (['曜日登録テスト','曜日未選択テスト'] as $testStaffName) {

@@ -177,6 +177,15 @@ check('職種 スタイリスト', shift_staff_role('stylist'), 'stylist');
 check('職種 アシスタント', shift_staff_role('assistant'), 'assistant');
 check('職種 既存は未設定', shift_staff_role(''), '');
 try { shift_staff_role('unknown'); check('職種 不正な値を拒否', false, true); } catch (HttpError $e) { check('職種 不正な値を拒否', $e->status, 400); }
+$holidayStaff=['name'=>'テスト','home_store'=>'イノ','off_days'=>'0,1','holiday_off'=>1,'work_from'=>'9:00','work_to'=>'17:00'];
+$holidayDay=['dow'=>2,'date'=>'2026-11-03','hol'=>'文化の日'];
+check('祝日休み 週の勤務日でも休み', shift_is_default_off($holidayStaff,$holidayDay), true);
+check('祝日休み 設定しなければ通常勤務', shift_is_default_off(array_replace($holidayStaff,['holiday_off'=>0]),$holidayDay), false);
+check('祝日休み 振替休日も対象', shift_is_default_off($holidayStaff,['dow'=>1,'date'=>'2027-03-22']), true);
+check('祝日休み 出勤表示から通常は除外', shift_calendar_entry($holidayStaff,$holidayDay,null,'all'), null);
+check('祝日休み 個別出勤を優先', shift_calendar_entry($holidayStaff,$holidayDay,['store'=>'イノ','tf'=>'','tt'=>''],'all')['store'], 'イノ');
+check('祝日休み 個別出勤は休日出勤', shift_difference($holidayStaff,$holidayDay,['store'=>'イノ','tf'=>'','tt'=>'']), ['休日出勤']);
+check('祝日休み お客様の休み表に反映', shift_customer_holiday($holidayStaff,$holidayDay,null)['full'], true);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

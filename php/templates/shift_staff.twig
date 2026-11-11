@@ -28,6 +28,7 @@
 .st-add-days legend {font-size:13px;color:var(--fg2);margin-bottom:8px}
 .st-add .st-add-days input[type=checkbox] {width:24px;height:24px;padding:0;margin:0;accent-color:var(--acc)}
 .st-role{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--fg2);width:100%;margin-bottom:8px}.st-role select{width:100%;font-size:16px;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--fg)}
+.st-holiday,.st-days .st-holiday{display:flex;flex-direction:row;align-items:center;gap:10px;min-height:46px;width:100%;padding:10px 0;font-size:14px;color:var(--fg)}.st-holiday input[type=checkbox]{width:24px;height:24px;padding:0;margin:0;accent-color:var(--acc)}
 </style>
 {% endblock %}
 {% block content %}
@@ -44,6 +45,7 @@
   <fieldset class="st-add-days"><legend>勤務日（チェック＝出勤）</legend><div class="st-days">
   {% for w in week %}<label>{{ w }}<input type="checkbox" name="work[]" value="{{ loop.index0 }}"{% if loop.index0 >= 2 %} checked{% endif %}></label>{% endfor %}
   </div></fieldset>
+  <input type="hidden" name="holiday_setting_present" value="1"><label class="st-holiday"><input type="checkbox" name="holiday_off" value="1">祝日は休み</label>
   <button class="btn" type="submit">スタッフを登録</button>
 </form>
 {% for s in staff %}{% if s.is_active %}
@@ -57,6 +59,7 @@
     <label class="st-role" style="grid-column:1/-1;align-items:stretch">職種<select name="role"><option value=""{% if not s.role %} selected{% endif %}>未設定</option><option value="stylist"{% if s.role == 'stylist' %} selected{% endif %}>スタイリスト</option><option value="assistant"{% if s.role == 'assistant' %} selected{% endif %}>アシスタント</option></select></label>
     <span class="lbl">勤務日（チェック＝出勤）</span>
     {% for w in week %}<label>{{ w }}<input type="checkbox" name="work[]" value="{{ loop.index0 }}"{% if loop.index0 not in s.offs %} checked{% endif %}></label>{% endfor %}
+    <input type="hidden" name="holiday_setting_present" value="1"><label class="st-holiday" style="grid-column:1/-1"><input type="checkbox" name="holiday_off" value="1"{% if s.holiday_off %} checked{% endif %}>祝日は休み</label>
     <span class="lbl">勤務時間</span>
     <div class="st-tm" style="grid-column:1/-1"><label>開始<input type="time" name="work_from" value="{{ s.work_from|time_input }}"></label><label>終了<input type="time" name="work_to" value="{{ s.work_to|time_input }}"></label></div>
     <button class="btn btn-ghost btn-sm" type="submit">保存</button>
