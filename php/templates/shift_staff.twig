@@ -11,14 +11,15 @@
 .st-wrap .st-card { border: 0; padding: 0; margin: 0 0 8px; background: transparent; }
 .st-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px 2px; align-items: center; }
 .st-days label { display: flex; flex-direction: column; align-items: center; font-size: 13px; gap: 3px; }
-.st-days input { width: 22px; height: 22px; margin: 0; }
+.st-days input[type=checkbox] { width: 22px; height: 22px; margin: 0; }
 .st-days .lbl { grid-column: 1 / -1; font-size: 12px; color: var(--fg2); }
 .st-days .btn { grid-column: 1 / -1; justify-self: end; margin-top: 4px; }
 .st-add { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
 .st-add input, .st-add select { font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
 .st-add input[name=name] { flex: 1; min-width: 140px; }
-.st-tm { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--fg2); }
-.st-tm input { font-size: 16px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; }
+.st-tm { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: start; gap: 12px; width: 100%; font-size: 13px; color: var(--fg2); }
+.st-tm label { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
+.st-tm input[type=time] { display: block; width: 100%; min-width: 0; height: 48px; box-sizing: border-box; background: #fff; color: var(--fg); font-size: 18px; padding: 10px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; }
 </style>
 {% endblock %}
 {% block content %}
@@ -28,7 +29,7 @@
 <form class="st-add" method="post" action="/settings/staff/add">
   <input name="name" placeholder="スタッフの名前" aria-label="スタッフの名前" required maxlength="40">
   <select name="home_store" aria-label="所属店舗"><option>イノ</option><option>リッチ</option></select>
-  <span class="st-tm">勤務時間 <input type="time" name="work_from"> 〜 <input type="time" name="work_to"></span>
+  <div class="st-tm"><label>勤務開始<input type="time" name="work_from"></label><label>勤務終了<input type="time" name="work_to"></label></div>
   <button class="btn" type="submit">スタッフを登録</button>
 </form>
 {% for s in staff %}
@@ -42,7 +43,7 @@
     <span class="lbl">勤務日（チェック＝出勤）</span>
     {% for w in week %}<label>{{ w }}<input type="checkbox" name="work[]" value="{{ loop.index0 }}"{% if loop.index0 not in s.offs %} checked{% endif %}></label>{% endfor %}
     <span class="lbl">勤務時間</span>
-    <span class="st-tm" style="grid-column:1/-1"><input type="time" name="work_from" value="{{ s.work_from }}"> 〜 <input type="time" name="work_to" value="{{ s.work_to }}"></span>
+    <div class="st-tm" style="grid-column:1/-1"><label>開始<input type="time" name="work_from" value="{{ s.work_from }}"></label><label>終了<input type="time" name="work_to" value="{{ s.work_to }}"></label></div>
     <button class="btn btn-ghost btn-sm" type="submit">保存</button>
   </form>
 </div>
