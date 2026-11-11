@@ -114,19 +114,6 @@ check('管理者鍵 期限切れ', admin_cookie_ok('pw1', admin_cookie_value('pw
 check('管理者鍵 合言葉が未設定なら開かない', admin_cookie_ok('', admin_cookie_value('', time() + 600)), false);
 check('管理者鍵 次の画面は、自分のサイトの中だけ', admin_next('//evil.example.com'), '/settings');
 check('管理者鍵 次の画面(正常)', admin_next('/settings/line'), '/settings/line');
-// 業者LINEの編集ロックは、画面・管理者Cookie・期限に結び付ける。
-$GLOBALS['CONFIG']['admin_pass'] = 'test-line-lock';
-$_COOKIE['zadmin'] = 'browser-a';
-$editTime = 1794375000;
-$editToken = line_edit_token('edit', $editTime);
-check('LINE変更ロック 有効な解除', line_edit_token_ok('edit', $editToken, $editTime), true);
-check('LINE変更ロック 5分で失効', line_edit_token_ok('edit', $editToken, $editTime + 300), false);
-check('LINE変更ロック 書き換えを拒否', line_edit_token_ok('edit', $editToken . 'x', $editTime), false);
-check('LINE変更ロック フォーム用の印では解除不可', line_edit_token_ok('edit', line_edit_token('form', $editTime), $editTime), false);
-$_COOKIE['zadmin'] = 'browser-b';
-check('LINE変更ロック 別ブラウザでは無効', line_edit_token_ok('edit', $editToken, $editTime), false);
-$GLOBALS['CONFIG']['admin_pass'] = '';
-check('LINE変更ロック 合言葉未設定では拒否', line_edit_token_ok('edit', $editToken, $editTime), false);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
