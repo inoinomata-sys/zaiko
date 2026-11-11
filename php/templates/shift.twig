@@ -213,6 +213,13 @@
 .cal-people {align-items:stretch}
 .cal-people .cal-bar {align-self:stretch;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .cal-closed{display:block;flex-basis:100%;font-size:10px;color:#b23f3f;line-height:1.5}.cal-people .rest-name{color:#b23f3f;white-space:nowrap;letter-spacing:0;font-size:9px}.cal-people .cal-bar.rest{padding-left:1px;padding-right:1px}@media(min-width:700px){.cal-people .rest-name{font-size:12px}}
+/* 週内で日付欄・人数欄の高さを共有し、どの曜日も同じ段から名簿を始める。 */
+@media screen {
+  .cal-week {grid-template-rows:auto auto 1fr;row-gap:0}
+  .cal-cell {display:grid;grid-row:span 3;grid-template-rows:subgrid}
+  .cal-counts {grid-row:2}
+  .cal-people {grid-row:3;align-self:start}
+}
 </style>
 {% endblock %}
 {% block content %}
