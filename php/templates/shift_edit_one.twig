@@ -53,13 +53,13 @@
 <div class="who">
   {% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on"{% endif %}>{{ s.name }}</a>{% endfor %}
 </div>
-<p class="eo-hint">休みの希望がある日を、「休み希望」にします。一部の時間だけ休みたい日は、「休み希望」にして、下の「時間」を押して、時間を入れます。選ぶと、すぐ保存されます。「休(定休)」は、毎週の休みの曜日です。別の店にヘルプに入る日だけ、店を選びます。</p>
+<p class="eo-hint">出勤する日は店舗を選び、「勤務時間」から開始・終了を設定できます。定休日でも店舗を選べば、その日だけ出勤にできます。休みは「休み希望」を選び、一部だけ休む場合は時間を設定してください。選ぶとすぐ保存されます。出勤の時間を空にすると、スタッフの基本時間を使います。</p>
 <div class="rg">
   <button type="button" class="rg-btn" id="rg-open">連休をまとめて入れる ▾</button>
   <div id="rg-box" hidden>
     <div class="row"><input type="date" id="rg-from" value="{{ nav.month }}-01"><span>から</span><input type="date" id="rg-to" value="{{ nav.month }}-01"><span>まで</span></div>
     <div class="row"><select id="rg-v"><option value="休">休み希望</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option><option value="">消す（空に戻す）</option></select>
-      <span id="rg-tm" class="row" style="margin:0"><input type="time" id="rg-tf"><span>〜</span><input type="time" id="rg-tt"><span style="font-size:12px;color:var(--fg2)">（時間は空なら終日）</span></span></div>
+      <span id="rg-tm" class="row" style="margin:0"><input type="time" id="rg-tf"><span>〜</span><input type="time" id="rg-tt"><span style="font-size:12px;color:var(--fg2)">（空なら出勤は基本時間・休みは終日）</span></span></div>
     <div class="row"><button class="btn" type="button" id="rg-go">入れる</button><span id="rg-msg" style="font-size:13px;color:var(--fg2)"></span></div>
   </div>
 </div>
@@ -77,7 +77,7 @@
         <option value="リッチ"{% if day.v == 'リッチ' %} selected{% endif %}>リッチ</option>
         <option value="休"{% if day.v == '休' %} selected{% endif %}>休み希望</option>
       </select>
-      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v != '休' %} hidden{% endif %}>{{ day.time_s ?: '一部だけ' }}</button>
+      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v == '' %} hidden{% endif %}>{{ day.time_s ?: (day.v == '休' ? '休みの時間' : '勤務時間') }}</button>
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}
@@ -86,9 +86,9 @@
 </div>
 <div class="tp" id="tp" hidden>
   <h3 id="tp-title">休みの時間</h3>
-  <div class="row"><input type="time" id="tp-from"><span>から</span><input type="time" id="tp-to"><span>まで 休み</span></div>
-  <div class="row"><button class="btn" type="button" id="tp-save">保存</button><button class="btn btn-ghost" type="button" id="tp-clear">終日休みにする</button><button class="btn btn-ghost" type="button" id="tp-close">閉じる</button></div>
-  <div class="hint">どちらか片方だけでも入れられます（例：「15:00から」だけ）。空のときは、終日休みです。</div>
+  <div class="row"><input type="time" id="tp-from"><span>から</span><input type="time" id="tp-to"><span id="tp-kind">まで 休み</span></div>
+  <div class="row"><button class="btn" type="button" id="tp-save">保存</button><button class="btn btn-ghost" type="button" id="tp-clear">時間指定を外す</button><button class="btn btn-ghost" type="button" id="tp-close">閉じる</button></div>
+  <div class="hint">出勤は空なら基本の勤務時間、休みは空なら終日休みになります。開始・終了の片方だけでも指定できます。</div>
 </div>
 
 {% endblock %}
@@ -100,14 +100,15 @@ const compact = t => (t || '').replace(/:00$/, '');
 function tmLabel(tf, tt) { return (tf || tt) ? compact(tf) + '〜' + compact(tt) : ''; }
 function paintTm(sel) {
   const btn = sel.parentElement.querySelector('.tm-btn');
-  btn.hidden = sel.value !== '休';
+  btn.hidden = sel.value === '';
   const l = tmLabel(sel.dataset.tf, sel.dataset.tt);
-  btn.textContent = l || '一部だけ'; btn.classList.toggle('set', !!l);
+  btn.textContent = l || (sel.value === '休' ? '休みの時間' : '勤務時間'); btn.classList.toggle('set', !!l);
 }
 document.querySelectorAll('.cal-cell select').forEach(sel => paintTm(sel));
 document.querySelectorAll('.tm-btn').forEach(btn => btn.addEventListener('click', () => {
   tpSel = btn.parentElement.querySelector('select'); tpBtn = btn;
-  document.getElementById('tp-title').textContent = '{{ nav.label|slice(5) }}' + btn.dataset.label + '日　{{ one.name }}　休みの時間';
+  document.getElementById('tp-title').textContent = '{{ nav.label|slice(5) }}' + btn.dataset.label + '日　{{ one.name }}　' + (tpSel.value === '休' ? '休みの時間' : '勤務時間');
+  document.getElementById('tp-kind').textContent = tpSel.value === '休' ? 'まで 休み' : 'まで 出勤';
   document.getElementById('tp-from').value = (tpSel.dataset.tf || '').padStart(5, '0');
   document.getElementById('tp-to').value = (tpSel.dataset.tt || '').padStart(5, '0');
   tp.hidden = false; tp.scrollIntoView({block: 'center', behavior: 'smooth'});
@@ -116,7 +117,7 @@ async function saveTime(tf, tt) {
   const sel = tpSel; if (!sel) return;
   try {
     const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: '休', time_from: tf, time_to: tt})});
+      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: sel.value, time_from: tf, time_to: tt})});
     const j = await res.json(); if (!res.ok || !j.ok) throw 0;
     sel.dataset.tf = tf; sel.dataset.tt = tt; paintTm(sel); tp.hidden = true;
   } catch (e) { alert('保存できませんでした。もう一度お試しください'); }
@@ -135,7 +136,8 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
     sel.className = v ? 'v-' + v : '';
     if (!v && sel.dataset.dflt) { sel.classList.add('v-dflt'); }
     sel.dataset.prev = v;
-    if (v !== '休') { sel.dataset.tf = ''; sel.dataset.tt = ''; }
+    sel.dataset.tf = ''; sel.dataset.tt = '';
+    tp.hidden = true;
     paintTm(sel);
   } catch (e) {
     sel.value = sel.dataset.prev; sel.classList.add('err');
@@ -146,7 +148,7 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
 (function () {
   const box = document.getElementById('rg-box'), v = document.getElementById('rg-v'), tm = document.getElementById('rg-tm');
   document.getElementById('rg-open').addEventListener('click', () => { box.hidden = !box.hidden; });
-  v.addEventListener('change', () => { tm.style.display = v.value === '休' ? '' : 'none'; });
+  v.addEventListener('change', () => { tm.style.display = v.value !== '' ? '' : 'none'; });
   document.getElementById('rg-go').addEventListener('click', async () => {
     const msg = document.getElementById('rg-msg');
     const a = document.getElementById('rg-from').value, b = document.getElementById('rg-to').value;
@@ -154,7 +156,7 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
     const days = []; for (let d = new Date(a + 'T00:00:00'); d <= new Date(b + 'T00:00:00') && days.length < 63; d.setDate(d.getDate() + 1)) {
       days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
     const body = {staff_id: {{ one.id }}, store: v.value};
-    if (v.value === '休') { body.time_from = document.getElementById('rg-tf').value; body.time_to = document.getElementById('rg-tt').value; }
+    if (v.value !== '') { body.time_from = document.getElementById('rg-tf').value; body.time_to = document.getElementById('rg-tt').value; }
     let n = 0;
     try {
       for (const d of days) {

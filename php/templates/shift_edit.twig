@@ -29,7 +29,7 @@ table.se { border-collapse: separate; border-spacing: 0; }
   <h1>出勤を入れる</h1>
   <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}">›</a></div>
 </div>
-<p class="se-hint">選ぶと、すぐ保存されます。入れたあとに変えた日には、見る画面で「変更」の印が3日間つきます。</p>
+<p class="se-hint">選ぶと、すぐ保存されます。名前を押すと、日別の勤務時間も設定できます。定休日も店舗を選べば出勤にできます。</p>
 {% if staff %}
 <div class="se-wrap">
 <table class="se">
@@ -38,7 +38,7 @@ table.se { border-collapse: separate; border-spacing: 0; }
   </tr></thead>
   <tbody>
   {% for s in staff %}
-    <tr><th class="nm">{{ s.name }}<span style="font-weight:400;color:var(--fg2);font-size:11px"> {{ s.home_store }}</span></th>
+    <tr><th class="nm"><a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a><span style="font-weight:400;color:var(--fg2);font-size:11px"> {{ s.home_store }}</span></th>
     {% for day in days %}
       {% set v = cells[s.id][day.date] %}
       {% set dd = dflt[s.id][day.date] %}

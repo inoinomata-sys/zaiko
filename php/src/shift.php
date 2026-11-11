@@ -354,7 +354,7 @@ function h_shift(): void
                 'changed' => $e['changed'],
                 'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
-                'hours' => $e['store'] !== SHIFT_OFF ? shift_time_label($s['work_from'], $s['work_to'], false) : '',
+                'hours' => $e['store'] !== SHIFT_OFF ? shift_time_label(($e['tf'] !== '' || $e['tt'] !== '') ? $e['tf'] : $s['work_from'], ($e['tf'] !== '' || $e['tt'] !== '') ? $e['tt'] : $s['work_to'], false) : '',
             ];
             $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => !empty($e['default']),
                 'time' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : ''];
@@ -398,7 +398,7 @@ function h_shift_edit(): void
             $day['v'] = $v;
             $day['tf'] = $entries[(int)$one['id']][$day['date']]['tf'] ?? '';
             $day['tt'] = $entries[(int)$one['id']][$day['date']]['tt'] ?? '';
-            $day['time_s'] = $v === SHIFT_OFF ? shift_time_label($day['tf'], $day['tt'], true) : '';
+            $day['time_s'] = shift_time_label($day['tf'], $day['tt'], true);
             $day['dflt'] = $v === '' && in_array((int)$day['dow'], shift_off_days($one), true);
         }
         unset($day);
@@ -448,18 +448,18 @@ function h_api_shift(): void
         respond_json(['ok' => false, 'error' => 'スタッフが見つかりません'], 404);
     }
     $now = now_jst()->format('Y-m-d H:i:s');
-    // 休みの時間（休のときだけ。送られてきたときだけ書き換える）
+    // 個別の出勤・休みの時間。送信されたときだけ書き換える。
     $hasTime = array_key_exists('time_from', $d) || array_key_exists('time_to', $d);
     $tf = shift_time($d['time_from'] ?? '');
     $tt = shift_time($d['time_to'] ?? '');
-    if ($tf === null || $tt === null) {
+    if ($tf === null || $tt === null || ($tf !== '' && $tt !== '' && strcmp(str_pad($tt, 5, '0', STR_PAD_LEFT), str_pad($tf, 5, '0', STR_PAD_LEFT)) <= 0)) {
         bad_input();
     }
     transaction(function () use ($sid, $date, $store, $now, $hasTime, $tf, $tt) {
         $cur = row('SELECT store, time_from, time_to FROM shift_entries WHERE staff_id = ? AND work_date = ? FOR UPDATE', [$sid, $date]);
-        $tfv = $store === SHIFT_OFF && $tf !== '' ? $tf : null;
-        $ttv = $store === SHIFT_OFF && $tt !== '' ? $tt : null;
-        $text = static fn(?string $st, ?string $a, ?string $b): string => $st === null || $st === '' ? '' : $st . ($st === SHIFT_OFF && shift_time_label($a, $b, false) !== '' ? '（' . shift_time_label($a, $b, false) . '）' : '');
+        $tfv = $tf !== '' ? $tf : null;
+        $ttv = $tt !== '' ? $tt : null;
+        $text = static fn(?string $st, ?string $a, ?string $b): string => $st === null || $st === '' ? '' : $st . (shift_time_label($a, $b, false) !== '' ? '（' . shift_time_label($a, $b, false) . '）' : '');
         $old = $cur ? $text($cur['store'], $cur['time_from'], $cur['time_to']) : '';
         $changed = false;
         if ($store === '') {
@@ -474,7 +474,7 @@ function h_api_shift(): void
             run('UPDATE shift_entries SET prev_store = ?, store = ?, changed_at = ?, time_from = ?, time_to = ? WHERE staff_id = ? AND work_date = ?',
                 [$cur['store'], $store, $now, $tfv, $ttv, $sid, $date]);
             $changed = true;
-        } elseif ($hasTime && $store === SHIFT_OFF) {
+        } elseif ($hasTime) {
             run('UPDATE shift_entries SET changed_at = ?, time_from = ?, time_to = ? WHERE staff_id = ? AND work_date = ?', [$now, $tfv, $ttv, $sid, $date]);
             $changed = true;
         }

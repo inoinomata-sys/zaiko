@@ -456,6 +456,15 @@ ok($st === 200 && db_val("SELECT time_from FROM shift_entries WHERE staff_id={$s
 page_ok('/shift?month=' . $m, '9:00〜13:00だけ休み');
 [$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => '休', 'time_from' => '25:99', 'time_to' => '']);
 ok($st === 400, 'シフト: 変な時刻は断る');
+$extraDate = $m . '-11';
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $extraDate, 'store' => 'イノ', 'time_from' => '9:30', 'time_to' => '14:00']);
+ok($st === 200 && db_val("SELECT time_from FROM shift_entries WHERE staff_id={$sid} AND work_date='{$extraDate}'") === '9:30', 'シフト: 個別出勤の時間を保存できる');
+page_ok('/shift?month=' . $m, '9:30〜14:00');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $extraDate, 'store' => 'イノ', 'time_from' => '10:00', 'time_to' => '15:00']);
+ok($st === 200 && db_val("SELECT time_to FROM shift_entries WHERE staff_id={$sid} AND work_date='{$extraDate}'") === '15:00', 'シフト: 店舗が同じでも個別時間を変更できる');
+[$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $extraDate, 'store' => 'イノ', 'time_from' => '18:00', 'time_to' => '9:00']);
+ok($st === 400, 'シフト: 終了が開始より前なら断る');
+api('/api/shift', ['staff_id' => $sid, 'date' => $extraDate, 'store' => '']);
 page_ok('/shift/log', 'テスト太郎');
 page_ok('/shift?month=' . $m, '最終入力');
 [$st, $j] = api('/api/shift/note', ['date' => $m . '-12', 'author' => 'テスト太郎', 'body' => '12時半から']);
