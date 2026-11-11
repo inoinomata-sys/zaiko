@@ -167,6 +167,7 @@ function h_settings_line_import(): void
 function h_settings_line_assign(): void
 {
     require_line_registration();
+    if (($_POST['confirm_change'] ?? '') !== '1') { throw new HttpError(403); }
     ensure_line_tables();
     $uid = (string)($_POST['user_id'] ?? '');
     $sup = (string)($_POST['supplier'] ?? '');
@@ -174,12 +175,16 @@ function h_settings_line_assign(): void
         throw new HttpError(400);
     }
     // 1つの仕入先に、ひも付けられるのは1人（送り先を間違えないため）
-    transaction(function () use ($uid, $sup) {
+    $saved = transaction(function () use ($uid, $sup) {
+        $current = row('SELECT supplier FROM line_contacts WHERE user_id = ? FOR UPDATE', [$uid]);
+        if (!$current || (string)$current['supplier'] !== (string)($_POST['previous_supplier'] ?? '')) { return false; }
         if ($sup !== '') {
             run('UPDATE line_contacts SET supplier = NULL WHERE supplier = ?', [$sup]);
         }
         run('UPDATE line_contacts SET supplier = ? WHERE user_id = ?', [$sup === '' ? null : $sup, $uid]);
+        return true;
     });
+    if (!$saved) { redirect_to('/settings/line?msg=' . urlencode('送信先の情報が変わったため保存しませんでした。開き直して確認してください。')); }
     redirect_to('/settings/line');
 }
 

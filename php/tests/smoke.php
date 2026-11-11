@@ -363,6 +363,24 @@ page_ok('/settings/line', 'LINE');
 $LINE_ENTRY_COOKIE = '';
 [$st] = http('GET', '/settings/line');
 ok($st === 302, 'LINE登録: 開き直すと再ロック');
+$recipientId = 'U' . str_repeat('0', 32);
+db_val("INSERT INTO line_contacts (user_id, display_name, supplier, last_text, last_at) VALUES ('{$recipientId}', '送信先ロック試験', '株式会社ワールド美容', '', NOW())");
+[$st, $b, $headers] = http('POST', '/admin/unlock', null, ['pass'=>'ci-admin-pass','next'=>'/settings/line']);
+foreach ($headers as $h) { if (preg_match('/^Set-Cookie:\s*(zline_entry=[^;]+)/i', $h, $mCookie)) { $LINE_ENTRY_COOKIE=$mCookie[1]; } }
+[$st, $recipientPage] = http('GET', '/settings/line');
+$LINE_ENTRY_COOKIE='';
+ok($st === 200 && str_contains($recipientPage, '<fieldset disabled class="ln-fields">'), 'LINE送信先: 登録画面を開いても選択欄はロック');
+preg_match('/name="line_registration_key" value="([^"]+)"/', $recipientPage, $keyMatch);
+$recipientForm = ['line_registration_key'=>$keyMatch[1]??'', 'user_id'=>$recipientId, 'supplier'=>'株式会社トピー商事','previous_supplier'=>'株式会社ワールド美容'];
+[$st] = http('POST', '/settings/line/assign', null, $recipientForm);
+ok($st === 403 && db_val("SELECT supplier FROM line_contacts WHERE user_id='{$recipientId}'") === '株式会社ワールド美容', 'LINE送信先: 明示的な保存確認なしでは変えない');
+$recipientForm['confirm_change']='1';
+[$st] = http('POST', '/settings/line/assign', null, $recipientForm);
+ok($st === 302 && db_val("SELECT supplier FROM line_contacts WHERE user_id='{$recipientId}'") === '株式会社トピー商事', 'LINE送信先: 確認した変更だけ保存');
+$recipientForm['supplier']='';
+[$st] = http('POST', '/settings/line/assign', null, $recipientForm);
+ok($st === 302 && db_val("SELECT supplier FROM line_contacts WHERE user_id='{$recipientId}'") === '株式会社トピー商事', 'LINE送信先: 古い画面からの上書きを拒否');
+
 [$st] = http('POST', '/line/webhook', null, []);
 ok($st === 403, 'LINE: 署名がない知らせは断る');
 [$st] = http('GET', '/pub/order?id=1&exp=2000000000&sig=00000000000000000000000000000000');
