@@ -148,6 +148,13 @@ $dailyBars = shift_week_bars($dailyRows, [['id'=>1,'name'=>'テスト','color'=>
 check('日別カレンダー 同じ勤務でも2日を結合しない', count($dailyBars['bars']), 2);
 check('日別カレンダー 各帯は1列だけ', array_column($dailyBars['bars'], 'n'), [1,1]);
 check('日別カレンダー 各日の列に配置', array_column($dailyBars['bars'], 'c'), [1,2]);
+$differenceStaff = ['home_store'=>'イノ','off_days'=>'0,1','work_from'=>'9:00','work_to'=>'17:00'];
+check('基本との差 通常の登録は変更でない', shift_difference($differenceStaff,['dow'=>2],['store'=>'イノ','tf'=>'09:00','tt'=>'17:00']), []);
+check('基本との差 勤務日の休み', shift_difference($differenceStaff,['dow'=>2],['store'=>'休','tf'=>'','tt'=>'']), ['休み']);
+check('基本との差 定休は変更でない', shift_difference($differenceStaff,['dow'=>0],['store'=>'休','tf'=>'','tt'=>'']), []);
+check('基本との差 休日出勤', shift_difference($differenceStaff,['dow'=>0],['store'=>'イノ','tf'=>'','tt'=>'']), ['休日出勤']);
+check('基本との差 ヘルプ', shift_difference($differenceStaff,['dow'=>2],['store'=>'リッチ','tf'=>'','tt'=>'']), ['ヘルプ']);
+check('基本との差 時間変更', shift_difference($differenceStaff,['dow'=>2],['store'=>'イノ','tf'=>'10:00','tt'=>'17:00']), ['時間変更']);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

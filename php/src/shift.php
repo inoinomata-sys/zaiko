@@ -292,7 +292,7 @@ function shift_week_bars(array $row, array $staff): array
             }
             if ($it !== null) {
                 $cur = ['key' => $key, 'id' => $id, 'name' => $s['name'], 'color' => $s['color'], 'c' => $c + 1, 'n' => 1, 'date' => $day['date'],
-                    'store' => $it['store'], 'time' => $it['time'], 'help' => $it['help'], 'dflt' => $it['dflt']];
+                    'store' => $it['store'], 'time' => $it['time'], 'help' => $it['help'], 'dflt' => $it['dflt'], 'difference' => $it['difference'] ?? []];
             }
         }
         if ($cur !== null) {
@@ -311,6 +311,23 @@ function shift_week_bars(array $row, array $staff): array
     }
     unset($b);
     return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
+}
+
+/** 個別登録を基本シフトと比較する。登録しただけの同じ勤務は変更扱いにしない。 */
+function shift_difference(array $staff, array $day, ?array $entry): array
+{
+    if ($entry === null) { return []; }
+    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    $tags = [];
+    if ($entry['store'] === SHIFT_OFF) {
+        return $off ? [] : ['休み'];
+    }
+    if ($off) { $tags[] = '休日出勤'; }
+    if ($entry['store'] !== $staff['home_store']) { $tags[] = 'ヘルプ'; }
+    if (($entry['tf'] ?? '') !== '' || ($entry['tt'] ?? '') !== '') {
+        if (shift_time_input($entry['tf'] ?? '') !== shift_time_input($staff['work_from'] ?? '') || shift_time_input($entry['tt'] ?? '') !== shift_time_input($staff['work_to'] ?? '')) { $tags[] = '時間変更'; }
+    }
+    return $tags;
 }
 
 /** 通常設定は全員表示でだけ補完し、個別登録を常に優先する。 */
@@ -345,8 +362,15 @@ function h_shift(): void
         $day['notes'] = $notes[$day['date']] ?? [];
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         $day['items'] = [];
+        $day['exceptions'] = [];
         foreach ($staff as $s) {
-            $e = shift_calendar_entry($s, $day, $entries[(int)$s['id']][$day['date']] ?? null, $view);
+            $raw = $entries[(int)$s['id']][$day['date']] ?? null;
+            $difference = shift_difference($s, $day, $raw);
+            if ($difference) {
+                $hours = shift_time_label($raw['tf'], $raw['tt'], false);
+                $day['exceptions'][] = ['name' => $s['name'], 'tags' => $difference, 'store' => $raw['store'], 'hours' => $hours];
+            }
+            $e = shift_calendar_entry($s, $day, $raw, $view);
             // 通常の勤務曜日・定休は設定として保持し、カレンダーには個別登録だけを載せる。
             if ($e === null) {
                 continue;
@@ -361,7 +385,7 @@ function h_shift(): void
                 'hours' => $e['store'] !== SHIFT_OFF ? shift_time_label(($e['tf'] !== '' || $e['tt'] !== '') ? $e['tf'] : $s['work_from'], ($e['tf'] !== '' || $e['tt'] !== '') ? $e['tt'] : $s['work_to'], false) : '',
             ];
             $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => !empty($e['default']),
-                'time' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : ''];
+                'time' => shift_time_label($e['tf'], $e['tt'], true), 'difference' => $difference];
         }
         $day['any'] = array_filter($day['groups']) !== [];
     }
