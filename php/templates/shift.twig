@@ -173,6 +173,11 @@
 .cal-person {display:block;font-weight:600}
 .cal-location {display:block;font-size:10px;font-weight:400;line-height:1.5}
 @media screen {.cal-bar {padding:4px 3px;line-height:1.5}}
+.cal-counts {z-index:2;min-width:0;padding:3px 2px 6px;font-size:10px;line-height:1.7;color:#555;cursor:pointer}
+.cal-counts span {display:block;white-space:nowrap;letter-spacing:-.03em}
+.cal-counts b {font-weight:700;color:#303030}
+.sh-counts {font-size:15px;padding:8px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--border);font-weight:600}
+@media(min-width:700px){.cal-counts{font-size:12px;padding:4px 6px 8px}}
 </style>
 {% endblock %}
 {% block content %}
@@ -204,12 +209,13 @@
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
   {% for w in weeks %}
-  <div class="cal-week" style="grid-template-rows: repeat({{ w.lanes + 1 }}, auto) 1fr">
+  <div class="cal-week" style="grid-template-rows: repeat({{ w.lanes + (view == 'all' ? 2 : 1) }}, auto) 1fr">
     {% for day in w.days %}
     {% if day %}
     <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1 / -1">
       <div class="cal-detail" hidden>
         <div class="sh-date">{{ nav.label|slice(5) }}{{ day.d }}日 <span class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}">（{{ day.w }}）</span>{% if day.hol %}<small>{{ day.hol }}</small>{% endif %}</div>
+        {% if view == 'all' %}<div class="sh-counts">イノ {{ day.groups['イノ']|length }}人 ／ リッチ {{ day.groups['リッチ']|length }}人</div>{% endif %}
         {% for store, people in day.groups %}{% if people %}
         <div class="sh-row">
           <span class="sh-store{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">{{ store }}</span>
@@ -230,10 +236,11 @@
       </div>
     </div>
     <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.notes %}<span class="cal-nt">✎{{ day.notes|length }}</span>{% endif %}</div>
+    {% if view == 'all' %}<div class="cal-counts" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:2"><span>イノ <b>{{ day.groups['イノ']|length }}</b>人</span><span>リッチ <b>{{ day.groups['リッチ']|length }}</b>人</span></div>{% endif %}
     {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
     {% endfor %}
     {% for b in w.bars %}
-    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + 2 }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small></div>
+    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + (view == 'all' ? 3 : 2) }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small></div>
     {% endfor %}
   </div>
   {% endfor %}
@@ -261,7 +268,7 @@
     detail.innerHTML = c.querySelector('.cal-detail').innerHTML;
     paint(); paintWho();
   }
-  document.querySelectorAll('.cal-cell[data-date], .cal-d[data-date], .cal-bar[data-date]').forEach(e => e.addEventListener('click', () => { const c = cellOf(e.dataset.date); if (c) show(c); }));
+  document.querySelectorAll('.cal-cell[data-date], .cal-d[data-date], .cal-bar[data-date], .cal-counts[data-date]').forEach(e => e.addEventListener('click', () => { const c = cellOf(e.dataset.date); if (c) show(c); }));
   if (btn) btn.addEventListener('click', () => { list.hidden = !list.hidden; });
   document.querySelectorAll('.ent-name').forEach(a => a.addEventListener('click', () => { try { localStorage.setItem('shift:me', a.dataset.sid); } catch (e) {} }));
   function paintWho() {
