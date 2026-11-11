@@ -67,12 +67,12 @@ nav a.nav-link {
 nav a.nav-link:hover { background: var(--surface); text-decoration: none; color: var(--fg); }
 nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
 @media (max-width: 700px) {
-  /* スマホ・タブレット: 文字を枠で囲んだ5つのボタンを、横いっぱいに並べる（今の画面は白く塗りつぶす） */
+  /* 文字数に応じてボタン幅を配分し、長いラベルも枠内に収める。 */
   :root { --nav-h: 56px; }
   nav { padding: 6px 6px; gap: 5px; }
   nav .brand, nav .spacer, nav .store-badge { display: none; }
-  nav a.nav-link { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; height: 100%;
-                   padding: 0 1px; font-size: clamp(11px, 3.3vw, 15px); font-weight: 700; text-align: center; white-space: nowrap; }
+  nav a.nav-link { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; height: 100%;
+                   padding: 0 5px; font-size: clamp(11px, 3vw, 14px); font-weight: 700; text-align: center; white-space: nowrap; }
   nav a.nav-link.active { background: var(--surface); color: var(--fg); border-color: #a8b4c2; }
   main { padding: 12px; }
 }
