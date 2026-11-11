@@ -1,0 +1,47 @@
+{% extends 'base.twig' %}
+{% block title %}スタッフLINE共有{% endblock %}
+{% block head %}<style>
+.sl-tabs{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.sl-tabs a{display:flex;align-items:center;justify-content:center;min-height:48px;flex:1;border:2px solid #7b5c26;border-radius:12px;background:#fff;color:#503b17;text-decoration:none;font-size:16px;font-weight:700;padding:8px 12px}.sl-tabs a[aria-current=page]{background:#503b17;color:#fff}.sl-card{background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin:14px 0}.sl-card label{display:block;margin:10px 0}.sl-card input[type=password],.sl-card select{padding:10px;max-width:100%;font-size:16px}.sl-card pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}.sl-card button{margin:8px 4px 0 0}.sl-note{color:var(--danger)}.sl-card button,.sl-card select{min-height:44px}.sl-card input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}h2{font-size:19px}h3{font-size:17px}.sl-card p{line-height:1.8}.sl-card summary{cursor:pointer;min-height:44px;padding:8px 0}.sl-steps{background:#fdf8fa;padding:12px 16px;border-radius:12px;line-height:1.9}
+</style>{% endblock %}
+{% block content %}
+<div class="sl-tabs"><a href="?stream=store" {% if stream == 'store' %}aria-current="page"{% endif %}>店舗スケジュール</a><a href="?stream=shift" {% if stream == 'shift' %}aria-current="page"{% endif %}>出勤スケジュール</a></div>
+<h1>{{ stream_title }}のLINE共有</h1><p>店舗の予定とスタッフの出勤は、別々に設定・配信します。</p><div class="sl-steps">① 共有する内容を選ぶ　→　② 内容を確認する　→　③ 承認する<br>慣れるまでは「内容を確認して承認」で使えます。</div>
+<p>火〜土の毎朝8:55（日本時間）。日月の通常配信はありません。土曜は登録された日曜分、設定により登録された月曜分もまとめます。</p>
+<p>変更・削除通知は、共有済みの今日以降の予定を対象に毎分確認します。日月も変更通知は動きます。</p>
+{% if not delivery_enabled %}<p class="sl-note">実送信は停止中です。サーバー側の送信許可が必要です。</p>{% endif %}
+{% if not configured %}<p class="sl-note">スタッフ用LINE認証情報・専用管理パスワードが未設定です。</p>{% endif %}
+<form method="post" action="/settings/staff-line/save" class="sl-card">
+<input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+<h2>1. 共有する内容と送り先を選ぶ</h2>
+<label><input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}> 配信処理を有効にする</label>
+<label>モード <select name="mode"><option value="approval" {% if settings.mode == 'approval' %}selected{% endif %}>内容を確認して承認</option><option value="auto" {% if settings.mode == 'auto' %}selected{% endif %}>完全自動</option></select></label>
+<label>送信先グループ <select name="group_id"><option value="">未選択</option>{% for g in groups %}<option value="{{ g.group_id }}" {% if settings.group_id == g.group_id %}selected{% endif %}>グループ …{{ g.group_id|slice(-8) }}</option>{% endfor %}</select></label>
+<p>スタッフ専用公式アカウントを招待し、一言投稿すると候補に出ます。送信先は末尾の番号で管理者が照合してください。</p>
+<label><input type="checkbox" name="include_monday" {% if settings.include_monday %}checked{% endif %}> 土曜に登録された月曜分も含める</label>
+<label><input type="checkbox" name="notify_changes" {% if settings.notify_changes %}checked{% endif %}> 共有済み予定の変更・削除を通知する</label>
+{% if stream == 'shift' %}<h3>LINEで共有を許可するスタッフ</h3>
+<p>チェックのないものは非公開です。新規登録も初期状態では非公開です。氏名・出勤先・勤務／休み時間だけを共有します。</p>
+{% for s in staff %}<label><input type="checkbox" name="staff[]" value="{{ s.id }}" {% if visibility['staff:' ~ s.id] is defined %}checked{% endif %}> {{ s.name }}</label>{% endfor %}
+{% else %}<h3>LINEで共有を許可する店舗予定</h3>
+<p>予定名に顧客名や個人の事情を入力しないでください。日ごとの自由メモは共有しません。</p>
+{% for r in rules %}<label><input type="checkbox" name="rule[]" value="{{ r.id }}" {% if visibility['rule:' ~ r.id] is defined %}checked{% endif %}> {{ r.title }}{% if not r.is_active %}（停止中）{% endif %}</label>{% endfor %}
+{% endif %}<p>設定保存時は未送信の承認を取り消します。送信を試行済みのものは要確認となります。</p>
+<label>共有専用の管理パスワード <input type="password" name="staff_password" required autocomplete="current-password"></label>
+<button class="btn">設定を保存</button>
+</form>
+<div class="sl-card"><h2>2. LINEに届く内容を確認する</h2>
+<form method="get"><input type="hidden" name="stream" value="{{ stream }}"><label>日付 <input type="date" name="date" value="{{ preview_date }}" required></label><button class="btn">表示</button></form>
+<pre>{{ preview }}</pre><p>この表示では送信も予約も行いません。</p>
+<form method="post" action="/settings/staff-line/prepare"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><label>共有専用の管理パスワード <input type="password" name="staff_password" required></label><button class="btn">現在の配信待ちを作成（送信は定期処理）</button></form></div>
+<h2>3. 承認・送信状況を確認する</h2><p>最新100件を表示しています。</p>
+<p>「LINE受付」はAPIが受け付けた状態です。既読・全員への到達を示すものではありません。前もって承認すると8:55に送信します。8:55以降の承認は次の定期処理で送信します（当日中）。</p>
+{% set labels = {'pending':'承認待ち','ready':'送信待ち','retry':'再送待ち','accepted':'LINE受付','failed':'失敗・設定確認','uncertain':'要確認・再送停止','cancelled':'取消','expired':'期限切れ','superseded':'設定変更で取消','oversized':'内容が長すぎます（共有対象を減らしてください）'} %}
+{% for j in jobs %}<details class="sl-card" {% if j.state in ['pending','ready','retry','failed','uncertain'] %}open{% endif %}><summary><b>#{{ j.id }} {{ labels[j.state]|default(j.state) }}</b> ／ {{ j.created_at }}</summary><p>{{ j.created_at }} ／ 配信予定 {{ j.scheduled_at }} ／ グループ …{{ j.group_id|slice(-8) }} ／ 試行 {{ j.attempts }}回 ／ HTTP {{ j.http_status|default('—') }}</p>
+{% if j.approved_by %}<p>承認者：{{ j.approved_by }}</p>{% endif %}<pre>{{ j.body }}</pre>
+{% if j.state in ['pending','ready','retry','failed'] %}<form method="post" action="/settings/staff-line/jobs/{{ j.id }}"><input type="hidden" name="stream" value="{{ stream }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="content_hash" value="{{ j.content_hash }}"><label>共有専用の管理パスワード <input type="password" name="staff_password" required></label>
+{% if j.state == 'pending' %}<button class="btn" name="action" value="approve">この内容を承認</button>{% endif %}
+{% if j.state in ['retry','failed'] %}<button class="btn" name="action" value="retry">同じ内容・送信番号で再送予約</button>{% endif %}
+<button class="btn btn-ghost" name="action" value="cancel">取り消す</button></form>{% endif %}</details>{% else %}<p>まだ履歴はありません。</p>{% endfor %}
+<details class="sl-card"><summary>送信試行の記録（最新50件）</summary>{% for a in attempts %}<p>#{{ a.job_id }} {{ a.attempted_at }} HTTP {{ a.http_status }} {{ labels[a.result]|default(a.result) }}</p>{% endfor %}</details>
+<details class="sl-card"><summary>管理操作の記録（最新30件）</summary>{% for a in audit %}<p>{{ a.at }} {{ a.actor }} {{ {'settings_saved':'配信設定を保存','queue_prepared':'配信待ちを作成','approved':'内容を承認','retry_requested':'再送を予約','cancelled':'配信を取消'}[a.action]|default(a.action) }} {% if a.job_id %}#{{ a.job_id }}{% endif %}</p>{% endfor %}</details>
+{% endblock %}

@@ -464,4 +464,11 @@ foreach ($h3 as $h) {
 ok($st3 === 200 && $opened && str_contains($b3, '正解！'), '暗証番号: 3回目は「正解！」で開く', "status={$st3}");
 $NO_ADMIN = false;
 
+// 新しい共有処理は、CI専用DBでLINE通信を完全に模擬して確認する。
+if (getenv('CI') === 'true') {
+    putenv('STAFF_LINE_TEST_MYSQL=1');
+    $staffLineStatus = 0;
+    passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/staff_line.php'), $staffLineStatus);
+    ok($staffLineStatus === 0, '店舗予定・出勤のLINE共有テスト');
+}
 exit($fail ? 1 : 0);

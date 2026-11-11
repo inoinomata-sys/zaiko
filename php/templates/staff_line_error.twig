@@ -1,0 +1,8 @@
+{% extends 'base.twig' %}
+{% block title %}共有内容を確認してください{% endblock %}
+{% block content %}
+<h1>もう一度確認してください</h1>
+<p style="line-height:1.9;margin:20px 0">{{ message }}</p>
+<p><a class="btn" href="/settings/staff-line?stream=store">店舗スケジュールに戻る</a></p>
+<p><a class="btn btn-ghost" href="/settings/staff-line?stream=shift">出勤スケジュールに戻る</a></p>
+{% endblock %}

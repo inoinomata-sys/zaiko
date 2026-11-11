@@ -14,6 +14,7 @@ require __DIR__ . '/schedule.php';
 require __DIR__ . '/migrations.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/line.php';
+require __DIR__ . '/staff_line.php';
 require __DIR__ . '/mail.php';
 
 // ── 画面（Twig）の準備 ─────────────────────────────────────────────────────────
@@ -137,6 +138,11 @@ function routes(): array
         ['GET', '/settings/line', 'h_settings_line'],
         ['POST', '/settings/line/assign', 'h_settings_line_assign'],
         ['POST', '/settings/line/import', 'h_settings_line_import'],
+        ['GET', '/settings/staff-line', 'h_staff_line'],
+        ['POST', '/settings/staff-line/save', 'h_staff_line_save'],
+        ['POST', '/settings/staff-line/prepare', 'h_staff_line_prepare'],
+        ['POST', '/settings/staff-line/jobs/<int:id>', 'h_staff_line_action'],
+        ['POST', '/staff-line/webhook', 'h_staff_line_webhook'],
         ['GET', '/ping', 'h_ping'],
         ['GET', '/health', 'h_health'],
     ];
@@ -156,7 +162,7 @@ function run_app(): void
     }
     $path = request_path();
     try {
-        if (!in_array($path, ['/ping', '/health', '/line/webhook'], true)) {
+        if (!in_array($path, ['/ping', '/health', '/line/webhook', '/staff-line/webhook'], true)) {
             ensure_data_migrations();   // 一回きりのデータの書き換え（済んでいれば、何もしない）
         }
         $pathMatched = false;
@@ -180,6 +186,11 @@ function run_app(): void
         }
         throw new HttpError($pathMatched ? 405 : 404);
     } catch (HttpError $e) {
+        if (str_starts_with($path, '/settings/staff-line')) {
+            $messages = [400 => '入力内容を確認してください。', 403 => '共有専用の管理パスワードを確認してください。管理者の認証が切れた場合は設定を開き直してください。', 404 => 'この配信は見つかりませんでした。', 409 => '内容または設定が変わったか、ほかの操作を処理中です。画面を開き直し、最新の内容を確認してください。'];
+            render('staff_line_error', ['message' => $messages[$e->status] ?? '操作を受け付けできませんでした。'], $e->status);
+            return;
+        }
         http_response_code($e->status);
         if (str_starts_with($path, '/api/') || $method !== 'GET') {
             respond_json(['ok' => false, 'error' => $e->status === 404 ? '見つかりません' : '受け付けできません'], $e->status);
