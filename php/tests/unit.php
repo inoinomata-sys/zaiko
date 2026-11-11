@@ -186,6 +186,7 @@ check('祝日休み 出勤表示から通常は除外', shift_calendar_entry($ho
 check('祝日休み 個別出勤を優先', shift_calendar_entry($holidayStaff,$holidayDay,['store'=>'イノ','tf'=>'','tt'=>''],'all')['store'], 'イノ');
 check('祝日休み 個別出勤は休日出勤', shift_difference($holidayStaff,$holidayDay,['store'=>'イノ','tf'=>'','tt'=>'']), ['休日出勤']);
 check('祝日休み お客様の休み表に反映', shift_customer_holiday($holidayStaff,$holidayDay,null)['full'], true);
+check('店休日 月曜は勤務曜日設定にかかわらず通常休み', shift_is_default_off(['off_days'=>''],['dow'=>1]), true);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

@@ -220,6 +220,7 @@ function shift_staff_list(bool $onlyActive = true): array
 /** 週の定休と祝日休みを共通判定する。個別登録は呼び出し側で優先する。 */
 function shift_is_default_off(array $staff, array $day): bool
 {
+    if ((int)$day['dow'] === 1) { return true; }
     if (in_array((int)$day['dow'], shift_off_days($staff), true)) { return true; }
     if (empty($staff['holiday_off'])) { return false; }
     if (!empty($day['hol'])) { return true; }
@@ -418,6 +419,7 @@ function h_shift(): void
         $notes[substr((string)$n['work_date'], 0, 10)][] = $n;
     }
     foreach ($days as &$day) {
+        $day['closed'] = (int)$day['dow'] === 1;
         $day['notes'] = $notes[$day['date']] ?? [];
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         $day['items'] = [];
@@ -747,6 +749,8 @@ function h_shift_customer_print(bool $asPdf = false): void
     $days = shift_days($first);
     foreach ($days as &$day) {
         $day['holidays'] = [];
+        $day['closed'] = (int)$day['dow'] === 1;
+        if ($day['closed']) { continue; }
         // 日曜はお客様に既知のため、日付だけを残し休みの名前を省く。
         if ((int)$day['dow'] === 0) { continue; }
         foreach ($staff as $person) {

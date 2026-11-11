@@ -212,6 +212,7 @@
 /* 名前の長さではなく、その日の列幅いっぱいに枠をそろえる。 */
 .cal-people {align-items:stretch}
 .cal-people .cal-bar {align-self:stretch;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.cal-closed{display:block;flex-basis:100%;font-size:10px;color:#b23f3f;line-height:1.5}.cal-people .rest-name{color:#b23f3f}
 </style>
 {% endblock %}
 {% block content %}
@@ -247,11 +248,11 @@
     {% for day in w.days %}
     {% if day %}
     <div class="cal-cell{% if day.today %} today{% endif %}" data-date="{{ day.date }}">
-      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.exceptions %}<span class="cal-change-count">変更{{ day.exceptions|length }}件</span>{% endif %}</div>
+      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}">{{ day.d }}{% if day.closed %}<span class="cal-closed">店休日</span>{% endif %}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.exceptions %}<span class="cal-change-count">変更{{ day.exceptions|length }}件</span>{% endif %}</div>
       {% if view == 'all' %}<div class="cal-counts" data-date="{{ day.date }}"><span>イノ <b>{{ day.groups['イノ']|length }}人</b></span><span>リッチ <b>{{ day.groups['リッチ']|length }}人</b></span></div>{% endif %}
       <div class="cal-people">
       {% for store, people in day.groups %}{% for p in people %}
-      <div class="cal-bar {{ store == '休' ? 'rest' : 'work' }}{% if p.default %} dflt{% endif %}{% if p.difference %} exception{% endif %}" data-date="{{ day.date }}" data-sid="{{ p.id }}"><span class="cal-person">{{ p.name }}</span><small class="cal-location">{{ store == '休' ? '休み' : store }}</small>
+      <div class="cal-bar {{ store == '休' ? 'rest' : 'work' }}{% if p.default %} dflt{% endif %}{% if p.difference %} exception{% endif %}" data-date="{{ day.date }}" data-sid="{{ p.id }}"><span class="cal-person{% if store == '休' %} rest-name{% endif %}">{{ p.name }}{% if store == '休' %}休み{% endif %}</span>{% if store != '休' %}<small class="cal-location">{{ store }}</small>{% endif %}
       {% if p.partial_off %}<small class="cal-change-time">{{ p.off_hours }}時休み</small>
       {% elseif store == '休' and p.time_s %}<small class="cal-change-time">{{ p.time_s }}時</small>
       {% else %}{% for tag in p.difference %}{% if not (store == '休' and tag in ['休み','一部休み']) and not (p.work_note and tag in ['休日出勤','時間変更']) %}<small class="cal-change-tag">{{ tag }}</small>{% endif %}{% endfor %}{% if p.work_note %}<small class="cal-change-time">{{ p.work_note }}</small>{% endif %}{% endif %}</div>

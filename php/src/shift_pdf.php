@@ -53,10 +53,11 @@ function build_shift_customer_pdf(array $data): string
     foreach($weeks as $r=>$week)foreach($week as $c=>$day){$x=$x0+$c*$cw;$y=$y0+$r*$rh;$pdf->SetDrawColor(225,221,214);$pdf->SetFillColor(...($day?[255,255,255]:[249,249,249]));$pdf->Rect($x,$y,$cw,$rh,'DF');if(!$day)continue;
         $text($x+1,$y+.5,(string)$day['d'],8,$day['sun']?[173,103,102]:($day['sat']?[104,131,151]:[48,51,51]));
         if($day['hol'])$text($x+6,$y+.7,$day['hol'],5.2,[150,100,95],$cw-7);
+        if (!empty($day['closed'])) { $text($x+2,$y+5,'店休日',8,[178,63,63]); continue; }
         $full=array_values(array_filter($day['holidays'],static fn($p)=>$p['full']));$partial=array_values(array_filter($day['holidays'],static fn($p)=>!$p['full']));
-        foreach($full as $i=>$person)$text($x+1+($i%3)*($cw-2)/3,$y+4+intdiv($i,3)*3,$person['name'],6.5,[48,51,51],($cw-2)/3);
-        $py=$y+4+ceil(count($full)/3)*3;
-        foreach($partial as $person){$text($x+1,$py,$person['name'].' '.$person['note'],6.1,$accent,$cw-2);$py+=3.2;}
+        foreach($full as $i=>$person)$text($x+1+($i%2)*($cw-2)/2,$y+4+intdiv($i,2)*3,$person['name'].'休み',6.5,[178,63,63],($cw-2)/2);
+        $py=$y+4+ceil(count($full)/2)*3;
+        foreach($partial as $person){$text($x+1,$py,$person['name'].' '.$person['note'],6.1,[178,63,63],$cw-2);$py+=3.2;}
     }
     $pdf->SetDrawColor(...$accent);$pdf->Line(6,130,204,130);
     $text(6,132,'お名前の記載がある日は、そのスタイリストのお休みです。',6.4,[90,90,90]);
