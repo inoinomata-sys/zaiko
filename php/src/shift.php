@@ -737,7 +737,7 @@ function shift_customer_themes(): array
     ];
 }
 
-function h_shift_customer_print(): void
+function h_shift_customer_print(bool $asPdf = false): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
@@ -762,6 +762,16 @@ function h_shift_customer_print(): void
     }
     unset($day);
     $month = (int)$first->format('n');
-    render('shift_customer_print', ['nav'=>shift_nav($first), 'year'=>$first->format('Y'), 'month_number'=>$month,
-        'store'=>$store, 'staff_count'=>count($staff), 'stores'=>SHIFT_STORES, 'theme'=>shift_customer_themes()[$month], 'weeks'=>shift_weeks($days)]);
+    $data = ['nav'=>shift_nav($first), 'year'=>$first->format('Y'), 'month_number'=>$month,
+        'store'=>$store, 'staff_count'=>count($staff), 'stores'=>SHIFT_STORES, 'theme'=>shift_customer_themes()[$month], 'weeks'=>shift_weeks($days)];
+    if ($asPdf && count($staff) === 0) {
+        redirect_to('/shift/customer-print?month=' . $first->format('Y-m'));
+    }
+    if ($asPdf) {
+        require_once __DIR__ . '/shift_pdf.php';
+        respond_pdf(build_shift_customer_pdf($data), 'イノ_お休みカレンダー_' . $first->format('Y-m') . '.pdf', true);
+    }
+    render('shift_customer_print', $data);
 }
+
+function h_shift_customer_pdf(): void { h_shift_customer_print(true); }
