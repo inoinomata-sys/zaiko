@@ -136,6 +136,7 @@ function routes(): array
         ['GET', '/admin/unlock', 'h_admin_unlock'],
         ['POST', '/admin/unlock', 'h_admin_unlock'],
         ['GET', '/settings/line', 'h_settings_line'],
+        ['POST', '/settings/line/unlock', 'h_line_edit_unlock'],
         ['POST', '/settings/line/assign', 'h_settings_line_assign'],
         ['POST', '/settings/line/import', 'h_settings_line_import'],
         ['GET', '/settings/staff-line', 'h_staff_line'],

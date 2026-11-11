@@ -73,12 +73,49 @@ function line_profile_name(string $uid, string $token): string
     return mb_substr((string)($j['displayName'] ?? ''), 0, 80);
 }
 
+// 送信先の変更は、この画面専用の短時間の解除が必要。
+function line_edit_token(string $scope, ?int $now = null): string
+{
+    $expires = ($now ?? time()) + ($scope === 'form' ? 3600 : 300);
+    $nonce = bin2hex(random_bytes(16));
+    $data = $expires . '.' . $nonce;
+    return $data . '.' . hash_hmac('sha256', $scope . '|' . $data . '|' . (string)($_COOKIE['zadmin'] ?? ''), admin_pass());
+}
+
+function line_edit_token_ok(string $scope, string $token, ?int $now = null): bool
+{
+    if (admin_pass() === '' || !preg_match('/^(\d{10})\.([a-f0-9]{32})\.([a-f0-9]{64})$/', $token, $m)) { return false; }
+    $now ??= time();
+    if ((int)$m[1] <= $now || (int)$m[1] > $now + ($scope === 'form' ? 3600 : 300)) { return false; }
+    return hash_equals(hash_hmac('sha256', $scope . '|' . $m[1] . '.' . $m[2] . '|' . (string)($_COOKIE['zadmin'] ?? ''), admin_pass()), $m[3]);
+}
+
+function require_line_edit(): void
+{
+    require_admin();
+    if (!line_edit_token_ok('form', (string)($_POST['edit_csrf'] ?? '')) || !line_edit_token_ok('edit', (string)($_POST['edit_grant'] ?? ''))) {
+        redirect_to('/settings/line?msg=' . urlencode('変更はロックされています。「送信先を変更する」から解除してください。'));
+    }
+}
+
+function h_line_edit_unlock(): void
+{
+    require_admin();
+    if (!line_edit_token_ok('form', (string)($_POST['edit_csrf'] ?? ''))) { respond_json(['ok' => false, 'error' => '画面を開き直してください'], 403); }
+    $pass = admin_pass();
+    if ($pass === '' || !hash_equals($pass, (string)($_POST['password'] ?? ''))) {
+        respond_json(['ok' => false, 'error' => '管理者の合言葉が違います'], 403);
+    }
+    respond_json(['ok' => true, 'grant' => line_edit_token('edit')]);
+}
+
 function h_settings_line(): void
 {
     require_admin();
     ensure_line_tables();
     $cfg = line_config();
     render('settings_line', [
+        'edit_csrf' => line_edit_token('form'),
         'contacts' => rows('SELECT user_id, display_name, supplier, last_text, last_at FROM line_contacts ORDER BY last_at DESC'),
         'ready' => ($cfg['secret'] ?? '') !== '' && ($cfg['token'] ?? '') !== '',
         'msg' => mb_substr((string)($_GET['msg'] ?? ''), 0, 200),
@@ -88,7 +125,7 @@ function h_settings_line(): void
 /** 友だちの一覧を LINE に聞いて取り込む（認証済みアカウントなどでないと、LINE が断る） */
 function h_settings_line_import(): void
 {
-    require_admin();
+    require_line_edit();
     ensure_line_tables();
     $token = (string)(line_config()['token'] ?? '');
     if ($token === '') {
@@ -134,7 +171,7 @@ function h_settings_line_import(): void
 
 function h_settings_line_assign(): void
 {
-    require_admin();
+    require_line_edit();
     ensure_line_tables();
     $uid = (string)($_POST['user_id'] ?? '');
     $sup = (string)($_POST['supplier'] ?? '');
@@ -143,6 +180,8 @@ function h_settings_line_assign(): void
     }
     // 1つの仕入先に、ひも付けられるのは1人（送り先を間違えないため）
     transaction(function () use ($uid, $sup) {
+        $current = row('SELECT supplier FROM line_contacts WHERE user_id = ? FOR UPDATE', [$uid]);
+        if (!$current || (string)$current['supplier'] !== (string)($_POST['previous_supplier'] ?? '')) { throw new HttpError(409); }
         if ($sup !== '') {
             run('UPDATE line_contacts SET supplier = NULL WHERE supplier = ?', [$sup]);
         }

@@ -2,6 +2,8 @@
 {% block title %}LINE（業者さん）{% endblock %}
 {% block head %}
 <style>
+#unlock-form[hidden],#relock[hidden]{display:none!important}
+#unlock-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}#unlock-form input{min-width:0;flex:1}#line-lock strong{font-size:16px}.ln select:disabled,.ln button:disabled{opacity:.6;cursor:not-allowed}
 .ln { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
 .ln .n { font-weight: 700; font-size: 16px; }
 .ln .m { font-size: 12px; color: var(--fg2); margin: 2px 0 8px; word-break: break-all; }
@@ -13,9 +15,10 @@
 {% block content %}
 <p style="margin-bottom:10px"><a href="/settings">← 設定にもどる</a></p>
 <h1 style="font-size:20px;font-weight:700;margin-bottom:8px">LINE（業者さん）</h1>
+<div class="warn" id="line-lock"><strong id="lock-label">🔒 送信先はロック中です</strong><p>普段は見るだけです。変更したい時だけ、管理者の合言葉で解除してください。</p><form id="unlock-form"><input type="hidden" name="edit_csrf" value="{{ edit_csrf }}"><input type="password" name="password" aria-label="管理者の合言葉" placeholder="管理者の合言葉" required autocomplete="off" style="font-size:16px;padding:10px;max-width:100%"><button class="btn btn-ghost" type="submit">送信先を変更する</button></form><button class="btn btn-ghost" id="relock" type="button" hidden>変更を終えてロックする</button><p id="unlock-error" role="status"></p></div>
 {% if msg %}<div class="warn" style="background:#eef6ff;border-color:#b9cdf5;color:#1a3d7a">{{ msg }}</div>{% endif %}
 {% if ready %}
-<form method="post" action="/settings/line/import" style="margin-bottom:12px"><button class="btn btn-ghost" type="submit">友だちを取り込む</button></form>
+<form method="post" action="/settings/line/import" data-line-edit style="margin-bottom:12px"><input type="hidden" name="edit_csrf" value="{{ edit_csrf }}"><input type="hidden" name="edit_grant"><button disabled class="btn btn-ghost" type="submit">友だちを取り込む</button></form>
 {% endif %}
 {% if not ready %}
 <div class="warn">まだ、LINE とつながっていません。公式LINEで Messaging API を使えるようにして、シークレットとトークンを、サーバーの設定（config.php）に入れると、つながります。</div>
@@ -25,16 +28,30 @@
 <div class="ln">
   <div class="n">{{ c.display_name ?: '（名前なし）' }}</div>
   <div class="m">最後の発言：{{ c.last_text ?: '—' }}（{{ c.last_at }}）</div>
-  <form method="post" action="/settings/line/assign">
+  <form method="post" action="/settings/line/assign" data-line-edit data-recipient="{{ c.display_name ?: '（名前なし）' }}"><input type="hidden" name="edit_csrf" value="{{ edit_csrf }}"><input type="hidden" name="edit_grant"><input type="hidden" name="previous_supplier" value="{{ c.supplier }}">
     <input type="hidden" name="user_id" value="{{ c.user_id }}">
-    <select name="supplier">
+    <select name="supplier" disabled aria-label="送信先の仕入先">
       <option value="">仕入先を選ぶ</option>
       {% for s in supplier_names %}<option value="{{ s }}"{% if c.supplier == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
     </select>
-    <button class="btn" type="submit">決める</button>
+    <button class="btn" type="submit" disabled>変更を保存</button>
   </form>
 </div>
 {% else %}
 <p style="color:var(--fg2);margin:20px 0">まだ誰も出ていません。</p>
 {% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+ const form=document.getElementById('unlock-form'), label=document.getElementById('lock-label'), error=document.getElementById('unlock-error'), relock=document.getElementById('relock');
+ const edits=[...document.querySelectorAll('[data-line-edit]')]; let timer;
+ function lock(){clearTimeout(timer);edits.forEach(f=>{f.querySelector('[name=edit_grant]').value='';const select=f.querySelector('select');if(select)select.value=f.querySelector('[name=previous_supplier]').value;f.querySelectorAll('select,button').forEach(e=>e.disabled=true);});form.hidden=false;relock.hidden=true;label.textContent='🔒 送信先はロック中です';form.reset();}
+ relock.addEventListener('click',()=>{lock();location.reload();});
+ form.addEventListener('submit',async e=>{e.preventDefault();error.textContent='';const button=form.querySelector('button');button.disabled=true;try{const body=new URLSearchParams(new FormData(form));body.set('edit_csrf',{{ edit_csrf|tojson }});const response=await fetch('/settings/line/unlock',{method:'POST',body});const result=await response.json();form.reset();if(!response.ok||!result.ok)throw Error(result.error||'解除できませんでした');edits.forEach(f=>{f.querySelector('[name=edit_grant]').value=result.grant;f.querySelectorAll('select,button').forEach(e=>e.disabled=false);});form.hidden=true;relock.hidden=false;label.textContent='🔓 変更できます（5分後に自動ロック）';timer=setTimeout(()=>{lock();error.textContent='時間が経ったためロックしました。';},300000);}catch(e){error.textContent=e.message;}finally{button.disabled=false;}});
+ edits.forEach(f=>f.addEventListener('submit',e=>{const select=f.querySelector('select');const message=select?`「${f.dataset.recipient}」の送信先を「${select.selectedOptions[0].textContent}」に変更しますか？`:'LINEの友だち一覧を取り込みますか？';if(!confirm(message))e.preventDefault();}));
+ window.addEventListener('pageshow',()=>lock());
+})();
+</script>
 {% endblock %}
