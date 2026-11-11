@@ -111,6 +111,26 @@ function h_schedule_rules(): void
     render('schedule_rules', ['rules' => $rules, 'week' => SHIFT_WEEK, 'selected_date' => $date]);
 }
 
+function schedule_add_key(): string
+{
+    return hash_hmac('sha256', 'schedule-add|' . (string)($_COOKIE['zlogin'] ?? ''), admin_pass());
+}
+
+function h_schedule_once(): void
+{
+    $date = (string)($_GET['date'] ?? now_jst()->format('Y-m-d'));
+    $d = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if (!$d || $d->format('Y-m-d') !== $date) { throw new HttpError(400); }
+    render('schedule_add', ['date' => $date, 'label' => $d->format('n月j日') . '（' . SHIFT_WEEK[(int)$d->format('w')] . '）', 'month' => $d->format('Y-m'), 'form_key' => schedule_add_key()]);
+}
+
+function h_schedule_once_save(): void
+{
+    if (!hash_equals(schedule_add_key(), (string)($_POST['form_key'] ?? ''))) { throw new HttpError(403); }
+    $_POST['kind'] = 'once';
+    h_schedule_add();
+}
+
 function h_schedule_add(): void
 {
     ensure_schedule_tables();
@@ -129,6 +149,8 @@ function h_schedule_add(): void
         || ($kind === 'once' && (!$okDate || $okDate->format('Y-m-d') !== $once))) {
         throw new HttpError(400);
     }
+    $simple = request_path() === '/schedule/add';
+    if ($simple) { ensure_staff_line_tables(); }
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM schedule_rules');
     run('INSERT INTO schedule_rules (title, store, kind, weekday, nth, day_of_month, once_date, sort_order) VALUES (?,?,?,?,?,?,?,?)', [
         $title, $store, $kind,
@@ -138,6 +160,11 @@ function h_schedule_add(): void
         $kind === 'once' ? $once : null,
         $max + 1,
     ]);
+    if ($simple) {
+        $id = last_id();
+        if (isset($_POST['share_line'])) { run("INSERT INTO staff_line_visibility (kind, entity_id, is_public) VALUES ('rule',?,1)", [$id]); }
+        redirect_to('/schedule?month=' . substr($once, 0, 7));
+    }
     redirect_to('/schedule/rules');
 }
 

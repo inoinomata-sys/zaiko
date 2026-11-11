@@ -1,0 +1,17 @@
+{% extends 'base.twig' %}
+{% block title %}この日だけの予定を追加{% endblock %}
+{% block head %}<style>
+.once-wrap{max-width:560px;margin:20px auto}.once-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:24px;margin:16px 0}.once-card label{display:block;font-weight:700;margin:18px 0 8px}.once-card input:not([type=checkbox]),.once-card select{width:100%;box-sizing:border-box;min-height:50px;padding:12px;border:1px solid var(--border);border-radius:10px;font-family:inherit;font-size:16px}.once-card .btn{width:100%;min-height:52px;margin-top:20px;font-size:17px}.once-card .once-share{font-size:14px;font-weight:400;display:flex;gap:8px;align-items:center}.once-share input{width:20px;height:20px}.once-note{font-size:13px;color:var(--fg2);line-height:1.7}.once-wrap h1{font-size:23px}
+</style>{% endblock %}
+{% block content %}<div class="once-wrap">
+<a href="/schedule?month={{ month }}">← 店舗カレンダーに戻る</a>
+<h1 style="margin-top:20px">この日だけの予定を追加</h1><p class="once-note">日付は選択済みです。予定名を入れて保存してください。</p>
+<form class="once-card" method="post" action="/schedule/add" onsubmit="this.querySelector('button[type=submit]').disabled=true">
+<input type="hidden" name="form_key" value="{{ form_key }}">
+<label for="once-date">日付</label><input id="once-date" type="date" name="once_date" value="{{ date }}" required>
+<label for="once-title">予定名</label><input id="once-title" name="title" placeholder="例：ミーティング、大掃除" maxlength="80" required autofocus>
+<label for="once-store">店舗</label><select id="once-store" name="store"><option value="">両方の店舗</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option></select>
+<label class="once-share"><input type="checkbox" name="share_line"> この予定をスタッフLINEで共有する</label><p class="once-note">チェックした予定だけが自動配信の対象になります。</p>
+<button class="btn" type="submit">保存してカレンダーに戻る</button>
+</form><p class="once-note">毎週・毎月の予定は、<a href="/schedule/rules">繰り返し予定の管理</a>から登録できます。</p>
+</div>{% endblock %}

@@ -19,7 +19,8 @@
   /* 白黒印刷：色に頼らず、文字と線で見分ける */
   html, body, main, * { color: #000 !important; }
   .cal-cell { border: 1px solid #000 !important; border-radius: 0 !important; }
-  .cal-cell.blank { border-color: transparent !important; }
+  .cal-cell[data-add-url]{cursor:pointer}
+.cal-cell.blank { border-color: transparent !important; }
   .cal-cell.today { border-width: 2px !important; }
   .cal-d.sun { background: #ddd !important; }
   .cal-d.sun .cal-hol, .cal-hol { font-weight: 700; }
@@ -68,8 +69,8 @@
   <div class="cal-week">
     {% for day in week %}
     {% if day %}
-    <div class="cal-cell{% if day.today %} today{% endif %}">
-      <a class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" href="/schedule/rules?date={{ day.date }}" aria-label="{{ day.date }}の予定を追加">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</a>
+    <div class="cal-cell{% if day.today %} today{% endif %}" data-add-url="/schedule/add?date={{ day.date }}">
+      <a class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" href="/schedule/add?date={{ day.date }}" aria-label="{{ day.date }}の予定を追加">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</a>
       {% for e in day.events %}<div class="cal-ev">{{ e.title }}{% if e.store %}<small>（{{ e.store }}）</small>{% endif %}</div>{% endfor %}
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
@@ -77,5 +78,7 @@
   </div>
   {% endfor %}
 </div>
-<p class="no-print" style="margin:16px 0 30px"><a class="btn" href="/schedule/rules" style="display:block;text-align:center">予定を足す・直す</a></p>
+<p class="no-print" style="margin:16px 0 30px"><a class="btn" href="/schedule/add" style="display:block;text-align:center">＋ この日だけの予定を追加</a><a href="/schedule/rules" style="display:block;text-align:center;margin-top:14px">繰り返し予定・登録済みの予定を管理</a></p>
 {% endblock %}
+
+{% block scripts %}<script>document.querySelectorAll('[data-add-url]').forEach(cell=>cell.addEventListener('click',e=>{if(!e.target.closest('a,button,input,select'))location.href=cell.dataset.addUrl;}));</script>{% endblock %}

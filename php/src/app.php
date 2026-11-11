@@ -114,6 +114,8 @@ function routes(): array
         ['GET', '/menu', 'h_menu_redirect'],
         ['GET', '/portal', 'h_menu_redirect'],
         ['GET', '/schedule', 'h_schedule'],
+        ['GET', '/schedule/add', 'h_schedule_once'],
+        ['POST', '/schedule/add', 'h_schedule_once_save'],
         ['GET', '/schedule/rules', 'h_schedule_rules'],
         ['POST', '/schedule/rules/add', 'h_schedule_add'],
         ['POST', '/schedule/rules/<int:id>/toggle', 'h_schedule_toggle'],
