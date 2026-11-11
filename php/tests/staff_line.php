@@ -80,7 +80,30 @@ expect(sl_snapshot('2026-11-14', 'store') === [] && sl_snapshot('2026-11-14', 's
 run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('staff',99001,1),('rule',99001,1)");
 $store = sl_snapshot('2026-11-14', 'store'); $shift = sl_snapshot('2026-11-14', 'shift');
 expect(isset($store['rule:99001']) && !isset($store['staff:99001']), 'store schedules exclude staff shifts');
-expect($shift === [], 'shift data is never read into LINE payloads');
+expect($shift === [], 'standalone shift stream remains disabled');
+run("UPDATE shift_entries SET store='休',time_from='10:00',time_to='13:00' WHERE staff_id=99001 AND work_date='2026-11-14'");
+expect(!isset(sl_snapshot('2026-11-14')['exception:99001']), 'work exceptions private until explicitly allowed');
+run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('exception',99001,1)");
+$exception = sl_snapshot('2026-11-14')['exception:99001'] ?? [];
+expect(str_contains($exception['label'] ?? '', '休み') && str_contains($exception['value'] ?? '', '10:00〜13:00だけ休み'), 'normally working staff partial absence shared with hours');
+run("UPDATE shift_entries SET store='リッチ',time_from='11:00',time_to='16:00' WHERE staff_id=99001 AND work_date='2026-11-14'");
+$exception = sl_snapshot('2026-11-14')['exception:99001'] ?? [];
+expect(str_contains($exception['label'] ?? '', 'ヘルプ') && str_contains($exception['value'] ?? '', 'イノ→リッチ／11:00〜16:00'), 'help destination and individual hours shared');
+run("INSERT INTO shift_entries (staff_id,work_date,store,time_from,time_to) VALUES (99001,'2026-11-15','イノ','12:00','17:00')");
+$exception = sl_snapshot('2026-11-15')['exception:99001'] ?? [];
+expect(str_contains($exception['label'] ?? '', '通常休み→出勤') && str_contains($exception['value'] ?? '', '12:00〜17:00'), 'normally off staff exceptional attendance shared');
+run("UPDATE shift_entries SET store='休' WHERE staff_id=99001 AND work_date='2026-11-15'");
+expect(!isset(sl_snapshot('2026-11-15')['exception:99001']), 'normal weekly rest is not shared');
+run("UPDATE shift_entries SET store='イノ',time_from=NULL,time_to=NULL WHERE staff_id=99001 AND work_date='2026-11-14'");
+expect(!isset(sl_snapshot('2026-11-14')['exception:99001']), 'ordinary attendance is not shared');
+run("UPDATE shift_entries SET store='リッチ' WHERE staff_id=99001 AND work_date='2026-11-14'");
+$exception = sl_snapshot('2026-11-14')['exception:99001'] ?? [];
+expect(str_contains($exception['value'] ?? '', '9:00〜18:00'), 'help uses basic hours when unspecified');
+run("UPDATE staff_line_visibility SET is_public=0 WHERE kind='exception'");
+expect(!isset(sl_snapshot('2026-11-14')['exception:99001']), 'revoking staff sharing excludes current content');
+run("DELETE FROM shift_entries WHERE staff_id=99001 AND work_date='2026-11-15'");
+run("UPDATE shift_entries SET store='イノ',time_from=NULL,time_to=NULL WHERE staff_id=99001 AND work_date='2026-11-14'");
+
 $_GET['stream'] = 'shift';
 try { sl_stream(); expect(false, 'shift sharing settings rejected'); } catch (HttpError $e) { expect($e->status === 400, 'shift sharing settings rejected'); }
 $_GET = [];

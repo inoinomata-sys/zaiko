@@ -13,6 +13,7 @@ function ensure_staff_line_tables(): void
     static $done = false;
     if ($done) { return; }
     ensure_schedule_tables();
+    ensure_shift_tables();
     $sql = file_get_contents(__DIR__ . '/staff_line.mysql.sql');
     if ($sql === false) { throw new RuntimeException('共有設定のDB定義がありません'); }
     foreach (explode(';', $sql) as $statement) {
@@ -73,6 +74,27 @@ function sl_dates(DateTimeImmutable $now, bool $monday, callable $registered): a
 }
 
 /** 明示的に共有を許可したスタッフ・予定だけ。顧客、電話、メモ、休暇理由は取得しない。 */
+/** 基本の勤務と異なる個別登録だけを共有。理由・自由メモは含めない。 */
+function sl_work_exception(array $staff, array $entry, DateTimeImmutable $date): ?array
+{
+    $off = in_array((int)$date->format('w'), shift_off_days($staff), true);
+    $store = $entry['store'];
+    if ($store === SHIFT_OFF) {
+        if ($off) { return null; }
+        $time = shift_time_label($entry['time_from'] ?? '', $entry['time_to'] ?? '', false);
+        return ['label' => $staff['name'] . '（休み）', 'value' => $staff['home_store'] . '／' . ($time === '' ? '終日休み' : $time . 'だけ休み')];
+    }
+    if (!in_array($store, SHIFT_STORES, true)) { return null; }
+    $help = $store !== $staff['home_store'];
+    if (!$off && !$help) { return null; }
+    $tf = (string)($entry['time_from'] ?? ''); $tt = (string)($entry['time_to'] ?? '');
+    $time = shift_time_label($tf !== '' || $tt !== '' ? $tf : $staff['work_from'], $tf !== '' || $tt !== '' ? $tt : $staff['work_to'], false);
+    $tags = [];
+    if ($off) { $tags[] = '通常休み→出勤'; }
+    if ($help) { $tags[] = 'ヘルプ'; }
+    return ['label' => $staff['name'] . '（' . implode('・', $tags) . '）', 'value' => ($help ? $staff['home_store'] . '→' : '') . $store . ($time === '' ? '' : '／' . $time)];
+}
+
 function sl_snapshot(string $date, string $stream = 'store'): array
 {
     $d = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
@@ -82,6 +104,10 @@ function sl_snapshot(string $date, string $stream = 'store'): array
     foreach (rows("SELECT r.* FROM schedule_rules r JOIN staff_line_visibility v ON v.kind = 'rule' AND v.entity_id = r.id AND v.is_public = 1 WHERE r.is_active = 1 ORDER BY r.sort_order, r.id") as $r) {
         if (schedule_matches($r, $d)) { $items['rule:' . $r['id']] = ['label' => $r['title'], 'value' => $r['store'] === '' ? '両店舗' : $r['store']]; }
     }
+    }
+    foreach (rows("SELECT s.*, e.store, e.time_from, e.time_to FROM shift_staff s JOIN shift_entries e ON e.staff_id = s.id JOIN staff_line_visibility v ON v.kind = 'exception' AND v.entity_id = s.id AND v.is_public = 1 WHERE s.is_active = 1 AND e.work_date = ? ORDER BY s.sort_order, s.id", [$date]) as $staff) {
+        $item = sl_work_exception($staff, $staff, $d);
+        if ($item !== null) { $items['exception:' . $staff['id']] = $item; }
     }
     ksort($items);
     return $items;
@@ -318,7 +344,7 @@ function h_staff_line(): void
     foreach (rows('SELECT * FROM staff_line_visibility WHERE is_public = 1') as $v) { $visibility[$v['kind'] . ':' . $v['entity_id']] = true; }
     render('settings_staff_line', [
         'stream' => $s['stream'], 'stream_title' => $s['stream'] === 'shift' ? '出勤スケジュール' : '店舗スケジュール', 'settings' => $s, 'groups' => rows('SELECT * FROM staff_line_groups WHERE active = 1'),
-        'rules' => schedule_rules_all(), 'visibility' => $visibility,
+        'rules' => schedule_rules_all(), 'staff' => shift_staff_list(), 'visibility' => $visibility,
         'csrf' => hash_hmac('sha256', 'staff-line-form|' . (string)($_COOKIE['zadmin'] ?? ''), (string)(sl_config()['admin_password'] ?? '')),
         'delivery_enabled' => !empty(sl_config()['delivery_enabled']),
         'configured' => !empty(sl_config()['admin_password']) && !empty(sl_config()['secret']) && !empty(sl_config()['token']),
@@ -338,8 +364,8 @@ function h_staff_line_save(): void
         if (!in_array($mode, ['approval','auto'], true) || ($group !== '' && !val('SELECT active FROM staff_line_groups WHERE group_id = ?', [$group]))) { throw new HttpError(400); }
         transaction(function () use ($mode, $group) {
             run('UPDATE staff_line_settings SET enabled = ?, mode = ?, group_id = ?, include_monday = ?, notify_changes = ?, revision = revision + 1 WHERE stream = ?', [isset($_POST['enabled']), $mode, $group, isset($_POST['include_monday']), isset($_POST['notify_changes']), sl_stream()]);
-            run('DELETE FROM staff_line_visibility WHERE kind = ?', [sl_stream() === 'shift' ? 'staff' : 'rule']);
-            foreach ([sl_stream() === 'shift' ? 'staff' : 'rule'] as $kind) {
+            run("DELETE FROM staff_line_visibility WHERE kind IN ('rule','exception')");
+            foreach (['rule','exception'] as $kind) {
                 foreach (array_unique((array)($_POST[$kind] ?? [])) as $id) {
                     if (ctype_digit((string)$id) && (int)$id > 0) { run('INSERT INTO staff_line_visibility (kind, entity_id, is_public) VALUES (?,?,1)', [$kind, (int)$id]); }
                 }

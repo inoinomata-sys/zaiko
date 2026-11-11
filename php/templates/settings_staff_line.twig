@@ -21,6 +21,9 @@
 <h3>LINEで共有を許可する店舗予定</h3>
 <p>予定名に顧客名や個人の事情を入力しないでください。日ごとの自由メモは共有しません。</p>
 {% for r in rules %}<label><input type="checkbox" name="rule[]" value="{{ r.id }}" {% if visibility['rule:' ~ r.id] is defined %}checked{% endif %}> {{ r.title }}{% if not r.is_active %}（停止中）{% endif %}</label>{% endfor %}
+<h3>勤務の変更を共有するスタッフ</h3>
+<p>選んだスタッフの「通常勤務日の休み」「通常休みの日の出勤」「別店舗へのヘルプ」を、店舗予定と一緒に共有します。個別に指定した時間を優先し、理由や自由メモは送りません。</p>
+{% for s in staff %}<label><input type="checkbox" name="exception[]" value="{{ s.id }}" {% if visibility['exception:' ~ s.id] is defined %}checked{% endif %}> {{ s.name }}（{{ s.home_store }}）</label>{% else %}<p>スタッフを先に登録してください。</p>{% endfor %}
 <p>設定保存時は未送信の承認を取り消します。送信を試行済みのものは要確認となります。</p>
 <label>共有専用の管理パスワード <input type="password" name="staff_password" required autocomplete="current-password"></label>
 <button class="btn">設定を保存</button>
