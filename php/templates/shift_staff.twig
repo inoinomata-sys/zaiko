@@ -24,6 +24,9 @@
 .st-tm input[type=time]::-webkit-date-and-time-value { min-width: 0; margin: 0; text-align: left; }
 .st-tm input[type=time]::-webkit-datetime-edit { min-width: 0; padding: 0; }
 @media(max-width:360px) { .st-tm { gap: 8px; } .st-tm input[type=time] { font-size: 16px; padding: 10px 4px; } }
+.st-add-days {width:100%;min-width:0;border:0;padding:8px 0;margin:0}
+.st-add-days legend {font-size:13px;color:var(--fg2);margin-bottom:8px}
+.st-add .st-add-days input[type=checkbox] {width:24px;height:24px;padding:0;margin:0;accent-color:var(--acc)}
 </style>
 {% endblock %}
 {% block content %}
@@ -34,6 +37,10 @@
   <input name="name" placeholder="スタッフの名前" aria-label="スタッフの名前" required maxlength="40">
   <select name="home_store" aria-label="所属店舗"><option>イノ</option><option>リッチ</option></select>
   <div class="st-tm"><label>勤務開始<input type="time" name="work_from"></label><label>勤務終了<input type="time" name="work_to"></label></div>
+  <input type="hidden" name="work_days_present" value="1">
+  <fieldset class="st-add-days"><legend>勤務日（チェック＝出勤）</legend><div class="st-days">
+  {% for w in week %}<label>{{ w }}<input type="checkbox" name="work[]" value="{{ loop.index0 }}"{% if loop.index0 >= 2 %} checked{% endif %}></label>{% endfor %}
+  </div></fieldset>
   <button class="btn" type="submit">スタッフを登録</button>
 </form>
 {% for s in staff %}{% if s.is_active %}

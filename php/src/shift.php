@@ -517,7 +517,12 @@ function h_shift_staff_add(): void
     $max = (int)val('SELECT COALESCE(MAX(sort_order), 0) FROM shift_staff');
     $wf = shift_time($_POST['work_from'] ?? '') ?? '';
     $wt = shift_time($_POST['work_to'] ?? '') ?? '';
-    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to) VALUES (?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt]);
+    $off = '';
+    if (isset($_POST['work_days_present'])) {
+        $work = array_filter((array)($_POST['work'] ?? []), static fn($w) => is_scalar($w) && preg_match('/^[0-6]$/', (string)$w));
+        $off = implode(',', array_diff(range(0, 6), array_map('intval', $work)));
+    }
+    run('INSERT INTO shift_staff (name, home_store, sort_order, work_from, work_to, off_days) VALUES (?,?,?,?,?,?)', [$name, $home, $max + 1, $wf, $wt, $off]);
     redirect_to('/settings/staff');
 }
 
