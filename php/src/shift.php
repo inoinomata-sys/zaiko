@@ -42,6 +42,14 @@ function ensure_shift_tables(): void
             run("ALTER TABLE shift_staff ADD COLUMN {$col} VARCHAR(5) NOT NULL DEFAULT ''");
         }
     }
+    run('CREATE TABLE IF NOT EXISTS shift_notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        work_date DATE NOT NULL,
+        author VARCHAR(40) NOT NULL DEFAULT \'\',
+        body VARCHAR(600) NOT NULL,
+        created_at DATETIME NOT NULL,
+        KEY idx_notes_date (work_date)
+    ) DEFAULT CHARSET=utf8mb4');
     run('CREATE TABLE IF NOT EXISTS shift_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
         at DATETIME NOT NULL,
@@ -310,7 +318,12 @@ function h_shift(): void
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
     $days = shift_days($first);
+    $notes = [];
+    foreach (rows('SELECT id, work_date, author, body FROM shift_notes WHERE work_date BETWEEN ? AND ? ORDER BY id', [$days[0]['date'], $days[count($days) - 1]['date']]) as $n) {
+        $notes[substr((string)$n['work_date'], 0, 10)][] = $n;
+    }
     foreach ($days as &$day) {
+        $day['notes'] = $notes[$day['date']] ?? [];
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         $day['items'] = [];
         foreach ($staff as $s) {
@@ -529,4 +542,35 @@ function h_shift_default(): void
     }
     unset($s);
     render('shift_default', ['staff' => $staff, 'week' => SHIFT_WEEK]);
+}
+
+
+/** 日ごとのメモを書く */
+function h_api_shift_note(): void
+{
+    ensure_shift_tables();
+    $d = req_json();
+    if ($d === null) {
+        bad_input();
+    }
+    $date = (string)($d['date'] ?? '');
+    $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    $body = mb_substr(trim((string)($d['body'] ?? '')), 0, 300);
+    $author = mb_substr(trim((string)($d['author'] ?? '')), 0, 40);
+    if (!$dt || $dt->format('Y-m-d') !== $date || $body === '') {
+        bad_input();
+    }
+    run('INSERT INTO shift_notes (work_date, author, body, created_at) VALUES (?,?,?,?)', [$date, $author, $body, now_jst()->format('Y-m-d H:i:s')]);
+    respond_json(['ok' => true]);
+}
+
+function h_api_shift_note_delete(): void
+{
+    ensure_shift_tables();
+    $d = req_json();
+    if ($d === null || !isset($d['id']) || !is_numeric($d['id'])) {
+        bad_input();
+    }
+    run('DELETE FROM shift_notes WHERE id = ?', [(int)$d['id']]);
+    respond_json(['ok' => true]);
 }

@@ -35,6 +35,11 @@
 .tp .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .tp input[type=time] { font-size: 18px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
 .tp .hint { font-size: 12px; color: var(--fg2); margin-top: 6px; }
+.rg { margin-bottom: 10px; }
+.rg-btn { font-size: 13px; padding: 6px 14px; border: 1px solid var(--acc); border-radius: 999px; background: #fff; color: var(--acc); font-family: inherit; font-weight: 600; cursor: pointer; }
+#rg-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+#rg-box .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+#rg-box input, #rg-box select { font-size: 16px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; }
 .cal-cell select.saving { opacity: .5; }
 .cal-cell select.err { outline: 2px solid #b3261e; }
 </style>
@@ -49,6 +54,15 @@
   {% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on"{% endif %}>{{ s.name }}</a>{% endfor %}
 </div>
 <p class="eo-hint">休みの希望がある日を、「休み希望」にします。一部の時間だけ休みたい日は、「休み希望」にして、下の「時間」を押して、時間を入れます。選ぶと、すぐ保存されます。「休(定休)」は、毎週の休みの曜日です。別の店にヘルプに入る日だけ、店を選びます。</p>
+<div class="rg">
+  <button type="button" class="rg-btn" id="rg-open">連休をまとめて入れる ▾</button>
+  <div id="rg-box" hidden>
+    <div class="row"><input type="date" id="rg-from" value="{{ nav.month }}-01"><span>から</span><input type="date" id="rg-to" value="{{ nav.month }}-01"><span>まで</span></div>
+    <div class="row"><select id="rg-v"><option value="休">休み希望</option><option value="イノ">イノ</option><option value="リッチ">リッチ</option><option value="">消す（空に戻す）</option></select>
+      <span id="rg-tm" class="row" style="margin:0"><input type="time" id="rg-tf"><span>〜</span><input type="time" id="rg-tt"><span style="font-size:12px;color:var(--fg2)">（時間は空なら終日）</span></span></div>
+    <div class="row"><button class="btn" type="button" id="rg-go">入れる</button><span id="rg-msg" style="font-size:13px;color:var(--fg2)"></span></div>
+  </div>
+</div>
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
   {% for week in weeks %}
@@ -128,5 +142,29 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
     alert('保存できませんでした。もう一度お試しください');
   } finally { sel.classList.remove('saving'); }
 }));
+
+(function () {
+  const box = document.getElementById('rg-box'), v = document.getElementById('rg-v'), tm = document.getElementById('rg-tm');
+  document.getElementById('rg-open').addEventListener('click', () => { box.hidden = !box.hidden; });
+  v.addEventListener('change', () => { tm.style.display = v.value === '休' ? '' : 'none'; });
+  document.getElementById('rg-go').addEventListener('click', async () => {
+    const msg = document.getElementById('rg-msg');
+    const a = document.getElementById('rg-from').value, b = document.getElementById('rg-to').value;
+    if (!a || !b || b < a) { msg.textContent = '日にちを、正しく入れてください'; return; }
+    const days = []; for (let d = new Date(a + 'T00:00:00'); d <= new Date(b + 'T00:00:00') && days.length < 63; d.setDate(d.getDate() + 1)) {
+      days.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); }
+    const body = {staff_id: {{ one.id }}, store: v.value};
+    if (v.value === '休') { body.time_from = document.getElementById('rg-tf').value; body.time_to = document.getElementById('rg-tt').value; }
+    let n = 0;
+    try {
+      for (const d of days) {
+        msg.textContent = '保存中… ' + (++n) + '／' + days.length;
+        const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...body, date: d})});
+        const j = await res.json(); if (!res.ok || !j.ok) throw 0;
+      }
+      location.href = '/shift/edit?month=' + a.slice(0, 7) + '&staff={{ one.id }}';
+    } catch (e) { msg.textContent = '途中で保存できませんでした（' + (n - 1) + '日ぶんまで）。もう一度お試しください'; }
+  });
+})();
 </script>
 {% endblock %}

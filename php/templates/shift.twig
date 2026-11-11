@@ -29,6 +29,7 @@
   .cal-bar { font-size: 9pt; background: #fff !important; border: 1px solid #000 !important; border-radius: 0 !important; overflow: visible; white-space: normal; opacity: 1 !important; outline: none !important; }
   .cal-bar.rest { border-style: dashed !important; border-width: 2px !important; font-weight: 700; }
   .cal-legend i { display: none !important; }
+  .cal-nt { display: none !important; }
   .cal-ev { border-left: 3px solid #000 !important; }
 
   .sh-top { margin-bottom: 4mm; }
@@ -58,6 +59,15 @@
 .cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; min-width: 0; }
 .cal-d.sun { color: #c0392b; } .cal-d.sat { color: #2c6fb7; }
 .cal-hol { font-size: 9px; font-weight: 400; color: #c0392b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cal-nt { font-size: 9px; font-weight: 400; color: #8a6d00; margin-left: auto; white-space: nowrap; }
+.nt-box { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 8px; }
+.nt { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 14px; }
+.nt-by { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #fff; background: #8a6d00; border-radius: 6px; padding: 0 6px; }
+.nt-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.nt-del { border: 0; background: transparent; color: var(--fg2); font-size: 16px; cursor: pointer; padding: 0 4px; }
+.nt-form { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.nt-form select, .nt-form input { font-size: 16px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; }
+.nt-form input { flex: 1; min-width: 140px; }
 .cal-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--fg2); margin: 8px 2px; }
 .cal-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 3px; background: var(--acc); }
 .cal-legend i.rich { background: #3b7dd8; } .cal-legend i.off { background: #b5b5b5; }
@@ -120,9 +130,17 @@
         </div>
         {% endif %}{% endfor %}
         {% if not day.any %}<div class="sh-none">出勤はまだ入っていません</div>{% endif %}
+        <div class="nt-box">
+          {% for n in day.notes %}<div class="nt"><span class="nt-by">{{ n.author ?: '—' }}</span><span class="nt-body">{{ n.body }}</span><button type="button" class="nt-del" data-id="{{ n.id }}" aria-label="メモを消す">×</button></div>{% endfor %}
+          <form class="nt-form" data-date="{{ day.date }}">
+            <select class="nt-who">{% for st in staff %}<option value="{{ st.name }}" data-sid="{{ st.id }}">{{ st.name }}</option>{% endfor %}</select>
+            <input class="nt-text" maxlength="300" placeholder="メモ（例: 12時半から出ます）" required>
+            <button type="submit" class="btn btn-sm">書く</button>
+          </form>
+        </div>
       </div>
     </div>
-    <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
+    <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" data-date="{{ day.date }}" style="grid-column:{{ loop.index }};grid-row:1">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}{% if day.notes %}<span class="cal-nt">✎{{ day.notes|length }}</span>{% endif %}</div>
     {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
     {% endfor %}
     {% for b in w.bars %}
@@ -152,13 +170,38 @@
   function show(c) {
     cells.forEach(x => x.classList.toggle('sel', x === c));
     detail.innerHTML = c.querySelector('.cal-detail').innerHTML;
-    paint();
+    paint(); paintWho();
   }
   document.querySelectorAll('.cal-cell[data-date], .cal-d[data-date], .cal-bar[data-date]').forEach(e => e.addEventListener('click', () => { const c = cellOf(e.dataset.date); if (c) show(c); }));
   if (btn) btn.addEventListener('click', () => { list.hidden = !list.hidden; });
   document.querySelectorAll('.ent-name').forEach(a => a.addEventListener('click', () => { try { localStorage.setItem('shift:me', a.dataset.sid); } catch (e) {} }));
+  function paintWho() {
+    detail.querySelectorAll('.nt-who').forEach(sel => { [...sel.options].forEach(o => { if (me !== '' && o.dataset.sid === me) sel.value = o.value; }); });
+  }
+  const post = (url, body) => fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+  detail.addEventListener('submit', async e => {
+    const f = e.target.closest('.nt-form'); if (!f) return;
+    e.preventDefault();
+    const text = f.querySelector('.nt-text').value.trim(); if (!text) return;
+    try {
+      const j = await post('/api/shift/note', {date: f.dataset.date, author: f.querySelector('.nt-who').value, body: text});
+      if (!j.ok) throw 0;
+      location.hash = f.dataset.date; location.reload();
+    } catch (err) { alert('書き込めませんでした。もう一度お試しください'); }
+  });
+  detail.addEventListener('click', async e => {
+    const b = e.target.closest('.nt-del'); if (!b) return;
+    if (!confirm('このメモを消しますか？')) return;
+    const f = detail.querySelector('.nt-form');
+    try {
+      const j = await post('/api/shift/note/delete', {id: +b.dataset.id});
+      if (!j.ok) throw 0;
+      location.hash = f ? f.dataset.date : ''; location.reload();
+    } catch (err) { alert('消せませんでした。もう一度お試しください'); }
+  });
   paint();
-  const t = document.querySelector('.cal-cell.today');
+  const hashDate = (location.hash || '').slice(1);
+  const t = cellOf(hashDate) || document.querySelector('.cal-cell.today');
   if (t) show(t);
 })();
 </script>
