@@ -40,6 +40,7 @@ function twig(): Environment
     $t->addFilter(new TwigFilter('yen', 'yen_fmt'));
     $t->addFilter(new TwigFilter('md', 'md_fmt'));
     $t->addFilter(new TwigFilter('jst', 'jst_fmt'));
+    $t->addFilter(new TwigFilter('time_input', 'shift_time_input'));
     $t->addFilter(new TwigFilter('pctf', 'pct_fmt'));
     $t->addFilter(new TwigFilter('int', static fn($v) => (int)$v));
     $t->addFilter(new TwigFilter('urlencode', static fn($v) => str_replace('%2F', '/', rawurlencode((string)$v))));

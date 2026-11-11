@@ -79,6 +79,13 @@ function shift_time(mixed $v): ?string
     return preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', $v, $m) ? sprintf('%d:%02d', (int)$m[1], (int)$m[2]) : null;
 }
 
+/** HTML time入力は必ず2桁時刻にする。保存済みの9:00も表示できる。 */
+function shift_time_input(mixed $value): string
+{
+    $time = shift_time($value);
+    return $time === null || $time === '' ? '' : str_pad($time, 5, '0', STR_PAD_LEFT);
+}
+
 /** 休みの時間の表示。$short なら「9〜13」のように短く */
 function shift_time_label(?string $from, ?string $to, bool $short): string
 {

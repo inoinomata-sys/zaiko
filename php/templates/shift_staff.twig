@@ -47,7 +47,7 @@
     <span class="lbl">勤務日（チェック＝出勤）</span>
     {% for w in week %}<label>{{ w }}<input type="checkbox" name="work[]" value="{{ loop.index0 }}"{% if loop.index0 not in s.offs %} checked{% endif %}></label>{% endfor %}
     <span class="lbl">勤務時間</span>
-    <div class="st-tm" style="grid-column:1/-1"><label>開始<input type="time" name="work_from" value="{{ s.work_from }}"></label><label>終了<input type="time" name="work_to" value="{{ s.work_to }}"></label></div>
+    <div class="st-tm" style="grid-column:1/-1"><label>開始<input type="time" name="work_from" value="{{ s.work_from|time_input }}"></label><label>終了<input type="time" name="work_to" value="{{ s.work_to|time_input }}"></label></div>
     <button class="btn btn-ghost btn-sm" type="submit">保存</button>
   </form>
 </div>
