@@ -1,59 +1,29 @@
 {% extends 'base.twig' %}
-{% block title %}{{ one.name }}の休み希望{% endblock %}
-{% block head %}
-<style>
-.sh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.sh-top h1 { font-size: 20px; font-weight: 700; }
-.sh-nav { display: flex; align-items: center; gap: 6px; }
-.sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
-.who { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.who a { padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--fg); text-decoration: none; font-size: 14px; }
-.who a.on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 700; }
-.eo-hint { font-size: 12px; color: var(--fg2); margin-bottom: 8px; }
-.cal { max-width: 1000px; margin: 0 auto; }
-.cal-head, .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-.cal-head div { text-align: center; font-size: 12px; font-weight: 700; padding: 4px 0; color: var(--fg2); }
-.cal-head .sun { color: #c0392b; } .cal-head .sat { color: #2c6fb7; }
-.cal-week { margin-bottom: 2px; }
-.cal-cell { min-width: 0; min-height: 78px; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px; display: flex; flex-direction: column; gap: 2px; }
-.cal-cell.blank { background: transparent; border-color: transparent; }
-.cal-cell.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
-.cal-d { font-size: 13px; font-weight: 700; display: flex; align-items: baseline; gap: 3px; }
-.cal-d.sun { color: #c0392b; } .cal-d.sat { color: #2c6fb7; }
-.cal-hol { font-size: 9px; font-weight: 400; color: #c0392b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.cal-cell select { width: 100%; min-width: 0; flex: 1; border: 1px solid var(--border); border-radius: 6px; background: #fafafa; font-size: 12px; font-family: inherit; padding: 0; text-align-last: center; }
-.cal-cell select.v-イノ { background: #fbe3ec; font-weight: 700; }
-.cal-cell select.v-リッチ { background: #e3f0fb; font-weight: 700; }
-.cal-cell select.v-休 { background: #eee; color: #777; }
-.cal-cell select.v-dflt { background: #f3f3f3; color: #888; }
-.tm-btn { border: 1px solid var(--border); background: #fff; border-radius: 6px; font-size: 10px; padding: 1px 0; font-family: inherit; color: var(--fg2); cursor: pointer; }
-.tm-btn[hidden] { display: none; }
-.tm-btn.set { background: #fff3a8; color: var(--fg); font-weight: 700; }
-.tp { background: #fff; border: 1px solid var(--acc); border-radius: 12px; padding: 12px; margin: 12px 0; }
-.tp[hidden] { display: none; }
-.tp h3 { font-size: 15px; margin: 0 0 8px; }
-.tp .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.tp input[type=time] { font-size: 18px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
-.tp .hint { font-size: 12px; color: var(--fg2); margin-top: 6px; }
-.rg { margin-bottom: 10px; }
-.rg-btn { font-size: 13px; padding: 6px 14px; border: 1px solid var(--acc); border-radius: 999px; background: #fff; color: var(--acc); font-family: inherit; font-weight: 600; cursor: pointer; }
-#rg-box { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
-#rg-box .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-#rg-box input, #rg-box select { font-size: 16px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; }
-.cal-cell select.saving { opacity: .5; }
-.cal-cell select.err { outline: 2px solid #b3261e; }
-</style>
-{% endblock %}
+{% block title %}{{ one.name }}の勤務登録{% endblock %}
+{% block head %}<style>
+.sh-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px;margin:20px 0}.sh-top h1{font-size:22px}
+.sh-nav{display:flex;align-items:center;gap:12px}.sh-nav a{display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--border);border-radius:50%;font-size:24px;background:#fff}
+.who{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px}.who a{flex-shrink:0;padding:9px 14px;border:1px solid var(--border);border-radius:12px;color:var(--fg)}.who a.on{background:var(--acc);color:#fff}
+.eo-hint{font-size:13px;line-height:1.8;color:var(--fg2);margin:12px 0 18px}
+.cal{max-width:1000px;margin:18px auto}.cal-head,.cal-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.cal-head div{text-align:center;color:var(--fg2);font-size:12px;padding:8px 0}.cal-week{margin-bottom:4px}
+.cal-cell{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:5px;min-width:0;min-height:88px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 4px;color:var(--fg);font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.cal-cell.blank{background:#fafafa;border-color:transparent;cursor:default}.cal-cell.today{border:2px solid var(--gold);padding:5px 3px}.cal-cell.set{background:#f4f4f4}.cal-cell:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.cal-d{font-size:14px;font-weight:600}.sun{color:#b64c43!important}.sat{color:#526f89!important}.cal-hol{font-size:9px;color:#b64c43}.day-value{font-size:11px;line-height:1.5}.day-time{font-size:10px;color:var(--fg2)}
+.rg{margin-bottom:12px}.rg-btn{padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:white;font:inherit;color:var(--fg)}
+#rg-box{border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:10px}#rg-box .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}#rg-box input,#rg-box select{min-width:0;max-width:100%;font:inherit;padding:10px;border:1px solid var(--border);border-radius:8px;background:white}
+.edit-dialog{width:calc(100% - 24px);max-width:460px;max-height:90dvh;margin:auto;padding:22px;border:1px solid var(--border);border-radius:20px;overflow-y:auto;color:var(--fg);background:#fff}
+.edit-dialog::backdrop{background:#0006}.edit-dialog h2{font-size:20px;margin:0 0 20px}.edit-dialog fieldset{border:0;padding:0;margin:0 0 18px}.edit-dialog legend,.field-label{font-size:13px;font-weight:600;margin-bottom:9px;display:block}
+.edit-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.edit-options label{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 3px;background:#f5f5f5;border:1px solid #ddd;border-radius:12px;font-size:14px}.edit-options label:has(input:checked){background:#faf6eb;border-color:var(--gold)}.edit-options input{accent-color:var(--acc);width:20px;height:20px}
+.edit-dialog select{width:100%;padding:12px;font-size:16px}.edit-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 12px}.edit-times label{min-width:0;font-size:13px;color:var(--fg2)}
+.edit-times input{display:block;appearance:none;-webkit-appearance:none;width:100%;min-width:0;max-width:100%;height:50px;margin-top:7px;font-size:19px;font-family:inherit;padding:10px 6px;background:#fff;color:var(--fg);border:1px solid var(--border);border-radius:10px;box-sizing:border-box}.edit-times input::-webkit-date-and-time-value{min-width:0;text-align:left}.edit-times input::-webkit-datetime-edit{padding:0}
+.edit-note{font-size:12px;color:var(--fg2);line-height:1.8;margin:12px 0}.edit-actions{display:flex;gap:10px;margin-top:20px}.edit-actions button{flex:1;justify-content:center;padding:14px;font-size:16px}.edit-error{font-size:13px;color:var(--danger);line-height:1.7}
+[hidden]{display:none!important}@media(max-width:360px){.cal-head,.cal-week{gap:2px}.cal-cell{padding:5px 2px}.edit-dialog{padding:18px}}
+</style>{% endblock %}
 {% block content %}
-<p style="margin-bottom:8px"><a href="/shift?month={{ nav.month }}">← 出勤スケジュールにもどる</a></p>
-<div class="sh-top">
-  <h1>{{ one.name }}　休み希望</h1>
-  <div class="sh-nav"><a href="/shift/edit?month={{ nav.prev }}&staff={{ one.id }}">‹</a><b>{{ nav.label }}</b><a href="/shift/edit?month={{ nav.next }}&staff={{ one.id }}">›</a></div>
-</div>
-<div class="who">
-  {% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on"{% endif %}>{{ s.name }}</a>{% endfor %}
-</div>
-<p class="eo-hint">出勤する日は店舗を選び、「勤務時間」から開始・終了を設定できます。定休日でも店舗を選べば、その日だけ出勤にできます。休みは「休み希望」を選び、一部だけ休む場合は時間を設定してください。選ぶとすぐ保存されます。出勤の時間を空にすると、スタッフの基本時間を使います。</p>
+<p><a href="/shift?month={{ nav.month }}">← 出勤一覧にもどる</a></p>
+<div class="sh-top"><h1>{{ one.name }}の勤務登録</h1><div class="sh-nav"><a aria-label="前の月" href="/shift/edit?month={{ nav.prev }}&staff={{ one.id }}">‹</a><b>{{ nav.label }}</b><a aria-label="次の月" href="/shift/edit?month={{ nav.next }}&staff={{ one.id }}">›</a></div></div>
+<div class="who">{% for s in staff %}<a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}"{% if s.id == one.id %} class="on" aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</div>
+<p class="eo-hint">日付を押して、出勤・休みと時間を設定します。「保存」を押すまで変更されません。定休日も「出勤」を選んで登録できます。</p>
 <div class="rg">
   <button type="button" class="rg-btn" id="rg-open">連休をまとめて入れる ▾</button>
   <div id="rg-box" hidden>
@@ -63,88 +33,39 @@
     <div class="row"><button class="btn" type="button" id="rg-go">入れる</button><span id="rg-msg" style="font-size:13px;color:var(--fg2)"></span></div>
   </div>
 </div>
-<div class="cal">
-  <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
-  {% for week in weeks %}
-  <div class="cal-week">
-    {% for day in week %}
-    {% if day %}
-    <div class="cal-cell{% if day.today %} today{% endif %}">
-      <div class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</div>
-      <select class="v-{{ day.v }}{% if day.dflt %} v-dflt{% endif %}" data-sid="{{ one.id }}" data-date="{{ day.date }}" data-prev="{{ day.v }}" data-tf="{{ day.tf }}" data-tt="{{ day.tt }}"{% if day.dflt %} data-dflt="1"{% endif %}>
-        <option value=""{% if day.v == '' %} selected{% endif %}>{% if day.dflt %}休(定休){% else %}－{% endif %}</option>
-        <option value="イノ"{% if day.v == 'イノ' %} selected{% endif %}>イノ</option>
-        <option value="リッチ"{% if day.v == 'リッチ' %} selected{% endif %}>リッチ</option>
-        <option value="休"{% if day.v == '休' %} selected{% endif %}>休み希望</option>
-      </select>
-      <button type="button" class="tm-btn" data-date="{{ day.date }}" data-label="{{ day.d }}"{% if day.v == '' %} hidden{% endif %}>{{ day.time_s ?: (day.v == '休' ? '休みの時間' : '勤務時間') }}</button>
-    </div>
-    {% else %}<div class="cal-cell blank"></div>{% endif %}
-    {% endfor %}
-  </div>
-  {% endfor %}
-</div>
-<div class="tp" id="tp" hidden>
-  <h3 id="tp-title">休みの時間</h3>
-  <div class="row"><input type="time" id="tp-from"><span>から</span><input type="time" id="tp-to"><span id="tp-kind">まで 休み</span></div>
-  <div class="row"><button class="btn" type="button" id="tp-save">保存</button><button class="btn btn-ghost" type="button" id="tp-clear">時間指定を外す</button><button class="btn btn-ghost" type="button" id="tp-close">閉じる</button></div>
-  <div class="hint">出勤は空なら基本の勤務時間、休みは空なら終日休みになります。開始・終了の片方だけでも指定できます。</div>
-</div>
-
+<div class="cal"><div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
+{% for week in weeks %}<div class="cal-week">{% for day in week %}{% if day %}
+<button type="button" class="cal-cell{% if day.today %} today{% endif %}{% if day.v %} set{% endif %}" data-date="{{ day.date }}" data-store="{{ day.v }}" data-tf="{{ day.tf|time_input }}" data-tt="{{ day.tt|time_input }}" data-off="{{ day.dflt ? '1' : '0' }}" aria-label="{{ day.date }}の勤務を編集">
+<span class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}">{{ day.d }}</span>{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}
+<span class="day-value">{{ day.v == '休' ? '休み' : (day.v ?: (day.dflt ? '定休' : '基本')) }}</span><span class="day-time">{{ day.time_s }}</span></button>
+{% else %}<div class="cal-cell blank"></div>{% endif %}{% endfor %}</div>{% endfor %}</div>
+<dialog id="day-editor" class="edit-dialog" aria-labelledby="edit-title"><form id="day-form">
+<h2 id="edit-title">勤務の登録</h2><fieldset><legend>勤務の種類</legend><div class="edit-options"><label><input type="radio" name="kind" value="base">基本設定</label><label><input type="radio" name="kind" value="work">出勤</label><label><input type="radio" name="kind" value="off">休み</label></div></fieldset>
+<div id="work-store"><label class="field-label" for="edit-store">勤務する店舗</label><select id="edit-store"><option>イノ</option><option>リッチ</option></select></div>
+<div id="time-area"><div class="edit-times"><label>開始<input type="time" id="edit-from"></label><label>終了<input type="time" id="edit-to"></label></div><p class="edit-note" id="time-note"></p><button type="button" class="btn btn-ghost btn-sm" id="time-reset">時間指定を外す</button></div>
+<p id="edit-error" class="edit-error" role="alert"></p><div class="edit-actions"><button type="button" class="btn btn-ghost" id="edit-cancel">キャンセル</button><button type="submit" class="btn btn-primary" id="edit-save">保存</button></div>
+</form></dialog>
 {% endblock %}
-{% block scripts %}
-<script>
-const tp = document.getElementById('tp');
-let tpSel = null, tpBtn = null;
-const compact = t => (t || '').replace(/:00$/, '');
-function tmLabel(tf, tt) { return (tf || tt) ? compact(tf) + '〜' + compact(tt) : ''; }
-function paintTm(sel) {
-  const btn = sel.parentElement.querySelector('.tm-btn');
-  btn.hidden = sel.value === '';
-  const l = tmLabel(sel.dataset.tf, sel.dataset.tt);
-  btn.textContent = l || (sel.value === '休' ? '休みの時間' : '勤務時間'); btn.classList.toggle('set', !!l);
-}
-document.querySelectorAll('.cal-cell select').forEach(sel => paintTm(sel));
-document.querySelectorAll('.tm-btn').forEach(btn => btn.addEventListener('click', () => {
-  tpSel = btn.parentElement.querySelector('select'); tpBtn = btn;
-  document.getElementById('tp-title').textContent = '{{ nav.label|slice(5) }}' + btn.dataset.label + '日　{{ one.name }}　' + (tpSel.value === '休' ? '休みの時間' : '勤務時間');
-  document.getElementById('tp-kind').textContent = tpSel.value === '休' ? 'まで 休み' : 'まで 出勤';
-  document.getElementById('tp-from').value = (tpSel.dataset.tf || '').padStart(5, '0');
-  document.getElementById('tp-to').value = (tpSel.dataset.tt || '').padStart(5, '0');
-  tp.hidden = false; tp.scrollIntoView({block: 'center', behavior: 'smooth'});
-}));
-async function saveTime(tf, tt) {
-  const sel = tpSel; if (!sel) return;
-  try {
-    const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: sel.value, time_from: tf, time_to: tt})});
-    const j = await res.json(); if (!res.ok || !j.ok) throw 0;
-    sel.dataset.tf = tf; sel.dataset.tt = tt; paintTm(sel); tp.hidden = true;
-  } catch (e) { alert('保存できませんでした。もう一度お試しください'); }
-}
-document.getElementById('tp-save').addEventListener('click', () => saveTime(document.getElementById('tp-from').value, document.getElementById('tp-to').value));
-document.getElementById('tp-clear').addEventListener('click', () => saveTime('', ''));
-document.getElementById('tp-close').addEventListener('click', () => { tp.hidden = true; });
-document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListener('change', async () => {
-  const v = sel.value;
-  sel.classList.add('saving'); sel.classList.remove('err');
-  try {
-    const res = await fetch('/api/shift', {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({staff_id: +sel.dataset.sid, date: sel.dataset.date, store: v})});
-    const j = await res.json();
-    if (!res.ok || !j.ok) throw 0;
-    sel.className = v ? 'v-' + v : '';
-    if (!v && sel.dataset.dflt) { sel.classList.add('v-dflt'); }
-    sel.dataset.prev = v;
-    sel.dataset.tf = ''; sel.dataset.tt = '';
-    tp.hidden = true;
-    paintTm(sel);
-  } catch (e) {
-    sel.value = sel.dataset.prev; sel.classList.add('err');
-    alert('保存できませんでした。もう一度お試しください');
-  } finally { sel.classList.remove('saving'); }
-}));
-
+{% block scripts %}<script>
+(() => {
+ const dialog=document.getElementById('day-editor'),form=document.getElementById('day-form'),store=document.getElementById('edit-store'),from=document.getElementById('edit-from'),to=document.getElementById('edit-to'),error=document.getElementById('edit-error'),save=document.getElementById('edit-save');
+ let active=null,busy=false;
+ const kind=()=>form.querySelector('input[name=kind]:checked').value;
+ const pad=v=>v ? v.padStart(5,'0') : '';
+ const home={{ one.home_store|tojson|raw }};
+ function fields(){const k=kind();document.getElementById('work-store').hidden=k!=='work';document.getElementById('time-area').hidden=k==='base';document.getElementById('time-note').textContent=k==='off'?'空欄なら終日休み。時間を入れると、その時間だけ休みです。':'空欄なら基本の勤務時間を使います。出勤できる時間だけ指定することもできます。';}
+ document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>cell.addEventListener('click',()=>{active=cell;const v=cell.dataset.store;form.querySelector('input[value="'+(v==='休'?'off':v?'work':'base')+'"]').checked=true;store.value=v&&v!=='休'?v:home;from.value=pad(cell.dataset.tf);to.value=pad(cell.dataset.tt);error.textContent='';document.getElementById('edit-title').textContent=cell.dataset.date.replaceAll('-','/')+' の勤務';fields();dialog.showModal();}));
+ form.querySelectorAll('[name=kind]').forEach(r=>r.addEventListener('change',()=>{from.value='';to.value='';error.textContent='';fields();}));
+ document.getElementById('time-reset').addEventListener('click',()=>{from.value='';to.value='';});
+ document.getElementById('edit-cancel').addEventListener('click',()=>{if(!busy)dialog.close();});
+ dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+ form.addEventListener('submit',async event=>{event.preventDefault();if(busy||!active)return;const k=kind(),v=k==='base'?'':k==='off'?'休':store.value;const tf=k==='base'?'':from.value,tt=k==='base'?'':to.value;if(tf&&tt&&tt<=tf){error.textContent='終了は開始より後の時間を選んでください。';return;}
+ busy=true;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);save.textContent='保存中…';error.textContent='';
+ try{const res=await fetch('/api/shift',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({staff_id:{{ one.id }},date:active.dataset.date,store:v,time_from:tf,time_to:tt})});const j=await res.json();if(!res.ok||!j.ok)throw new Error();active.dataset.store=v;active.dataset.tf=tf;active.dataset.tt=tt;active.classList.toggle('set',v!=='');active.querySelector('.day-value').textContent=v==='休'?'休み':v||(active.dataset.off==='1'?'定休':'基本');active.querySelector('.day-time').textContent=tf||tt?tf+'〜'+tt:'';dialog.close();toast('保存しました');}
+ catch(e){error.textContent='保存できませんでした。内容はそのままなので、もう一度保存してください。';}
+ finally{busy=false;form.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);save.textContent='保存';}
+ });
+})();
 (function () {
   const box = document.getElementById('rg-box'), v = document.getElementById('rg-v'), tm = document.getElementById('rg-tm');
   document.getElementById('rg-open').addEventListener('click', () => { box.hidden = !box.hidden; });
@@ -168,5 +89,4 @@ document.querySelectorAll('.cal-cell select').forEach(sel => sel.addEventListene
     } catch (e) { msg.textContent = '途中で保存できませんでした（' + (n - 1) + '日ぶんまで）。もう一度お試しください'; }
   });
 })();
-</script>
-{% endblock %}
+</script>{% endblock %}
