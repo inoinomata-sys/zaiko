@@ -95,10 +95,9 @@ function h_menu(): void
 }
 
 /** 店舗予定の月間カレンダー。出勤シフトとは別の予定だけを表示する。 */
-function h_schedule(): void
+function schedule_calendar(DateTimeImmutable $first): array
 {
     ensure_schedule_tables();
-    $first = shift_month($_GET['month'] ?? null);
     $rules = schedule_rules_for_period($first, $first->modify('last day of this month'));
     $days = [];
     foreach (shift_days($first) as $day) {
@@ -107,11 +106,19 @@ function h_schedule(): void
         $day['closed'] = (int)$day['dow'] === 1;
         $days[] = $day;
     }
-    ensure_staff_line_tables();
-    $sharing = sl_settings('store');
-    render('schedule', ['nav' => shift_nav($first), 'weeks' => shift_weeks($days),
-        'line_enabled' => (bool)$sharing['enabled'] && !empty(sl_config()['delivery_enabled']),
-        'line_auto' => $sharing['mode'] === 'auto']);
+    return ['nav' => shift_nav($first), 'weeks' => shift_weeks($days)];
+}
+
+function h_schedule(): void
+{
+    render('schedule', schedule_calendar(shift_month($_GET['month'] ?? null)));
+}
+
+function h_schedule_pdf(): void
+{
+    require_once __DIR__ . '/schedule_pdf.php';
+    $first = shift_month($_GET['month'] ?? null);
+    respond_pdf(build_schedule_pdf(schedule_calendar($first)), '店舗予定_' . $first->format('Y-m') . '.pdf', true);
 }
 
 function h_schedule_rules(): void

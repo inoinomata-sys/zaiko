@@ -25,7 +25,7 @@
   .cal-ev { border-left: 3px solid #000 !important; }
 
 }
-.sc-sharing{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin:12px 0}.sc-sharing p{font-size:13px;margin:5px 0 0;color:var(--fg2)}.sc-state{font-size:12px;margin-left:8px;background:#f3eee0;padding:3px 8px;border-radius:999px}.sc-hint{font-size:13px;color:var(--fg2);margin:12px 0}.cal-d{text-decoration:none;color:inherit;min-height:28px}.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.sc-hint{font-size:13px;color:var(--fg2);margin:12px 0}.cal-d{text-decoration:none;color:inherit;min-height:28px}.sc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .sc-top h1 { font-size: 20px; font-weight: 700; }
 .sh-nav { display: flex; align-items: center; gap: 6px; }
 .sh-nav a { padding: 7px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--fg); text-decoration: none; }
@@ -67,10 +67,6 @@
  .cal-d {font-size:14px;font-weight:600;min-height:30px;padding:4px 5px;line-height:1.5}
  .cal-hol {font-size:10px}
  .cal-cell.sel {background:#f8f1df;border-color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold)}
- .sc-sharing {padding:16px 18px;border-radius:16px;margin:0 0 16px;flex-wrap:wrap}
- .sc-sharing strong {font-size:14px;font-weight:600}
- .sc-state {background:var(--soft);color:var(--fg)}
- .sc-sharing p {line-height:1.8}
 
  .sc-hint {line-height:1.8;margin-bottom:16px}
  .sh-bar {gap:12px;margin:0 0 18px}
@@ -93,8 +89,6 @@
   .cal-cell {border-radius:6px}
   .cal-d {font-size:13px;padding:3px 2px;min-height:27px;flex-wrap:wrap;gap:0 2px}
   .cal-hol {font-size:9px;max-width:100%}
-  .sc-sharing {padding:14px;gap:10px}
-  .sc-sharing p {font-size:12px}
   .sh-detail {padding:14px 10px}
  }
 }
@@ -129,7 +123,6 @@
 <p class="back-link" style="margin-bottom:8px"><a href="/">← 総合管理にもどる</a></p>
 <div class="sc-top"><h1>店舗スケジュール</h1>
   <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}" aria-label="前の月">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}" aria-label="次の月">›</a></div></div>
-<div class="sc-sharing no-print"><div><strong>LINE自動送信</strong> <span class="sc-state">{{ line_enabled ? (line_auto ? '自動配信中' : '承認して配信') : '準備中' }}</span><p>月〜金 夜20:00に翌日分 ／ 金曜は日月の予定も共有</p></div></div>
 <p class="sc-hint no-print">日付を押すと、その日の予定を追加できます。出勤予定は別のカレンダーで管理します。</p>
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
@@ -150,4 +143,24 @@
 <p class="no-print" style="margin:16px 0 30px"><a class="btn" href="/schedule/add" style="display:block;text-align:center">＋ 予定追加</a><a href="/schedule/rules" style="display:block;text-align:center;margin-top:14px">繰り返し予定・登録済みの予定を管理</a></p>
 {% endblock %}
 
-{% block scripts %}<script>document.querySelectorAll('[data-add-url]').forEach(cell=>cell.addEventListener('click',e=>{if(!e.target.closest('a,button,input,select'))location.href=cell.dataset.addUrl;}));</script>{% endblock %}
+{% block scripts %}<script>document.querySelectorAll('[data-add-url]').forEach(cell=>cell.addEventListener('click',e=>{if(!e.target.closest('a,button,input,select'))location.href=cell.dataset.addUrl;}));
+// ホーム画面から開いたiPhoneでも、共有シートからプリントできるようにする。
+const printLink = document.getElementById('schedule-print');
+if (printLink && navigator.canShare && navigator.share) {
+  const pdfUrl = printLink.href;
+  const filename = '店舗予定_{{ nav.month }}.pdf';
+  const fileType = {type: 'application/pdf'};
+  if (navigator.canShare({files: [new File([], filename, fileType)]})) {
+    fetch(pdfUrl).then(async response => {
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/pdf')) return;
+      const file = new File([await response.blob()], filename, fileType);
+      if (!navigator.canShare({files: [file]})) return;
+      printLink.addEventListener('click', async event => {
+        event.preventDefault();
+        try { await navigator.share({files: [file]}); }
+        catch (error) { if (error.name !== 'AbortError') location.assign(pdfUrl); }
+      });
+    }).catch(() => {}); // 準備前や通信失敗時は通常のPDFリンクを使う。
+  }
+}
+</script>{% endblock %}

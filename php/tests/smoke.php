@@ -338,7 +338,9 @@ ok((int)db_val("SELECT COUNT(*) FROM price_items WHERE name = 'V3 エキサイ�
 [$st] = http('GET', '/menu');
 ok($st === 302, '/menu は、トップの画面に移す', "status={$st}");
 page_ok('/schedule');
-page_ok('/schedule?month=2026-11', 'sc-closed');
+$storeCalendar = page_ok('/schedule?month=2026-11', 'href="/schedule/pdf?month=2026-11"');
+ok(!str_contains($storeCalendar, 'LINE自動送信'), '店舗カレンダーにLINE配信の枠を表示しない');
+pdf_ok('/schedule/pdf?month=2026-11', ['2026年11月', '店舗スケジュール', '店休日', 'ゴミ出し']);
 $NO_ADMIN = true;
 [$st] = http('GET', '/settings/line');
 ok($st === 302, 'LINE設定: 鍵がかかっている（合言葉の画面へ）', "status={$st}");
