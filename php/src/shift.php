@@ -773,7 +773,7 @@ function h_shift_customer_print(bool $asPdf = false): void
     }
     if ($asPdf) {
         require_once __DIR__ . '/shift_pdf.php';
-        respond_pdf(build_shift_customer_pdf($data), 'イノ_お休みカレンダー_' . $first->format('Y-m') . '.pdf', true);
+        respond_pdf(build_shift_customer_pdf($data), 'イノ_お休みカレンダー_' . $first->format('Y-m') . '.pdf', !isset($_GET['download']));
     }
     render('shift_customer_print', $data);
 }
