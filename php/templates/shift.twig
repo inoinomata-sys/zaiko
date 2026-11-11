@@ -229,7 +229,7 @@
 <a href="/shift?month={{ nav.month }}&view=all"{% if view == 'all' %} aria-current="page"{% endif %}>出勤スケジュール</a>
 <a href="/shift?month={{ nav.month }}&view=changes"{% if view != 'all' %} aria-current="page"{% endif %}>休みスケジュール</a>
 </div>
-<p class="shift-view-hint no-print">{% if view == 'all' %}出勤する人と勤務店舗を表示します。休みは「休みスケジュール」で確認できます。日付を押すと勤務時間も確認できます。{% else %}個別に登録した休みを表示します。通常の勤務日・定休日は表示しません。{% endif %}</p>
+<p class="shift-view-hint no-print">{% if view == 'all' %}勤務日に登録した休みは「名前＋休み」で表示します。日付を押すと勤務時間を確認できます。{% else %}個別に登録した休みを表示します。通常の勤務日・定休日は表示しません。{% endif %}</p>
 <div class="sh-bar">
   <div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}</div>
   <span style="display:flex;gap:6px">{% if staff %}<button type="button" id="ent-btn" class="ent-btn" aria-expanded="false" aria-controls="ent-list">出勤・休みを登録／変更 ▾</button>{% endif %}</span>

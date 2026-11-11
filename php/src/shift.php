@@ -357,7 +357,7 @@ function shift_calendar_entry(array $staff, array $day, ?array $entry, string $v
         if ($entry['store'] !== SHIFT_OFF) { return $entry; }
         if (shift_is_default_off($staff, $day)) { return null; }
         $hours = shift_remaining_hours($staff, $entry);
-        if ($hours === '') { return null; }
+        if ($hours === '') { return $entry; }
         return array_replace($entry, ['store' => $staff['home_store'], 'work_hours' => $hours, 'partial_off' => true]);
     }
     $off = shift_is_default_off($staff, $day);

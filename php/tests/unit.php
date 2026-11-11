@@ -133,7 +133,7 @@ check('変更表示 通常勤務を補完しない', shift_calendar_entry($staff
 check('変更表示 定休を補完しない', shift_calendar_entry($staffExample, $offDay, null, 'changes'), null);
 check('全員表示 基本の店で出勤', shift_calendar_entry($staffExample, $workDay, null, 'all')['store'], 'イノ');
 check('出勤表示 定休は載せない', shift_calendar_entry($staffExample, $offDay, null, 'all'), null);
-check('出勤表示 個別の休みも載せない', shift_calendar_entry($staffExample, $workDay, ['store' => SHIFT_OFF], 'all'), null);
+check('出勤表示 勤務日に登録した休みを表示', shift_calendar_entry($staffExample, $workDay, ['store' => SHIFT_OFF], 'all'), ['store' => SHIFT_OFF]);
 $customEntry = ['store' => 'リッチ', 'changed' => true, 'tf' => '', 'tt' => ''];
 check('全員表示 個別変更が優先', shift_calendar_entry($staffExample, $offDay, $customEntry, 'all'), $customEntry);
 check('休み表示 出勤変更は表示しない', shift_calendar_entry($staffExample, $workDay, $customEntry, 'changes'), null);
@@ -158,7 +158,7 @@ check('一部休み 中抜けは前後の勤務', shift_remaining_hours($partSta
 check('一部休み 午後は休み', shift_remaining_hours($partStaff,['tf'=>'15:00','tt'=>'']), '09:00〜15:00');
 check('一部休み 出勤側に勤務店舗を残す', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'all')['store'], 'イノ');
 check('一部休み 休み表示は元の時間', shift_calendar_entry($partStaff,['dow'=>6],$partEntry,'changes')['tt'], '10:00');
-check('一部休み 基本勤務全部を休むと出勤なし', shift_calendar_entry($partStaff,['dow'=>6],['store'=>SHIFT_OFF,'tf'=>'9:00','tt'=>'17:00'],'all'), null);
+check('一部休み 基本勤務全部を休むと出勤なし', shift_calendar_entry($partStaff,['dow'=>6],['store'=>SHIFT_OFF,'tf'=>'9:00','tt'=>'17:00'],'all')['store'], SHIFT_OFF);
 check('勤務表現 終了だけ', shift_work_note('', '14:00'), '14時まで出勤');
 check('勤務表現 開始だけ', shift_work_note('13:00', ''), '13時から出勤');
 check('勤務表現 両方', shift_work_note('09:30', '14:00'), '9時30分〜14時出勤');
