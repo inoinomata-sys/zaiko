@@ -21,6 +21,30 @@ table.se { border-collapse: separate; border-spacing: 0; }
 .se select.v-dflt { background: #f3f3f3; color: #888; }
 .se select.saving { opacity: .5; }
 .se select.err { outline: 2px solid #b3261e; }
+.se .nm a{display:block;color:var(--fg);font-weight:600}
+.se .home-store{display:block;font-size:11px;font-weight:400;color:var(--fg2)}
+.se select.v-イノ,.se select.v-リッチ{background:#f5f3ec;color:#333}
+.se select.v-休{background:#f4f4f4;color:#a34444}
+.se select.v-dflt{background:#f8f8f8;color:#777}
+.se-day-nav{display:none}
+@media(max-width:600px){
+ .se-top{flex-wrap:wrap;gap:16px;margin:18px 0}
+ .se-top h1{font-size:22px}.sh-nav{width:100%;justify-content:space-between}
+ .sh-nav a{min-width:42px;min-height:42px;display:grid;place-items:center;padding:0}
+ .se-hint{font-size:13px;line-height:1.8}
+ .se-day-nav{display:flex;align-items:center;gap:10px;margin:18px 0 12px}
+ .se-day-nav button{min-width:44px;min-height:44px;border:1px solid var(--border);border-radius:10px;background:white;color:var(--fg);font-size:24px}
+ .se-day-nav button:disabled{opacity:.35}
+ .se-day-nav select{flex:1;min-width:0;height:44px;background:#fff;font:inherit;border:1px solid var(--border);border-radius:10px;padding:8px}
+ .se-wrap{max-height:70vh;border-radius:14px}
+ table.se{width:100%;table-layout:fixed}
+ .se .mobile-out{display:none}
+ .se .nm{min-width:0;max-width:none;width:28%;padding:10px 8px;white-space:normal}
+ .se thead th{min-width:0;padding:10px 3px;height:58px;box-sizing:border-box;font-size:14px}
+ .se select{width:100%;min-width:0;max-width:100%;height:62px;font-size:13px;padding:8px 2px;text-align-last:center;border-radius:0}
+ .se .nm a{font-size:15px}.se .home-store{font-size:11px;margin-top:3px}
+ .se thead th.today{background:#f7f1de}
+}
 </style>
 {% endblock %}
 {% block content %}
@@ -31,19 +55,20 @@ table.se { border-collapse: separate; border-spacing: 0; }
 </div>
 <p class="se-hint">選ぶと、すぐ保存されます。名前を押すと、日別の勤務時間も設定できます。定休日も店舗を選べば出勤にできます。</p>
 {% if staff %}
+<div class="se-day-nav" aria-label="表示する日付"><button type="button" id="se-prev" aria-label="前の2日">‹</button><select id="se-day" aria-label="表示開始日">{% for day in days %}<option value="{{ loop.index0 }}">{{ day.d }}日（{{ day.w }}）{% if day.hol %} {{ day.hol }}{% endif %}</option>{% endfor %}</select><button type="button" id="se-next" aria-label="次の2日">›</button></div>
 <div class="se-wrap">
 <table class="se">
   <thead><tr><th class="nm">名前</th>
-    {% for day in days %}<th class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}{% if day.today %} today{% endif %}"{% if day.hol %} title="{{ day.hol }}"{% endif %}>{{ day.d }}<br>{{ day.w }}{% if day.hol %}<br><span style="font-size:9px;font-weight:400">祝</span>{% endif %}</th>{% endfor %}
+    {% for day in days %}<th data-day="{{ loop.index0 }}" data-today="{{ day.today ? 1 : 0 }}" class="{% if day.sun %}sun{% elseif day.sat %}sat{% endif %}{% if day.today %} today{% endif %}"{% if day.hol %} title="{{ day.hol }}"{% endif %}>{{ day.d }}<br>{{ day.w }}{% if day.hol %}<br><span style="font-size:9px;font-weight:400">祝</span>{% endif %}</th>{% endfor %}
   </tr></thead>
   <tbody>
   {% for s in staff %}
-    <tr><th class="nm"><a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a><span style="font-weight:400;color:var(--fg2);font-size:11px"> {{ s.home_store }}</span></th>
+    <tr><th class="nm"><a href="/shift/edit?month={{ nav.month }}&staff={{ s.id }}">{{ s.name }}</a><span class="home-store">{{ s.home_store }}</span></th>
     {% for day in days %}
       {% set v = cells[s.id][day.date] %}
       {% set dd = dflt[s.id][day.date] %}
-      <td><select class="v-{{ v }}{% if dd %} v-dflt{% endif %}" data-sid="{{ s.id }}" data-date="{{ day.date }}" data-prev="{{ v }}"{% if dd %} data-dflt="1"{% endif %}>
-        <option value=""{% if v == '' %} selected{% endif %}>{% if dd %}休(定休){% else %}－{% endif %}</option>
+      <td data-day="{{ loop.index0 }}"><select aria-label="{{ s.name }} {{ day.d }}日（{{ day.w }}）の勤務" class="v-{{ v }}{% if dd %} v-dflt{% endif %}" data-sid="{{ s.id }}" data-date="{{ day.date }}" data-prev="{{ v }}"{% if dd %} data-dflt="1"{% endif %}>
+        <option value=""{% if v == '' %} selected{% endif %}>{% if dd %}定休{% else %}基本・{{ s.home_store }}{% endif %}</option>
         <option value="イノ"{% if v == 'イノ' %} selected{% endif %}>イノ</option>
         <option value="リッチ"{% if v == 'リッチ' %} selected{% endif %}>リッチ</option>
         <option value="休"{% if v == '休' %} selected{% endif %}>休</option>
@@ -60,6 +85,25 @@ table.se { border-collapse: separate; border-spacing: 0; }
 {% endblock %}
 {% block scripts %}
 <script>
+const dayPicker=document.getElementById('se-day');
+if(dayPicker){
+ const last=dayPicker.options.length-1;
+ const today=document.querySelector('thead [data-today="1"]');
+ const previous=document.getElementById('se-prev'),next=document.getElementById('se-next');
+ function showDays(index){
+  index=Math.max(0,Math.min(last,index));
+  dayPicker.value=String(index);
+  document.querySelectorAll('.se [data-day]').forEach(cell=>{
+   const day=Number(cell.dataset.day);
+   cell.classList.toggle('mobile-out',day<index||day>index+1);
+  });
+  previous.disabled=index===0;next.disabled=index+1>=last;
+ }
+ dayPicker.addEventListener('change',()=>showDays(Number(dayPicker.value)));
+ previous.addEventListener('click',()=>showDays(Number(dayPicker.value)-2));
+ next.addEventListener('click',()=>showDays(Number(dayPicker.value)+2));
+ showDays(today?Number(today.dataset.day):0);
+}
 document.querySelectorAll('.se select').forEach(sel => sel.addEventListener('change', async () => {
   const v = sel.value;
   sel.classList.add('saving'); sel.classList.remove('err');
