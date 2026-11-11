@@ -167,6 +167,12 @@ check('勤務表現 終了だけ', shift_work_note('', '14:00'), '14時まで出
 check('勤務表現 開始だけ', shift_work_note('13:00', ''), '13時から出勤');
 check('勤務表現 両方', shift_work_note('09:30', '14:00'), '9時30分〜14時出勤');
 check('勤務表現 指定なし', shift_work_note('', ''), '');
+$customerStaff=['name'=>'スタッフ','off_days'=>'0,1','home_store'=>'イノ','work_from'=>'9:00','work_to'=>'17:00'];
+check('お客様休み表 通常の休み', shift_customer_holiday($customerStaff,['dow'=>0],null)['full'], true);
+check('お客様休み表 休日出勤は休みに載せない', shift_customer_holiday($customerStaff,['dow'=>0],['store'=>'イノ','tf'=>'','tt'=>'']), null);
+check('お客様休み表 一部休み', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'休','tf'=>'9:00','tt'=>'10:00'])['note'], '9〜10時休み');
+check('お客様休み表 短縮勤務', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'イノ','tf'=>'','tt'=>'14:00'])['note'], '14時まで出勤');
+check('お客様休み表 12か月分のテーマ', count(shift_customer_themes()), 12);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

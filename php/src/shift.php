@@ -672,3 +672,65 @@ function h_api_shift_note_delete(): void
     run('DELETE FROM shift_notes WHERE id = ?', [(int)$d['id']]);
     respond_json(['ok' => true]);
 }
+
+/** お客様向けには勤務に必要な名前・時間だけを出し、社内メモ・理由は取得しない。 */
+function shift_customer_holiday(array $staff, array $day, ?array $entry): ?array
+{
+    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    if ($entry === null) { return $off ? ['name'=>$staff['name'], 'note'=>'', 'full'=>true] : null; }
+    if ($entry['store'] === SHIFT_OFF) {
+        $time = shift_time_label($entry['tf'], $entry['tt'], true);
+        return ['name'=>$staff['name'], 'note'=>$time === '' ? '' : $time . '時休み', 'full'=>$time === ''];
+    }
+    $changes = shift_difference($staff, $day, $entry);
+    if (in_array('時間変更', $changes, true)) {
+        return ['name'=>$staff['name'], 'note'=>shift_work_note($entry['tf'], $entry['tt']), 'full'=>false];
+    }
+    return null;
+}
+
+function shift_customer_themes(): array
+{
+    return [
+        1=>['en'=>'January','name'=>'梅と新春','color'=>'#9b5960','soft'=>'#f8eff0','motif'=>'plum'],
+        2=>['en'=>'February','name'=>'椿','color'=>'#8c5958','soft'=>'#f7f0ef','motif'=>'camellia'],
+        3=>['en'=>'March','name'=>'ミモザ','color'=>'#998132','soft'=>'#faf6e8','motif'=>'mimosa'],
+        4=>['en'=>'April','name'=>'桜','color'=>'#aa7887','soft'=>'#fcf0f3','motif'=>'cherry'],
+        5=>['en'=>'May','name'=>'新緑','color'=>'#66806a','soft'=>'#eff5ef','motif'=>'leaves'],
+        6=>['en'=>'June','name'=>'紫陽花','color'=>'#8582a5','soft'=>'#f0eff8','motif'=>'hydrangea'],
+        7=>['en'=>'July','name'=>'七夕と星','color'=>'#6a8495','soft'=>'#eef4f8','motif'=>'stars'],
+        8=>['en'=>'August','name'=>'向日葵','color'=>'#a38a49','soft'=>'#fcf7e9','motif'=>'sunflower'],
+        9=>['en'=>'September','name'=>'月とすすき','color'=>'#988763','soft'=>'#f7f4ec','motif'=>'moon'],
+        10=>['en'=>'October','name'=>'金木犀','color'=>'#ab8053','soft'=>'#faf3e9','motif'=>'osmanthus'],
+        11=>['en'=>'November','name'=>'紅葉','color'=>'#9c7060','soft'=>'#f8f0eb','motif'=>'maple'],
+        12=>['en'=>'December','name'=>'冬の枝と雪','color'=>'#66827e','soft'=>'#edf4f2','motif'=>'winter'],
+    ];
+}
+
+function h_shift_customer_print(): void
+{
+    ensure_shift_tables();
+    $first = shift_month($_GET['month'] ?? null);
+    $store = (string)($_GET['store'] ?? 'イノ');
+    if (!in_array($store, SHIFT_STORES, true)) { throw new HttpError(400); }
+    $staff = array_values(array_filter(shift_staff_list(), static fn($s) => $s['home_store'] === $store));
+    $entries = shift_entries_of($first);
+    $days = shift_days($first);
+    foreach ($days as &$day) {
+        $day['holidays'] = [];
+        foreach ($staff as $person) {
+            $entry = $entries[(int)$person['id']][$day['date']] ?? null;
+            // 別店舗へ勤務する日も、この店舗ではお休みとして案内する。
+            if ($entry !== null && $entry['store'] !== SHIFT_OFF && $entry['store'] !== $store) {
+                $day['holidays'][] = ['name'=>$person['name'], 'note'=>'', 'full'=>true];
+                continue;
+            }
+            $item = shift_customer_holiday($person, $day, $entry);
+            if ($item !== null) { $day['holidays'][] = $item; }
+        }
+    }
+    unset($day);
+    $month = (int)$first->format('n');
+    render('shift_customer_print', ['nav'=>shift_nav($first), 'year'=>$first->format('Y'), 'month_number'=>$month,
+        'store'=>$store, 'stores'=>SHIFT_STORES, 'theme'=>shift_customer_themes()[$month], 'weeks'=>shift_weeks($days)]);
+}

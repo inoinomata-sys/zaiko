@@ -435,6 +435,8 @@ $sid = (int)db_val("SELECT id FROM shift_staff WHERE name='テスト太郎'");
 $m = date('Y-m');
 page_ok('/shift/edit?month=' . $m, 'テスト花子');
 page_ok('/shift?month=2026-05', 'こどもの日');
+page_ok('/shift/customer-print?month=2026-11&store=' . rawurlencode('イノ'), 'A5横で印刷');
+page_ok('/shift/customer-print?month=2027-03&store=' . rawurlencode('リッチ'), 'March');
 page_ok('/shift?month=2026-05', '振替休日');
 page_ok('/shift?month=2026-09', '国民の休日');
 page_ok('/shift?month=2027-03', '振替休日');

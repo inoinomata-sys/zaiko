@@ -125,6 +125,7 @@ function routes(): array
         ['GET', '/shift/edit', 'h_shift_edit'],
         ['GET', '/shift/log', 'h_shift_log'],
         ['GET', '/shift/default', 'h_shift_default'],
+        ['GET', '/shift/customer-print', 'h_shift_customer_print'],
         ['POST', '/api/shift/note', 'h_api_shift_note'],
         ['POST', '/api/shift/note/delete', 'h_api_shift_note_delete'],
         ['POST', '/api/shift', 'h_api_shift'],

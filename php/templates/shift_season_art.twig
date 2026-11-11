@@ -1,0 +1,17 @@
+<svg viewBox="0 0 180 100" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.2">
+{% if theme.motif in ['plum','camellia','cherry','osmanthus'] %}
+<path d="M25 100Q70 65 150 15M62 78L55 42M104 48L148 58"/>
+{% for point in [[55,42],[92,53],[145,18],[145,58]] %}{% set x = point[0] %}{% set y = point[1] %}<g transform="translate({{ x }} {{ y }})">{% for angle in (theme.motif == 'camellia' ? [0,45,90,135,180,225,270,315] : (theme.motif == 'osmanthus' ? [0,90,180,270] : [0,72,144,216,288])) %}<ellipse cx="0" cy="-7" rx="5" ry="8" transform="rotate({{ angle }})" fill="{{ theme.soft }}"/>{% endfor %}<circle r="2.5" fill="currentColor"/></g>{% endfor %}
+{% elseif theme.motif in ['leaves','winter','maple'] %}
+<path d="M40 100Q90 65 140 5M73 75L45 32M105 45L150 47"/>{% for point in [[61,61,-35],[80,71,40],[97,42,-30],[121,31,45],[139,44,70]] %}{% set x = point[0] %}{% set y = point[1] %}{% set a = point[2] %}<path d="{{ theme.motif == 'maple' ? 'M0 0-12-9-5-10-11-21-2-16 0-31 4-17 13-23 7-11 14-10Z' : (theme.motif == 'winter' ? 'M0 0V-30M0-5-9-15M0-10 10-21M0-16-7-25' : 'M0 0Q-14 -18 0 -28Q14 -18 0 0') }}" transform="translate({{ x }} {{ y }}) rotate({{ a }})" fill="{{ theme.soft }}"/>{% endfor %}{% if theme.motif == 'winter' %}<path d="M158 70v16m-8-8h16m-14-6 12 12m0-12-12 12"/>{% endif %}
+{% elseif theme.motif == 'mimosa' %}
+<path d="M50 100L120 10M76 66L44 40M94 43L142 38"/>{% for point in [[44,39],[51,48],[62,47],[77,61],[83,47],[95,33],[105,23],[116,12],[128,37],[141,35]] %}{% set x = point[0] %}{% set y = point[1] %}<circle cx="{{ x }}" cy="{{ y }}" r="6" fill="currentColor" stroke="none" opacity=".6"/>{% endfor %}
+{% elseif theme.motif == 'hydrangea' %}
+{% for point in [[80,45],[100,32],[117,48],[100,62],[65,60],[125,67]] %}{% set x = point[0] %}{% set y = point[1] %}<g transform="translate({{ x }} {{ y }})">{% for a in [0,90,180,270] %}<ellipse cy="-5" rx="4" ry="6" transform="rotate({{ a }})" fill="{{ theme.soft }}"/>{% endfor %}</g>{% endfor %}<path d="M99 76L90 100M94 87Q120 76 128 85Q110 104 94 87"/>
+{% elseif theme.motif == 'stars' %}
+<path d="M58 0v32m45-32v48m43-48v22"/>{% for point in [[58,42],[103,58],[146,32],[135,83]] %}{% set x = point[0] %}{% set y = point[1] %}<path d="m0-8 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" transform="translate({{ x }} {{ y }})" fill="{{ theme.soft }}"/>{% endfor %}
+{% elseif theme.motif == 'sunflower' %}
+<g transform="translate(108 47)">{% for a in [0,30,60,90,120,150,180,210,240,270,300,330] %}<ellipse cy="-23" rx="6" ry="15" transform="rotate({{ a }})" fill="{{ theme.soft }}"/>{% endfor %}<circle r="13"/><circle r="9" stroke-dasharray="2 3"/></g><path d="M108 83v17"/>
+{% elseif theme.motif == 'moon' %}
+<circle cx="118" cy="35" r="22" fill="{{ theme.soft }}"/><path d="M35 100Q36 60 55 45M48 100Q58 62 81 54M59 100Q82 78 98 76"/>{% for point in [[51,48],[77,57],[94,78]] %}{% set x = point[0] %}{% set y = point[1] %}<ellipse cx="{{ x }}" cy="{{ y }}" rx="3" ry="12" transform="rotate(35 {{ x }} {{ y }})"/>{% endfor %}
+{% endif %}</svg>
