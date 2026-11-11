@@ -679,7 +679,7 @@ function shift_customer_holiday(array $staff, array $day, ?array $entry): ?array
     $off = in_array((int)$day['dow'], shift_off_days($staff), true);
     if ($entry === null) { return $off ? ['name'=>$staff['name'], 'note'=>'', 'full'=>true] : null; }
     if ($entry['store'] === SHIFT_OFF) {
-        $time = shift_time_label($entry['tf'], $entry['tt'], true);
+        $time = shift_time_label(shift_time($entry['tf']), shift_time($entry['tt']), true);
         return ['name'=>$staff['name'], 'note'=>$time === '' ? '' : $time . '時休み', 'full'=>$time === ''];
     }
     $changes = shift_difference($staff, $day, $entry);
