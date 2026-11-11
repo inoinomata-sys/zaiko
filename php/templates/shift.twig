@@ -249,7 +249,7 @@
     {% else %}<div class="cal-cell blank" style="grid-column:{{ loop.index }};grid-row:1 / -1"></div>{% endif %}
     {% endfor %}
     {% for b in w.bars %}
-    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}{% if b.difference %} exception{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + (view == 'all' ? 3 : 2) }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small>{% for tag in b.difference %}<small class="cal-change-tag">{{ tag }}</small>{% endfor %}{% if b.time and b.store != '休' %}<small class="cal-change-time">{{ b.time }}</small>{% endif %}</div>
+    <div class="cal-bar {{ b.store == '休' ? 'rest' : 'work' }}{% if b.dflt %} dflt{% endif %}{% if b.help %} help{% endif %}{% if b.difference %} exception{% endif %}" data-date="{{ b.date }}" data-sid="{{ b.id }}" style="--c:{{ b.color }};grid-column:{{ b.c }} / span {{ b.n }};grid-row:{{ b.r + (view == 'all' ? 3 : 2) }}"><span class="cal-person">{{ b.name }}</span><small class="cal-location">{% if b.store == '休' %}休み{% if b.time %} {{ b.time }}{% endif %}{% else %}{{ b.store }}{% if b.help %}・ヘルプ{% endif %}{% endif %}</small>{% for tag in b.difference %}{% if not (tag == '休み' and b.store == '休') and not (tag == 'ヘルプ' and b.help) %}<small class="cal-change-tag">{{ tag }}</small>{% endif %}{% endfor %}{% if b.time and b.store != '休' %}<small class="cal-change-time">{{ b.time }}</small>{% endif %}</div>
     {% endfor %}
   </div>
   {% endfor %}
