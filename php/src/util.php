@@ -327,7 +327,7 @@ function login_page(string $user, string $error = ''): void
         . 'form{width:min(88vw,360px);background:#fff;border-radius:14px;padding:24px 20px;box-shadow:0 2px 14px rgba(0,0,0,.08)}'
         . 'h1{font-size:18px;margin:0 0 16px}input{width:100%;box-sizing:border-box;font-size:17px;padding:12px;margin:0 0 12px;border:1px solid #e2e7ed;border-radius:10px}'
         . 'button{width:100%;font-size:17px;font-weight:700;padding:13px;border:0;border-radius:10px;background:#435366;color:#fff}'
-        . '.e{color:#b3261e;font-size:14px;margin:0 0 12px}</style></head><body>'
+        . '.e{color:#b3261e;font-size:14px;margin:0 0 12px}@media screen {body,button,input,select,textarea {text-shadow:-.25px -.25px 0 #b79850,.25px -.25px 0 #b79850,-.25px .25px 0 #b79850,.25px .25px 0 #b79850}}</style></head><body>'
         . '<form method="post" action="/login"><h1>INO.inc 在庫管理</h1>' . $e
         . '<input name="user" value="' . $u . '" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="ID" required>'
         . '<input name="pass" type="password" autocomplete="current-password" placeholder="パスワード" required>'
