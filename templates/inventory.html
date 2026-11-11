@@ -92,14 +92,7 @@
   <button class="chip" data-f="shortage">不足<span class="num">{{ counts.shortage }}</span></button>
 </div>
 
-<details class="notice">
-  <summary>数えた時は、数を入れて<b>「確認」</b>を押す</summary>
-  <div style="margin-top:6px">
-    <b>＋／－</b>は使った・補充した時の数量変更です（「最終更新」が変わります）。<br>
-    実際に数えた時は、数を入れて<b>「確認」</b>を押すと確認日時が記録されます。<br>
-    「未確認」は数えた記録がない商品です。在庫がなかった時は「?」のまま「確認」を押すと 0 で記録されます。
-  </div>
-</details>
+
 
 {% for cat, prods in grouped.items() %}
 <div class="card cat-card" data-cat="{{ cat }}" style="margin-bottom:12px">
