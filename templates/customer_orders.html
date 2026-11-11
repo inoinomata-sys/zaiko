@@ -5,15 +5,16 @@
 <style>
 .o-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--fg); }
 .o-row:last-child { border-bottom: none; }
-.o-row:hover { background: #fff4d6; text-decoration: none; color: var(--fg); }
+.o-row:hover { background: #f8f6f0; text-decoration: none; color: var(--fg); }
 .o-name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .o-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
-.o-row.done { background: #f1f8f2; }
-.o-done { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #2e8b57; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
-.o-todo { display: inline-block; font-size: 12px; font-weight: 700; color: #b8531a; border: 1px solid #e0a070; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
-.o-part { display: inline-block; font-size: 12px; font-weight: 700; color: #7a5a00; background: #fff1c2; border: 1px solid #e3c66a; border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
-.o-ready { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #3b7dd8; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
-.o-hand { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: #7a7a7a; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+.o-row.done { background: #fafaf8; }
+.o-done,.o-todo,.o-part,.o-ready,.o-hand { display:inline-block;font-size:12px;font-weight:500;line-height:1.6;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;white-space:nowrap;color:#56534c;background:#fff; }
+.o-done {background:#f1f1ee;border-color:#d6d5ce;color:#555750}
+.o-todo {background:#fff;border-color:#b5a57e;color:#655c48}
+.o-part {background:#f7f4ec;border-color:#d3c7a8;color:#655c48}
+.o-ready {background:#eceeea;border-color:#ced2c9;color:#4d554b}
+.o-hand {background:#f1f1f1;border-color:#d4d4d4;color:#666}
 .o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
 .o-tabs button { flex: 1; padding: 9px 0; font-size: 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--card, #fff); color: var(--fg); font-family: inherit; }
 .o-tabs button.on { background: var(--acc); color: #fff; border-color: transparent; font-weight: 700; }

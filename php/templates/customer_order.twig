@@ -14,10 +14,10 @@
 .slip .sub { font-size: 12px; color: var(--fg2); }
 .slip .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; font-size: 14px; }
 .slip .sum strong { font-size: 26px; }
-.ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #e0a070; color: #b8531a; background: #fff; font-family: inherit; cursor: pointer; }
-.ord-chip.on { background: #2e8b57; border-color: #2e8b57; color: #fff; }
+.ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #b5a57e; color: #655c48; background: #fff; font-family: inherit; cursor: pointer; }
+.ord-chip.on { background: #eceeea; border-color: #ced2c9; color: #4d554b; }
 .st-btn { flex: 1; padding: 14px 8px; font-size: 17px; font-weight: 700; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); font-family: inherit; cursor: pointer; }
-.st-btn.on { background: #2e8b57; border-color: #2e8b57; color: #fff; }
+.st-btn.on { background: #eceeea; border-color: #ced2c9; color: #4d554b; }
 .act { display: flex; gap: 8px; flex-wrap: wrap; max-width: 640px; margin: 0 auto; }
 .act .btn { flex: 1 1 140px; justify-content: center; text-align: center; padding: 12px; font-size: 16px; }
 </style>
@@ -79,7 +79,7 @@ function showOrdered() {
   const all = chips(), n = all.length, k = all.filter(c => c.classList.contains('on')).length;
   const st = document.getElementById('ord-state'), btn = document.getElementById('ord-btn');
   st.textContent = k === n ? '✔ 全部発注済み' : k ? '一部発注 ' + k + '／' + n + ' 品（残り ' + (n - k) + ' 品）' : '未発注（' + n + ' 品）';
-  st.style.color = k === n ? '#2e8b57' : k ? '#7a5a00' : '#b8531a';
+  st.style.color = k === n ? '#4d554b' : '#655c48';
   btn.textContent = k === n ? '全部を未発注に戻す' : '✔ 未発注の ' + (n - k) + ' 品を、発注済みに確定する';
   btn.className = 'btn ' + (k === n ? 'btn-ghost' : 'btn-primary');
 }
