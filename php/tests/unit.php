@@ -135,7 +135,8 @@ check('全員表示 基本の店で出勤', shift_calendar_entry($staffExample, 
 check('全員表示 定休日は休み', shift_calendar_entry($staffExample, $offDay, null, 'all')['store'], SHIFT_OFF);
 $customEntry = ['store' => 'リッチ', 'changed' => true, 'tf' => '', 'tt' => ''];
 check('全員表示 個別変更が優先', shift_calendar_entry($staffExample, $offDay, $customEntry, 'all'), $customEntry);
-check('変更表示 個別登録を維持', shift_calendar_entry($staffExample, $workDay, $customEntry, 'changes'), $customEntry);
+check('休み表示 出勤変更は表示しない', shift_calendar_entry($staffExample, $workDay, $customEntry, 'changes'), null);
+check('休み表示 個別の休みは表示する', shift_calendar_entry($staffExample, $workDay, ['store' => SHIFT_OFF], 'changes'), ['store' => SHIFT_OFF]);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

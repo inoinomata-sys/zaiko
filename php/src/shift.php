@@ -313,7 +313,10 @@ function shift_week_bars(array $row, array $staff): array
 /** 通常設定は全員表示でだけ補完し、個別登録を常に優先する。 */
 function shift_calendar_entry(array $staff, array $day, ?array $entry, string $view): ?array
 {
-    if ($entry !== null || $view !== 'all') {
+    if ($view !== 'all') {
+        return $entry !== null && $entry['store'] === SHIFT_OFF ? $entry : null;
+    }
+    if ($entry !== null) {
         return $entry;
     }
     $off = in_array((int)$day['dow'], shift_off_days($staff), true);
@@ -326,7 +329,7 @@ function h_shift(): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
-    $view = ($_GET['view'] ?? '') === 'all' ? 'all' : 'changes';
+    $view = ($_GET['view'] ?? '') === 'changes' ? 'changes' : 'all';
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
     $days = shift_days($first);

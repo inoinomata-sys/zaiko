@@ -440,7 +440,7 @@ page_ok('/shift?month=' . $m, '休み希望を入れる');
 [$st] = http('GET', '/shift/edit?staff=999999');
 ok($st === 404, 'シフト: いないスタッフの入力画面は 404');
 page_ok('/shift/edit?month=' . $m, '休(定休)');
-[$st, $calendar] = http('GET', '/shift?month=' . $m);
+[$st, $calendar] = http('GET', '/shift?month=' . $m . '&view=changes');
 ok($st === 200 && !preg_match('/class="cal-bar (?:rest|work)/', $calendar), 'シフト: 通常の勤務日・定休はカレンダーに自動表示しない');
 [$st, $fullCalendar] = http('GET', '/shift?month=' . $m . '&view=all');
 ok($st === 200 && str_contains($fullCalendar, 'class="cal-bar work dflt') && str_contains($fullCalendar, 'class="cal-bar rest dflt'), 'シフト: 全員表示は基本の出勤と定休を補完する');
