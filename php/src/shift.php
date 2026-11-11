@@ -548,7 +548,12 @@ function h_shift_staff_toggle(int $id): void
 {
     require_admin();
     ensure_shift_tables();
-    run('UPDATE shift_staff SET is_active = 1 - is_active WHERE id = ?', [$id]);
+    if (isset($_POST['is_active'])) {
+        if (!in_array((string)$_POST['is_active'], ['0', '1'], true)) { throw new HttpError(400); }
+        run('UPDATE shift_staff SET is_active = ? WHERE id = ?', [(int)$_POST['is_active'], $id]);
+    } else {
+        run('UPDATE shift_staff SET is_active = 1 - is_active WHERE id = ?', [$id]);
+    }
     redirect_to('/settings/staff');
 }
 
