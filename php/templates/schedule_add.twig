@@ -8,7 +8,7 @@
 <h1 style="margin-top:20px">この日だけの予定を追加</h1><p class="once-note">日付は選択済みです。予定名を入れて保存してください。</p>
 <form class="once-card" method="post" action="/schedule/add" onsubmit="this.querySelector('button[type=submit]').disabled=true">
 <input type="hidden" name="form_key" value="{{ form_key }}">
-<label class="once-share"><input type="checkbox" name="is_closure" id="is-closure">店休日として登録（正月休み・夏季休暇など）</label>
+<label class="once-share"><input type="checkbox" name="is_closure" id="is-closure">店休日として登録</label>
 <label for="once-date">開始日</label><input id="once-date" type="date" name="once_date" value="{{ date }}" required>
 <div id="closure-end" hidden><label for="end-date">終了日</label><input type="date" id="end-date" name="end_date" value="{{ date }}"><p class="once-note">開始日から終了日までを店休日として登録します。</p></div>
 <label for="once-title">予定名</label><input id="once-title" name="title" placeholder="例：ミーティング、大掃除" maxlength="80" required autofocus>
