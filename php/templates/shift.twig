@@ -52,7 +52,6 @@
 .cal-bar { z-index: 2; align-self: start; margin: 1px 3px; padding: 1px 5px; font-size: 11px; line-height: 1.35; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; background: var(--c); border: 1px solid var(--c); cursor: pointer; min-width: 0; }
 .cal-bar.work { background: #fff; color: var(--c); }
 .cal-bar.dflt { opacity: .4; }
-.cal-bar.me { outline: 2px solid #e0a020; outline-offset: 1px; }
 .cal-cell.blank { background: transparent; border-color: transparent; cursor: default; }
 .cal-cell.today { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
 .cal-cell.sel { background: #fffbe8; box-shadow: 0 0 0 2px #e0a020; }
@@ -81,7 +80,6 @@
 .sh-store.off { background: #9a9a9a; }
 .sh-people { flex: 1; display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .sh-p { font-size: 15px; }
-.sh-p.me { background: #fff3a8; border-radius: 6px; padding: 0 5px; font-weight: 700; }
 .sh-tag { font-size: 11px; border-radius: 5px; padding: 0 5px; margin-left: 3px; vertical-align: 1px; }
 .sh-tag.help { background: #e8f0fe; color: #1a56b0; border: 1px solid #b9cdf5; }
 .sh-tag.chg { background: #fde8e8; color: #b3261e; border: 1px solid #f2b8b5; }
@@ -148,7 +146,6 @@
  .cal-cell {min-height:94px}
  .cal-bar {font-size:12px;line-height:1.65;padding:2px 5px;margin:2px 3px;border-radius:5px}
  .cal-bar.dflt {opacity:1;border-style:dashed}
- .cal-bar.me {outline:2px solid #686868;outline-offset:1px;font-weight:700}
  .cal-nt {color:#686868}
  @media(max-width:560px){.cal-cell{min-height:90px}.cal-bar{font-size:11px;line-height:1.6;padding:1px 2px;margin:2px 1px}}
 }
@@ -163,11 +160,9 @@
  .cal-bar,.cal-bar.work,.cal-bar.rest {background:#f4f4f4;color:#3d3d3d;border:1px solid #c9c9c9}
  .cal-bar.dflt {border-style:dashed}
  .cal-bar.help {background:#fbf7ed;border-color:var(--gold);color:#5e4c26}
- .cal-bar.me {outline:none;box-shadow:inset 0 0 0 1px #666;border-color:#666}
  .sh-store.rich,.sh-store.off {background:#707070}
  .sh-tag.help {background:#f5f1e7;border-color:var(--border);color:#5e4c26}
  .sh-tag.chg {background:#f0f0f0;border-color:#ccc;color:#4b4b4b}
- .sh-p.me {background:#f5f1e7}
 }
 .cal-bar {white-space:normal;overflow-wrap:anywhere;text-overflow:clip}
 .cal-person {display:block;font-weight:600}
@@ -200,7 +195,6 @@
 @media(min-width:700px){.cal-people .cal-bar{font-size:13px;padding:6px}.cal-counts b{display:inline}.cal-counts{font-size:12px}.cal-counts span{display:inline-block;margin-right:10px}}
 /* 名前と店舗名は同じ文字サイズ・行間でそろえる。 */
 .cal-people .cal-person,.cal-people .cal-location {font-size:10px;font-weight:400;line-height:1.6}
-.cal-people .cal-bar.me .cal-person {font-weight:400}
 @media(min-width:700px){.cal-people .cal-person,.cal-people .cal-location{font-size:12px}}
 .ent-btn{min-height:48px;padding:12px 16px;font-size:14px;line-height:1.5}
 .ent-list{gap:10px;margin:4px 0 20px}.ent-name{min-height:48px;display:flex;align-items:center;justify-content:center;padding:12px}
@@ -308,13 +302,10 @@
   const cellOf = d => cells.find(x => x.dataset.date === d);
   let me = '';
   try { me = localStorage.getItem('shift:me') || ''; } catch (e) {}
-  function paint() {
-    document.querySelectorAll('.cal-bar, .sh-p').forEach(p => p.classList.toggle('me', me !== '' && p.dataset.sid === me));
-  }
   function show(c) {
     cells.forEach(x => x.classList.toggle('sel', x === c));
     detail.innerHTML = c.querySelector('.cal-detail').innerHTML;
-    paint(); paintWho();
+    paintWho();
   }
   document.querySelectorAll('.cal-cell[data-date], .cal-d[data-date], .cal-bar[data-date], .cal-counts[data-date]').forEach(e => e.addEventListener('click', () => { const c = cellOf(e.dataset.date); if (c) show(c); }));
   if (btn) btn.addEventListener('click', () => { list.hidden = !list.hidden; btn.setAttribute('aria-expanded', String(!list.hidden)); });
@@ -343,7 +334,6 @@
       location.hash = f ? f.dataset.date : ''; location.reload();
     } catch (err) { alert('消せませんでした。もう一度お試しください'); }
   });
-  paint();
   const hashDate = (location.hash || '').slice(1);
   const t = cellOf(hashDate) || document.querySelector('.cal-cell.today');
   if (t) show(t);
