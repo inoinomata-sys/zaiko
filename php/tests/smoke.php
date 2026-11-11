@@ -451,7 +451,7 @@ page_ok('/shift/edit?month=' . $m, '休(定休)');
 [$st, $calendar] = http('GET', '/shift?month=' . $m . '&view=changes');
 ok($st === 200 && !preg_match('/class="cal-bar (?:rest|work)/', $calendar), 'シフト: 通常の勤務日・定休はカレンダーに自動表示しない');
 [$st, $fullCalendar] = http('GET', '/shift?month=' . $m . '&view=all');
-ok($st === 200 && str_contains($fullCalendar, 'class="cal-bar work dflt') && str_contains($fullCalendar, 'class="cal-bar rest dflt'), 'シフト: 全員表示は基本の出勤と定休を補完する');
+ok($st === 200 && str_contains($fullCalendar, 'class="cal-bar work dflt') && !str_contains($fullCalendar, 'class="cal-bar rest'), 'シフト: 出勤表示は勤務だけを補完し休みを載せない');
 ok(str_contains($fullCalendar, '&view=all'), 'シフト: 月移動でも表示モードを維持する');
 [$st, $j] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => 'リッチ']);
 ok($st === 200 && ($j['ok'] ?? false), 'シフト: 入れられる（イノの人がリッチへ）', json_encode($j, JSON_UNESCAPED_UNICODE));
@@ -461,7 +461,7 @@ ok($st === 200 && db_val("SELECT prev_store FROM shift_entries WHERE staff_id={$
 page_ok('/shift?month=' . $m, '変更');
 [$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => '休', 'time_from' => '9:00', 'time_to' => '13:00']);
 ok($st === 200 && db_val("SELECT time_from FROM shift_entries WHERE staff_id={$sid}") === '9:00' && db_val("SELECT time_to FROM shift_entries WHERE staff_id={$sid}") === '13:00', 'シフト: 休みの時間を入れられる');
-page_ok('/shift?month=' . $m, '9:00〜13:00だけ休み');
+page_ok('/shift?month=' . $m . '&view=changes', '9:00〜13:00だけ休み');
 [$st] = api('/api/shift', ['staff_id' => $sid, 'date' => $m . '-10', 'store' => '休', 'time_from' => '25:99', 'time_to' => '']);
 ok($st === 400, 'シフト: 変な時刻は断る');
 $extraDate = $m . '-11';

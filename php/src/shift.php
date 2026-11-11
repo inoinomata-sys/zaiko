@@ -324,10 +324,11 @@ function shift_calendar_entry(array $staff, array $day, ?array $entry, string $v
         return $entry !== null && $entry['store'] === SHIFT_OFF ? $entry : null;
     }
     if ($entry !== null) {
-        return $entry;
+        return $entry['store'] === SHIFT_OFF ? null : $entry;
     }
     $off = in_array((int)$day['dow'], shift_off_days($staff), true);
-    return ['store' => $off ? SHIFT_OFF : $staff['home_store'], 'changed' => false,
+    if ($off) { return null; }
+    return ['store' => $staff['home_store'], 'changed' => false,
         'tf' => '', 'tt' => '', 'default' => true];
 }
 
