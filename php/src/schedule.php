@@ -96,6 +96,7 @@ function h_schedule(): void
     foreach (shift_days($first) as $day) {
         $d = new DateTimeImmutable($day['date'], new DateTimeZone('Asia/Tokyo'));
         $day['events'] = schedule_on($rules, $d);
+        $day['closed'] = (int)$day['dow'] === 1;
         $days[] = $day;
     }
     ensure_staff_line_tables();
