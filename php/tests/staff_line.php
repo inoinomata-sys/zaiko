@@ -150,7 +150,7 @@ expect(count($calls) === 0, 'approval mode never sends without approval');
 $j = row("SELECT * FROM staff_line_jobs WHERE stream = 'store'");
 expect($j['state'] === 'pending' && str_contains($j['body'],'店舗清掃') && !str_contains($j['body'],'花子'), 'separate store preview queued');
 expect(str_starts_with($j['body'], "こんばんは🌙\n\n本日も一日お疲れ様でございました。\n\n明日以降の店舗スケジュールをお知らせいたします📅\n\n")
-    && str_ends_with($j['body'], "\n\nいつもありがとうございます"), 'daily message includes the requested greeting and closing once per schedule');
+    && str_ends_with($j['body'], "\n\nいつもありがとうございます🙏"), 'daily message includes the requested greeting and closing once per schedule');
 run("UPDATE staff_line_jobs SET body = '旧文面', state = 'ready' WHERE id = ?", [$j['id']]);
 $updated = sl_refresh(row('SELECT * FROM staff_line_jobs WHERE id = ?', [$j['id']]), sl_settings('store'));
 expect($updated['body'] === $j['body'] && $updated['state'] === 'pending', 'unsent older wording is refreshed for review');

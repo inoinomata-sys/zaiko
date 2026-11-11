@@ -143,7 +143,7 @@ function sl_text(array $snapshot, ?array $before = null, string $stream = 'store
     if ($stream === 'store' && $before === null) {
         array_unshift($lines, 'こんばんは🌙', '', '本日も一日お疲れ様でございました。', '', '明日以降の店舗スケジュールをお知らせいたします📅', '');
         $lines[] = '';
-        $lines[] = 'いつもありがとうございます';
+        $lines[] = 'いつもありがとうございます🙏';
     }
     return implode("\n", $lines);
 }
