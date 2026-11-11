@@ -66,11 +66,14 @@ function h_admin_unlock(): void
         }
         // オーナーの指定：正しい番号、または、番号を3回まちがえた時（10分のうちに）、鍵が開く
         $fails = (int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]);
-        if ($right || $fails >= ADMIN_MAX_FAILS) {
+        if ($right || ($next !== '/settings/line' && $fails >= ADMIN_MAX_FAILS)) {
             run('DELETE FROM admin_fail');
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
             if ($right) {
+                if ($next === '/settings/line') {
+                    setcookie('zline_entry', line_registration_key('entry', time()+60), ['expires' => time()+60, 'path' => '/settings/line', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
+                }
                 redirect_to($next);
             }
             render('admin_unlock', ['next' => $next, 'error' => '', 'unset' => false, 'win' => true]);   // 「正解！」を見せてから開く

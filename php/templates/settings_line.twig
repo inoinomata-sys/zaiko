@@ -15,7 +15,7 @@
 <h1 style="font-size:20px;font-weight:700;margin-bottom:8px">LINE（業者さん）</h1>
 {% if msg %}<div class="warn" style="background:#eef6ff;border-color:#b9cdf5;color:#1a3d7a">{{ msg }}</div>{% endif %}
 {% if ready %}
-<form method="post" action="/settings/line/import" style="margin-bottom:12px"><button class="btn btn-ghost" type="submit">友だちを取り込む</button></form>
+<form method="post" action="/settings/line/import" style="margin-bottom:12px"><input type="hidden" name="line_registration_key" value="{{ line_registration_key }}"><button class="btn btn-ghost" type="submit">友だちを取り込む</button></form>
 {% endif %}
 {% if not ready %}
 <div class="warn">まだ、LINE とつながっていません。公式LINEで Messaging API を使えるようにして、シークレットとトークンを、サーバーの設定（config.php）に入れると、つながります。</div>
@@ -26,7 +26,7 @@
   <div class="n">{{ c.display_name ?: '（名前なし）' }}</div>
   <div class="m">最後の発言：{{ c.last_text ?: '—' }}（{{ c.last_at }}）</div>
   <form method="post" action="/settings/line/assign">
-    <input type="hidden" name="user_id" value="{{ c.user_id }}">
+    <input type="hidden" name="line_registration_key" value="{{ line_registration_key }}"><input type="hidden" name="user_id" value="{{ c.user_id }}">
     <select name="supplier">
       <option value="">仕入先を選ぶ</option>
       {% for s in supplier_names %}<option value="{{ s }}"{% if c.supplier == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
@@ -38,3 +38,5 @@
 <p style="color:var(--fg2);margin:20px 0">まだ誰も出ていません。</p>
 {% endfor %}
 {% endblock %}
+
+{% block scripts %}<script>window.addEventListener('pageshow', e => { if(e.persisted) location.replace('/settings/line'); });</script>{% endblock %}

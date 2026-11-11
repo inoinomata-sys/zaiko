@@ -114,6 +114,17 @@ check('管理者鍵 期限切れ', admin_cookie_ok('pw1', admin_cookie_value('pw
 check('管理者鍵 合言葉が未設定なら開かない', admin_cookie_ok('', admin_cookie_value('', time() + 600)), false);
 check('管理者鍵 次の画面は、自分のサイトの中だけ', admin_next('//evil.example.com'), '/settings');
 check('管理者鍵 次の画面(正常)', admin_next('/settings/line'), '/settings/line');
+$GLOBALS['CONFIG']['admin_pass'] = 'unit-line-registration';
+$_COOKIE['zadmin'] = 'unit-settings-unlocked';
+check('LINE登録 設定解除のみでは入室不可', line_registration_key_ok('entry', ''), false);
+$entryKey = line_registration_key('entry', time()+60);
+check('LINE登録 専用の入室印', line_registration_key_ok('entry', $entryKey), true);
+check('LINE登録 入室印で変更できない', line_registration_key_ok('form', $entryKey), false);
+check('LINE登録 期限切れ', line_registration_key_ok('entry', line_registration_key('entry', time()-1)), false);
+$formKey = line_registration_key('form');
+check('LINE登録 同じ管理者で変更可能', line_registration_key_ok('form', $formKey), true);
+$_COOKIE['zadmin'] = 'other-browser';
+check('LINE登録 別の管理者Cookieでは変更不可', line_registration_key_ok('form', $formKey), false);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);

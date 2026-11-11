@@ -73,12 +73,44 @@ function line_profile_name(string $uid, string $token): string
     return mb_substr((string)($j['displayName'] ?? ''), 0, 80);
 }
 
+// LINE登録は設定の解除状態を引き継がず、同じ合言葉で毎回開く。
+function line_registration_key(string $scope, ?int $expires = null): string
+{
+    $expires ??= time() + ADMIN_UNLOCK_MINUTES * 60;
+    $data = $expires . '.' . bin2hex(random_bytes(16));
+    $binding = $scope === 'form' ? (string)($_COOKIE['zadmin'] ?? '') : '';
+    return $data . '.' . hash_hmac('sha256', 'line-registration|' . $scope . '|' . $data . '|' . $binding, admin_pass());
+}
+
+function line_registration_key_ok(string $scope, string $key): bool
+{
+    if (admin_pass() === '' || !preg_match('/^(\d{10})\.([a-f0-9]{32})\.([a-f0-9]{64})$/', $key, $m)) { return false; }
+    if ((int)$m[1] <= time() || (int)$m[1] > time() + ADMIN_UNLOCK_MINUTES * 60) { return false; }
+    $binding = $scope === 'form' ? (string)($_COOKIE['zadmin'] ?? '') : '';
+    return hash_equals(hash_hmac('sha256', 'line-registration|' . $scope . '|' . $m[1] . '.' . $m[2] . '|' . $binding, admin_pass()), $m[3]);
+}
+
+function require_line_registration(bool $opening = false): void
+{
+    header('Cache-Control: no-store, private');
+    if ($opening) {
+        $key = (string)($_COOKIE['zline_entry'] ?? '');
+        setcookie('zline_entry', '', ['expires' => time()-3600, 'path' => '/settings/line', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
+        if (!line_registration_key_ok('entry', $key)) { redirect_to('/admin/unlock?next=' . urlencode('/settings/line')); }
+        require_admin();
+        return;
+    }
+    require_admin();
+    if (!line_registration_key_ok('form', (string)($_POST['line_registration_key'] ?? ''))) { throw new HttpError(403); }
+}
+
 function h_settings_line(): void
 {
-    require_admin();
+    require_line_registration(true);
     ensure_line_tables();
     $cfg = line_config();
     render('settings_line', [
+        'line_registration_key' => line_registration_key('form'),
         'contacts' => rows('SELECT user_id, display_name, supplier, last_text, last_at FROM line_contacts ORDER BY last_at DESC'),
         'ready' => ($cfg['secret'] ?? '') !== '' && ($cfg['token'] ?? '') !== '',
         'msg' => mb_substr((string)($_GET['msg'] ?? ''), 0, 200),
@@ -88,7 +120,7 @@ function h_settings_line(): void
 /** 友だちの一覧を LINE に聞いて取り込む（認証済みアカウントなどでないと、LINE が断る） */
 function h_settings_line_import(): void
 {
-    require_admin();
+    require_line_registration();
     ensure_line_tables();
     $token = (string)(line_config()['token'] ?? '');
     if ($token === '') {
@@ -134,7 +166,7 @@ function h_settings_line_import(): void
 
 function h_settings_line_assign(): void
 {
-    require_admin();
+    require_line_registration();
     ensure_line_tables();
     $uid = (string)($_POST['user_id'] ?? '');
     $sup = (string)($_POST['supplier'] ?? '');

@@ -42,8 +42,8 @@ $NO_ADMIN = true;
 
 function http(string $method, string $path, ?array $json = null, ?array $form = null, string $accept = 'text/html'): array
 {
-    global $BASE, $ADMIN_COOKIE, $NO_ADMIN;
-    $header = "Accept: {$accept}\r\n" . ($NO_ADMIN ? '' : "Cookie: {$ADMIN_COOKIE}\r\n");
+    global $BASE, $ADMIN_COOKIE, $NO_ADMIN, $LINE_ENTRY_COOKIE;
+    $header = "Accept: {$accept}\r\n" . ($NO_ADMIN ? '' : "Cookie: {$ADMIN_COOKIE}; " . ($LINE_ENTRY_COOKIE ?? '') . "\r\n");
     $opts = ['http' => ['method' => $method, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 180]];
     if ($json !== null) {
         $header .= "Content-Type: application/json\r\n";
@@ -351,7 +351,18 @@ page_ok('/admin/unlock', '暗証番号');
 [$st] = http('POST', '/settings/line/assign', null, ['user_id' => 'U' . str_repeat('0', 32), 'supplier' => '株式会社クリエイティブブレーン']);
 ok($st === 403, 'LINE設定: 鍵なしでは、ひも付けできない', "status={$st}");
 $NO_ADMIN = false;
+[$st, $lockBody, $lockHeaders] = http('GET', '/settings/line');
+ok($st === 302, 'LINE登録: 設定の鍵が開いていても改めて解除が必要');
+[$st] = http('POST', '/settings/line/assign', null, ['user_id'=>'U'.str_repeat('0',32), 'supplier'=>'']);
+ok($st === 403, 'LINE登録: 設定の解除だけでは直接変更できない');
+[$st, $unlockBody, $unlockHeaders] = http('POST', '/admin/unlock', null, ['pass'=>'ci-admin-pass', 'next'=>'/settings/line']);
+$LINE_ENTRY_COOKIE = '';
+foreach ($unlockHeaders as $h) { if (preg_match('/^Set-Cookie:\s*(zline_entry=[^;]+)/i', $h, $cookieMatch)) { $LINE_ENTRY_COOKIE=$cookieMatch[1]; } }
+ok($st === 302 && $LINE_ENTRY_COOKIE !== '', 'LINE登録: 同じ合言葉で専用の入室を許可');
 page_ok('/settings/line', 'LINE');
+$LINE_ENTRY_COOKIE = '';
+[$st] = http('GET', '/settings/line');
+ok($st === 302, 'LINE登録: 開き直すと再ロック');
 [$st] = http('POST', '/line/webhook', null, []);
 ok($st === 403, 'LINE: 署名がない知らせは断る');
 [$st] = http('GET', '/pub/order?id=1&exp=2000000000&sig=00000000000000000000000000000000');
