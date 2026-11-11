@@ -209,6 +209,9 @@
 .cal-people .cal-bar {min-height:44px;padding:5px 3px;box-sizing:border-box}
 .cal-people .cal-person,.cal-people .cal-location {min-height:16px;line-height:16px;margin:0}
 @media(min-width:700px){.cal-people .cal-bar{min-height:48px}.cal-people .cal-person,.cal-people .cal-location{min-height:18px;line-height:18px}}
+/* 名前の長さではなく、その日の列幅いっぱいに枠をそろえる。 */
+.cal-people {align-items:stretch}
+.cal-people .cal-bar {align-self:stretch;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 </style>
 {% endblock %}
 {% block content %}
