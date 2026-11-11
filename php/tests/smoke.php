@@ -88,10 +88,10 @@ function pdf_ok(string $path, array $mustContainText = []): string
 {
     [$st, $body] = http('GET', $path);
     ok($st === 200 && str_starts_with($body, '%PDF') && strlen($body) > 1500, "PDF {$path}", "status={$st} bytes=" . strlen($body) . ' ' . (str_contains($body, '<pre') ? $body : substr($body, 0, 200)));
-    if ($mustContainText && str_starts_with($body, '%PDF') && trim((string)shell_exec('command -v pdftotext')) !== '') {
+    if ($mustContainText && str_starts_with($body, '%PDF')) {
         $f = tempnam(sys_get_temp_dir(), 'pdf');
         file_put_contents($f, $body);
-        $text = (string)shell_exec('pdftotext -layout ' . escapeshellarg($f) . ' - 2>/dev/null');
+        $text = (string)shell_exec('python3 ' . escapeshellarg(__DIR__ . '/pdf_text.py') . ' ' . escapeshellarg($f));
         unlink($f);
         foreach ($mustContainText as $t) {
             ok(str_contains($text, $t), "PDF {$path} の文字に「{$t}」がある", substr($text, 0, 400));
