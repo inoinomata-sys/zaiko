@@ -426,7 +426,10 @@ http('POST', '/settings/staff/add', null, ['name' => 'テスト花子', 'home_st
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE name='曜日登録テスト'") === '0,1', 'スタッフ新規登録で勤務曜日を保存できる');
 [$st] = http('POST', '/settings/staff/add', null, ['name' => '曜日未選択テスト', 'work_days_present' => '1']);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE name='曜日未選択テスト'") === '0,1,2,3,4,5,6', 'スタッフ新規登録で勤務曜日なしも保持できる');
-run("UPDATE shift_staff SET is_active=0 WHERE name IN ('曜日登録テスト','曜日未選択テスト')");
+foreach (['曜日登録テスト','曜日未選択テスト'] as $testStaffName) {
+    $testStaffId = (int)db_val("SELECT id FROM shift_staff WHERE name='{$testStaffName}'");
+    http('POST', "/settings/staff/{$testStaffId}/toggle", null, ['is_active' => '0']);
+}
 page_ok('/settings/staff', 'テスト太郎');
 $sid = (int)db_val("SELECT id FROM shift_staff WHERE name='テスト太郎'");
 $m = date('Y-m');
