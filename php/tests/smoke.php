@@ -446,7 +446,7 @@ page_ok('/shift?month=2026-11', '勤労感謝の日');
 [$st] = http('POST', "/settings/staff/{$sid}/off", null, ['work' => ['0', '1', '4', '5', '6'], 'role' => 'stylist', 'work_from' => '9:00', 'work_to' => '18:00']);
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE id={$sid}") === '2,3', 'シフト: 毎週の休みの曜日を保存できる');
 page_ok('/settings/staff', 'checked');
-pdf_ok('/shift/customer.pdf?month=2026-11', ['スタイリストのお休み', 'テスト太郎']);
+pdf_ok('/shift/customer/pdf?month=2026-11', ['スタイリストのお休み', 'テスト太郎']);
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'テスト太郎');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, '定休');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'day-editor');
