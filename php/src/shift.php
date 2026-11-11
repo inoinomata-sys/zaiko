@@ -711,13 +711,14 @@ function h_shift_customer_print(): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
-    $store = (string)($_GET['store'] ?? 'イノ');
-    if (!in_array($store, SHIFT_STORES, true)) { throw new HttpError(400); }
+    $store = 'イノ';
     $staff = array_values(array_filter(shift_staff_list(), static fn($s) => $s['home_store'] === $store));
     $entries = shift_entries_of($first);
     $days = shift_days($first);
     foreach ($days as &$day) {
         $day['holidays'] = [];
+        // 日曜はお客様に既知のため、日付だけを残し休みの名前を省く。
+        if ((int)$day['dow'] === 0) { continue; }
         foreach ($staff as $person) {
             $entry = $entries[(int)$person['id']][$day['date']] ?? null;
             // 別店舗へ勤務する日も、この店舗ではお休みとして案内する。
