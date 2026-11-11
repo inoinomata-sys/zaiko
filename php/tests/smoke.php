@@ -457,7 +457,7 @@ page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'day-editor');
 page_ok('/shift?month=' . $m, '出勤・休みを登録／変更');
 [$st] = http('GET', '/shift/edit?staff=999999');
 ok($st === 404, 'シフト: いないスタッフの入力画面は 404');
-page_ok('/shift/edit?month=' . $m, '休(定休)');
+page_ok('/shift/edit?month=' . $m, '定休');
 [$st, $calendar] = http('GET', '/shift?month=' . $m . '&view=changes');
 ok($st === 200 && !preg_match('/class="cal-bar (?:rest|work)/', $calendar), 'シフト: 通常の勤務日・定休はカレンダーに自動表示しない');
 [$st, $fullCalendar] = http('GET', '/shift?month=' . $m . '&view=all');
