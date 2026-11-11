@@ -310,11 +310,23 @@ function shift_week_bars(array $row, array $staff): array
     return ['days' => $row, 'bars' => $bars, 'lanes' => count($lanes)];
 }
 
+/** 通常設定は全員表示でだけ補完し、個別登録を常に優先する。 */
+function shift_calendar_entry(array $staff, array $day, ?array $entry, string $view): ?array
+{
+    if ($entry !== null || $view !== 'all') {
+        return $entry;
+    }
+    $off = in_array((int)$day['dow'], shift_off_days($staff), true);
+    return ['store' => $off ? SHIFT_OFF : $staff['home_store'], 'changed' => false,
+        'tf' => '', 'tt' => '', 'default' => true];
+}
+
 /** 見る画面：日ごとに、イノ・リッチ・休みの人が並ぶ。ヘルプ（本店と違う店に入る人）には印が付く */
 function h_shift(): void
 {
     ensure_shift_tables();
     $first = shift_month($_GET['month'] ?? null);
+    $view = ($_GET['view'] ?? '') === 'all' ? 'all' : 'changes';
     $staff = shift_staff_list();
     $entries = shift_entries_of($first);
     $days = shift_days($first);
@@ -327,7 +339,7 @@ function h_shift(): void
         $day['groups'] = ['イノ' => [], 'リッチ' => [], '休' => []];
         $day['items'] = [];
         foreach ($staff as $s) {
-            $e = $entries[(int)$s['id']][$day['date']] ?? null;
+            $e = shift_calendar_entry($s, $day, $entries[(int)$s['id']][$day['date']] ?? null, $view);
             // 通常の勤務曜日・定休は設定として保持し、カレンダーには個別登録だけを載せる。
             if ($e === null) {
                 continue;
@@ -339,8 +351,9 @@ function h_shift(): void
                 'changed' => $e['changed'],
                 'time_s' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : '',
                 'time_l' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], false) : '',
+                'hours' => $e['store'] !== SHIFT_OFF ? shift_time_label($s['work_from'], $s['work_to'], false) : '',
             ];
-            $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => false,
+            $day['items'][(int)$s['id']] = ['store' => $e['store'], 'help' => $e['store'] !== SHIFT_OFF && $e['store'] !== $s['home_store'], 'dflt' => !empty($e['default']),
                 'time' => $e['store'] === SHIFT_OFF ? shift_time_label($e['tf'], $e['tt'], true) : ''];
         }
         $day['any'] = array_filter($day['groups']) !== [];
@@ -355,7 +368,7 @@ function h_shift(): void
         $weeks[] = shift_week_bars($row, $staff);
     }
     $last = val('SELECT MAX(at) FROM shift_log');
-    render('shift', ['nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff,
+    render('shift', ['view' => $view, 'nav' => shift_nav($first), 'weeks' => $weeks, 'staff' => $staff,
         'last_at' => $last ? (new DateTimeImmutable((string)$last))->format('n/j H:i') : '']);
 }
 

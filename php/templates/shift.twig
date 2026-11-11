@@ -152,6 +152,13 @@
  .cal-nt {color:#686868}
  @media(max-width:560px){.cal-cell{min-height:90px}.cal-bar{font-size:11px;line-height:1.6;padding:1px 2px;margin:2px 1px}}
 }
+
+.shift-views {display:flex;gap:6px;padding:5px;background:#f2f2f2;border-radius:14px;margin:16px 0}
+.shift-views a {flex:1;text-align:center;padding:12px 6px;border:1px solid transparent;border-radius:10px;color:var(--fg2);font-weight:600;font-size:14px;text-decoration:none}
+.shift-views a[aria-current=page] {background:#fff;border-color:var(--gold);color:var(--fg);box-shadow:0 2px 5px #00000008}
+.shift-view-hint {font-size:13px;line-height:1.7;color:var(--fg2);margin:0 0 18px}
+.sh-hours {font-size:12px;color:var(--fg2);margin-left:4px}
+@media print {.shift-views,.shift-view-hint {display:none!important}}
 </style>
 {% endblock %}
 {% block content %}
@@ -159,11 +166,16 @@
 <div class="sh-top">
   <h1>出勤スケジュール</h1>
   <div class="sh-nav">
-    <a href="/shift?month={{ nav.prev }}" aria-label="前の月">‹</a>
+    <a href="/shift?month={{ nav.prev }}&view={{ view }}" aria-label="前の月">‹</a>
     <b>{{ nav.label }}</b>
-    <a href="/shift?month={{ nav.next }}" aria-label="次の月">›</a>
+    <a href="/shift?month={{ nav.next }}&view={{ view }}" aria-label="次の月">›</a>
   </div>
 </div>
+<div class="shift-views no-print" aria-label="カレンダーの表示切り替え">
+<a href="/shift?month={{ nav.month }}&view=changes"{% if view != 'all' %} aria-current="page"{% endif %}>変更・休みだけ</a>
+<a href="/shift?month={{ nav.month }}&view=all"{% if view == 'all' %} aria-current="page"{% endif %}>全員の出勤</a>
+</div>
+<p class="shift-view-hint no-print">{% if view == 'all' %}基本の勤務日・時間と、個別に登録した変更をまとめて表示します。日付を押すと勤務時間も確認できます。{% else %}個別に登録した出勤・休み・ヘルプを表示します。通常の勤務日・定休日は表示しません。{% endif %}</p>
 <div class="sh-bar">
   <div class="sh-stamp">{% if last_at %}最終入力 <b>{{ last_at }}</b>{% else %}まだ入力はありません{% endif %}</div>
   <span style="display:flex;gap:6px">{% if staff %}<button type="button" id="ent-btn" class="ent-btn">休み希望を入れる ▾</button>{% endif %}</span>
@@ -188,7 +200,7 @@
         <div class="sh-row">
           <span class="sh-store{% if store == 'リッチ' %} rich{% elseif store == '休' %} off{% endif %}">{{ store }}</span>
           <span class="sh-people">
-            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.time_l %}<span class="sh-tag help">{{ p.time_l }}だけ休み</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
+            {% for p in people %}<span class="sh-p" data-sid="{{ p.id }}">{{ p.name }}{% if p.hours %}<span class="sh-hours">{{ p.hours }}</span>{% endif %}{% if p.help %}<span class="sh-tag help">{{ p.from }}から</span>{% endif %}{% if p.time_l %}<span class="sh-tag help">{{ p.time_l }}だけ休み</span>{% endif %}{% if p.changed %}<span class="sh-tag chg">変更</span>{% endif %}</span>{% endfor %}
           </span>
         </div>
         {% endif %}{% endfor %}
@@ -211,7 +223,7 @@
     {% endfor %}
   </div>
   {% endfor %}
-  <div class="cal-legend">{% for st in staff %}<span><i style="background:{{ st.color }}"></i>{{ st.name }}</span>{% endfor %}<span>色つき＝休み</span><span>白＝出勤（店名つき）</span><span style="color:#c0392b">赤＝日曜・祝日</span></div>
+  <div class="cal-legend">{% for st in staff %}<span><i style="background:{{ st.color }}"></i>{{ st.name }}</span>{% endfor %}<span>色つき＝休み</span><span>白＝出勤（店名つき）</span>{% if view == 'all' %}<span>点線＝基本設定</span>{% endif %}<span style="color:#c0392b">赤＝日曜・祝日</span></div>
   <div class="sh-detail" id="detail"><div class="sh-none">日をタップすると、くわしく出ます</div></div>
 </div>
 <div class="sh-foot">

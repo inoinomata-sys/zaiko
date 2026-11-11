@@ -5,6 +5,7 @@ declare(strict_types=1);
 define('BASE_DIR', dirname(__DIR__));
 require BASE_DIR . '/src/util.php';
 require BASE_DIR . '/src/schedule.php';
+require BASE_DIR . '/src/shift.php';
 require BASE_DIR . '/src/line.php';
 require BASE_DIR . '/src/admin.php';
 
@@ -125,6 +126,16 @@ $formKey = line_registration_key('form');
 check('LINE登録 同じ管理者で変更可能', line_registration_key_ok('form', $formKey), true);
 $_COOKIE['zadmin'] = 'other-browser';
 check('LINE登録 別の管理者Cookieでは変更不可', line_registration_key_ok('form', $formKey), false);
+$staffExample = ['home_store' => 'イノ', 'off_days' => '0,1'];
+$workDay = ['dow' => 2];
+$offDay = ['dow' => 0];
+check('変更表示 通常勤務を補完しない', shift_calendar_entry($staffExample, $workDay, null, 'changes'), null);
+check('変更表示 定休を補完しない', shift_calendar_entry($staffExample, $offDay, null, 'changes'), null);
+check('全員表示 基本の店で出勤', shift_calendar_entry($staffExample, $workDay, null, 'all')['store'], 'イノ');
+check('全員表示 定休日は休み', shift_calendar_entry($staffExample, $offDay, null, 'all')['store'], SHIFT_OFF);
+$customEntry = ['store' => 'リッチ', 'changed' => true, 'tf' => '', 'tt' => ''];
+check('全員表示 個別変更が優先', shift_calendar_entry($staffExample, $offDay, $customEntry, 'all'), $customEntry);
+check('変更表示 個別登録を維持', shift_calendar_entry($staffExample, $workDay, $customEntry, 'changes'), $customEntry);
 if ($n < 500) {
     echo "NG 確認した件数が少なすぎます（{$n} 件）。テストが途中で止まっている可能性があります\n";
     exit(1);
