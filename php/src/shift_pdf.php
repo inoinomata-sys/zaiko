@@ -5,7 +5,7 @@ class ShiftHolidayPdf extends ZPdf
 {
     public function Header(): void { $this->_out('0 Tr'); }
     public function Footer(): void {}
-    public function textWeight(array $color): void { $this->SetDrawColor(...$color); $this->SetLineWidth(.06); $this->_out('2 Tr'); }
+    public function textWeight(array $color): void { $this->SetDrawColor(...$color); $this->SetLineWidth(.13); $this->_out('2 Tr'); }
     public function circle(float $x, float $y, float $r): void
     {
         $k=$this->k; $h=$this->h; $c=.55228475*$r;
