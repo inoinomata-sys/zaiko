@@ -48,16 +48,36 @@ function build_shift_customer_pdf(array $data): string
     elseif($m===7){foreach([[178,15],[188,21],[199,11]] as [$x,$y]){$pdf->Line($x,5,$x,$y-2);$pdf->Line($x-2,$y,$x+2,$y);$pdf->Line($x,$y-2,$x,$y+2);}}
     elseif($m===8){$pdf->circle(187,15,3);for($i=0;$i<12;$i++){$a=$i*M_PI/6;$pdf->circle(187+cos($a)*5,15+sin($a)*5,1.7);}}
     else{$pdf->circle(190,12,5);$pdf->Line(172,27,179,13);$pdf->Line(177,27,187,18);}
-    $x0=6.;$cw=198/7;$y0=36.;$weeks=$data['weeks'];$rh=92/count($weeks);
-    foreach(['月','火','水','木','金','土','日'] as $i=>$w)$text($x0+$i*$cw+11,31,$w,7,$i===6?[173,103,102]:($i===5?[104,131,151]:[110,110,110]));
-    foreach($weeks as $r=>$week)foreach($week as $c=>$day){$x=$x0+$c*$cw;$y=$y0+$r*$rh;$pdf->SetDrawColor(225,221,214);$pdf->SetFillColor(...($day?[255,255,255]:[249,249,249]));$pdf->Rect($x,$y,$cw,$rh,'DF');if(!$day)continue;
-        $text($x+1,$y+.5,(string)$day['d'],8,$day['sun']?[173,103,102]:($day['sat']?[104,131,151]:[48,51,51]));
-        if($day['hol'])$text($x+6,$y+.7,$day['hol'],5.2,[150,100,95],$cw-7);
-        if (!empty($day['closed'])) { $text($x+2,$y+5,'店休日',8,[178,63,63]); continue; }
+    $x0=6.;$cw=198/7;$y0=35.;$weeks=$data['weeks'];$rh=94/count($weeks);
+    foreach(['月','火','水','木','金','土','日'] as $i=>$w)$text($x0+$i*$cw+11,30,$w,8.5,$i===6?[173,103,102]:($i===5?[104,131,151]:[110,110,110]));
+    foreach($weeks as $r=>$week)foreach($week as $c=>$day){$x=$x0+$c*$cw;$y=$y0+$r*$rh;$pdf->SetDrawColor(130,130,130);$pdf->SetLineWidth(.25);$pdf->SetFillColor(...($day?[255,255,255]:[249,249,249]));$pdf->Rect($x,$y,$cw,$rh,'F');if(!$day)continue;
+        $text($x+1,$y+.5,(string)$day['d'],11,$day['sun']?[173,103,102]:($day['sat']?[104,131,151]:[48,51,51]));
+        if($day['hol'])$text($x+6,$y+.7,$day['hol'],6.5,[150,70,65],$cw-7);
+        if (!empty($day['closed'])) { $text($x+2,$y+5.5,'店休日',10,[178,63,63]); continue; }
         $full=array_values(array_filter($day['holidays'],static fn($p)=>$p['full']));$partial=array_values(array_filter($day['holidays'],static fn($p)=>!$p['full']));
-        foreach($full as $i=>$person)$text($x+1+($i%2)*($cw-2)/2,$y+4+intdiv($i,2)*3,$person['name'].'休み',6.5,[178,63,63],($cw-2)/2);
-        $py=$y+4+ceil(count($full)/2)*3;
-        foreach($partial as $person){$text($x+1,$py,$person['name'].' '.$person['note'],6.1,[178,63,63],$cw-2);$py+=3.2;}
+        $columns = count($full) <= 3 ? 1 : 2;
+        $rowCount = (int)ceil(count($full) / $columns) + count($partial);
+        $lineHeight = min(3.8, ($rh - 6) / max(1, $rowCount));
+        $nameSize = min(9, $lineHeight * 2.4);
+        foreach ($full as $i => $person) {
+            $text($x+1+($i%$columns)*$cw/$columns, $y+5.5+intdiv($i,$columns)*$lineHeight,
+                $person['name'].'休み', $nameSize, [165,48,48], $cw/$columns-3);
+        }
+        $py = $y + 5.5 + ceil(count($full)/$columns)*$lineHeight;
+        foreach ($partial as $person) {
+            $text($x+1, $py, $person['name'].' '.$person['note'], min(8.5, $nameSize), [165,48,48], $cw-2);
+            $py += $lineHeight;
+        }
+    }
+    $pdf->SetDrawColor(130,130,130);
+    $pdf->SetLineWidth(.25);
+    for ($col = 0; $col <= 7; $col++) {
+        $x = $x0 + $col * $cw;
+        $pdf->Line($x, $y0, $x, $y0 + 94);
+    }
+    for ($row = 0; $row <= count($weeks); $row++) {
+        $y = $y0 + $row * $rh;
+        $pdf->Line($x0, $y, $x0 + 198, $y);
     }
     $pdf->SetDrawColor(...$accent);$pdf->Line(6,130,204,130);
     $text(6,132,'お名前の記載がある日は、そのスタイリストのお休みです。',6.4,[90,90,90]);
