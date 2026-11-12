@@ -451,6 +451,13 @@ page_ok('/shift?month=2026-11', '勤労感謝の日');
 ok($st === 302 && db_val("SELECT off_days FROM shift_staff WHERE id={$sid}") === '2,3', 'シフト: 毎週の休みの曜日を保存できる');
 page_ok('/settings/staff', 'checked');
 pdf_ok('/shift/customer/pdf?month=2026-11', ['スタイリストのお休み', 'テスト太郎']);
+[$st, $j] = api('/api/shift', ['staff_id'=>$sid, 'date'=>'2026-11-15', 'store'=>'休']);
+ok($st === 200, 'お客様休み表: 日曜の個別休みを登録できる');
+$sundayPrint = page_ok('/shift/customer-print?month=2026-11');
+preg_match('~class="day-number sun">15</div><div class="names[^"]*">(.*?)</div></div>~s', $sundayPrint, $sundayCell);
+ok(str_contains($sundayCell[1] ?? '', 'テスト太郎休み'), 'お客様休み表: 日曜の個別休みをその日の日付に掲載する');
+api('/api/shift', ['staff_id'=>$sid, 'date'=>'2026-11-15', 'store'=>'']);
+
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'テスト太郎');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, '定休');
 page_ok('/shift/edit?month=' . $m . '&staff=' . $sid, 'day-editor');

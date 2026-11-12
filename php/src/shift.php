@@ -661,7 +661,7 @@ function h_api_shift_note_delete(): void
 function shift_customer_holiday(array $staff, array $day, ?array $entry): ?array
 {
     $off = shift_is_default_off($staff, $day);
-    if ($entry === null) { return $off ? ['name'=>$staff['name'], 'note'=>'', 'full'=>true] : null; }
+    if ($entry === null) { return $off && (int)$day['dow'] !== 0 ? ['name'=>$staff['name'], 'note'=>'', 'full'=>true] : null; }
     if ($entry['store'] === SHIFT_OFF) {
         $time = shift_time_label(shift_time($entry['tf']), shift_time($entry['tt']), true);
         return ['name'=>$staff['name'], 'note'=>$time === '' ? '' : $time . '時休み', 'full'=>$time === ''];
@@ -704,8 +704,6 @@ function h_shift_customer_print(bool $asPdf = false): void
         $day['holidays'] = [];
         $day['closed'] = (int)$day['dow'] === 1 || !empty($GLOBALS['shift_closure_map'][$day['date']]['イノ']);
         if ($day['closed']) { continue; }
-        // 日曜はお客様に既知のため、日付だけを残し休みの名前を省く。
-        if ((int)$day['dow'] === 0) { continue; }
         foreach ($staff as $person) {
             $entry = $entries[(int)$person['id']][$day['date']] ?? null;
             // 別店舗へ勤務する日も、この店舗ではお休みとして案内する。

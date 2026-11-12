@@ -164,7 +164,10 @@ check('勤務表現 開始だけ', shift_work_note('13:00', ''), '13時から出
 check('勤務表現 両方', shift_work_note('09:30', '14:00'), '9時30分〜14時出勤');
 check('勤務表現 指定なし', shift_work_note('', ''), '');
 $customerStaff=['name'=>'スタッフ','off_days'=>'0,1','home_store'=>'イノ','work_from'=>'9:00','work_to'=>'17:00'];
-check('お客様休み表 通常の休み', shift_customer_holiday($customerStaff,['dow'=>0],null)['full'], true);
+check('お客様休み表 日曜の基本休みは省く', shift_customer_holiday($customerStaff,['dow'=>0],null), null);
+check('お客様休み表 月曜の基本休み', shift_customer_holiday($customerStaff,['dow'=>1],null)['full'], true);
+check('お客様休み表 日曜の個別休みは載せる', shift_customer_holiday($customerStaff,['dow'=>0],['store'=>'休','tf'=>'','tt'=>''])['full'], true);
+check('お客様休み表 日曜の一部休みも載せる', shift_customer_holiday($customerStaff,['dow'=>0],['store'=>'休','tf'=>'9:00','tt'=>'10:00'])['note'], '9〜10時休み');
 check('お客様休み表 休日出勤は休みに載せない', shift_customer_holiday($customerStaff,['dow'=>0],['store'=>'イノ','tf'=>'','tt'=>'']), null);
 check('お客様休み表 一部休み', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'休','tf'=>'9:00','tt'=>'10:00'])['note'], '9〜10時休み');
 check('お客様休み表 短縮勤務', shift_customer_holiday($customerStaff,['dow'=>6],['store'=>'イノ','tf'=>'','tt'=>'14:00'])['note'], '14時まで出勤');
