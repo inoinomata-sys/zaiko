@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="総合管理">
+<meta name="apple-mobile-web-app-title" content="ダッシュボード">
 <link rel="apple-touch-icon" href="/static/icons/ino7-180.png">
 <style>
 :root {
@@ -223,7 +223,7 @@ h1, h2 { font-weight: 500 !important; }
 {% block navigation %}
 <nav>
   {% if request.path == '/' %}
-  <span class="brand">総合管理</span>
+  <span class="brand">ダッシュボード</span>
   {% elseif request.path starts with '/shift' or request.path starts with '/schedule' %}
   <span class="brand">{{ ((request.path starts with '/shift') ? ('出勤スケジュール') : ('予定')) }}</span>
   <a href="/" class="nav-link"><span>トップ</span></a>
