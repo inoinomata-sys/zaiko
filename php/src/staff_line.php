@@ -126,7 +126,7 @@ function sl_text(array $snapshot, ?array $before = null, string $stream = 'store
     foreach ($snapshot as $date => $items) {
         $part = [];
         if ($before === null) {
-            foreach ($items as $item) { $part[] = $item['label'] . '：' . $item['value']; }
+            foreach ($items as $item) { $part[] = '・' . $item['label'] . "\n　" . $item['value']; }
             if (!$part) { $part[] = '共有する予定はありません'; }
         } else {
             foreach ($items as $key => $item) {
@@ -138,7 +138,14 @@ function sl_text(array $snapshot, ?array $before = null, string $stream = 'store
                 if (!isset($items[$key])) { $part[] = '削除・共有終了：1件（管理画面で確認）'; }
             }
         }
-        if ($part) { $lines[] = $date . '（' . SHIFT_WEEK[(int)(new DateTimeImmutable($date))->format('w')] . '）'; array_push($lines, ...$part); }
+        if ($part) {
+            $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
+            if (count($lines) > 1) { $lines[] = ''; $lines[] = '────────────'; }
+            $lines[] = '';
+            $lines[] = '【' . $day->format('n月j日') . '（' . SHIFT_WEEK[(int)$day->format('w')] . '曜日）】';
+            $lines[] = '';
+            $lines[] = implode("\n\n", $part);
+        }
     }
     if ($stream === 'store' && $before === null) {
         array_unshift($lines, 'こんばんは🌙', '', '本日も一日お疲れ様でございました。', '', '明日以降の店舗スケジュールをお知らせいたします📅', '');

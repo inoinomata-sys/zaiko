@@ -139,6 +139,18 @@ expect(!line_signature_ok($body.' ','secret',$sig) && !line_signature_ok($body,'
 $parts = sl_messages(str_repeat('😀',2500));
 expect(count($parts) === 2 && implode('',array_column($parts,'text')) === str_repeat('😀',2500), 'UTF-16 aware message split');
 try { sl_messages(str_repeat('あ',23000)); expect(false,'oversized message rejected'); } catch (LengthException) { expect(true,'oversized message rejected'); }
+$weekendText = sl_text([
+    '2026-11-14' => ['a' => ['label'=>'野村（休み）', 'value'=>'リッチ／終日休み'], 'b' => ['label'=>'長野（通常休み→出勤）', 'value'=>'リッチ／〜14:00']],
+    '2026-11-15' => ['c' => ['label'=>'ゴミ出し', 'value'=>'イノ']],
+]);
+expect(str_contains($weekendText, '【11月14日（土曜日）】') && str_contains($weekendText, '【11月15日（日曜日）】'), 'weekend headings show readable Japanese dates and full weekdays');
+expect(str_contains($weekendText, "\n\n────────────\n\n【11月15日（日曜日）】\n\n"), 'different days are separated by blank lines and a divider');
+expect(str_contains($weekendText, "・野村（休み）\n　リッチ／終日休み\n\n・長野"), 'each schedule separates the name from its store and hours');
+expect(!str_contains($weekendText, '2026-11-14') && substr_count($weekendText, 'こんばんは') === 1, 'no cramped ISO dates and no duplicate greeting');
+$emptyDay = sl_text(['2026-11-16'=>[]]);
+expect(str_contains($emptyDay, '【11月16日（月曜日）】') && str_contains($emptyDay, '共有する予定はありません'), 'an empty day still has its date and weekday');
+$changedDay = sl_text(['2026-11-15'=>['c'=>['label'=>'ゴミ出し','value'=>'リッチ']]], ['2026-11-15'=>['c'=>['label'=>'ゴミ出し','value'=>'イノ']]]);
+expect(str_contains($changedDay, '【11月15日（日曜日）】') && str_contains($changedDay, '変更 ゴミ出し：イノ → リッチ'), 'change notifications also keep readable dates and the old and new values');
 $deleted = sl_text(['2026-11-14'=>[]], ['2026-11-14'=>['private'=>['label'=>'非公開の氏名','value'=>'私的な予定']]]);
 expect(!str_contains($deleted,'非公開の氏名') && !str_contains($deleted,'私的な予定') && str_contains($deleted,'削除'), 'removed or private content never repeated');
 run("UPDATE staff_line_settings SET enabled = 1, mode = 'approval', group_id = ? WHERE stream = 'store'", [$group]);
