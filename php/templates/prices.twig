@@ -40,6 +40,12 @@
   position: sticky; bottom: 0; background: var(--surface); border-top: 2px solid var(--border);
   padding: 10px 14px; z-index: 50; box-shadow: 0 -4px 16px rgba(0,0,0,.08); margin: 14px -16px 0;
 }
+@media (max-width: 767px) {
+  .cart-bar { position: static; box-shadow: none; margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; }
+}
+.order-edit .cart-bar { position: static; box-shadow: none; margin: 0 0 14px; border: 1px solid var(--border); border-radius: 12px; }
+.order-filter { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding:10px 0; font-size:16px; }
+.order-filter input { width:22px; height:22px; accent-color:var(--acc); }
 .cart-sum { font-size: 14px; margin-bottom: 8px; }
 .cart-sum strong { font-size: 19px; }
 .cart-sum .total { font-size: 22px; margin-left: 8px; }
@@ -70,6 +76,8 @@
 </p>
 
 {% if groups %}
+<div id="order-editor"{% if editing %} class="order-edit"{% endif %}>
+<div id="order-details-slot"></div>
 <div class="card" id="custom-card" style="margin-bottom:12px">
   <div class="card-head"><span>その他（品名・値段を入れて追加）</span></div>
   <div id="custom-rows">
@@ -81,6 +89,7 @@
 </div>
 <input type="search" id="q" placeholder="商品名で探す（注文を受ける時に）" autocomplete="off"
        style="width:100%; font-size:17px; padding:12px 14px; border:1px solid var(--border); border-radius:10px; margin-bottom:10px">
+<label class="order-filter"><input type="checkbox" id="selected-only"{% if editing %} checked{% endif %}> 注文に入っている商品だけ表示</label>
 <div class="cat-scroll" id="cat-tabs">
   <button type="button" class="on" data-cat="">すべて</button>
   {% for cat in groups|keys %}<button type="button" data-cat="{{ cat }}">{{ cat }}</button>{% endfor %}
@@ -129,6 +138,7 @@
     <button class="btn btn-primary" type="button" id="c-save">{% if editing %}注文を保存{% else %}注文用紙を作る{% endif %}</button>
   </div>
 </div>
+</div>
 {% else %}
 <div class="card" style="padding:28px; text-align:center; color:var(--fg2)">
   まだ商品が登録されていません。<br>商品名と値段のExcelを渡すと、ここに一覧が出て、注文用紙が作れます。
@@ -139,6 +149,10 @@
 {% block scripts %}
 <script>
 const EDIT_ID = {{ (((editing) ? (editing.id) : (null)))|tojson }};
+if (EDIT_ID) {
+  const bar = document.getElementById('cart-bar');
+  if (bar) document.getElementById('order-details-slot').appendChild(bar);
+}
 const REQUEST_KEY = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 const yen = n => '¥' + Number(n).toLocaleString('ja-JP');
 const norm = s => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
@@ -210,7 +224,8 @@ function applyFilter() {
     let any = false;
     if (!currentCat || card.dataset.cat === currentCat) {
       card.querySelectorAll('.p-row').forEach(row => {
-        const show = !q || norm(row.querySelector('.p-info').textContent).includes(q);
+        const selectedOnly = document.getElementById('selected-only').checked;
+        const show = (!selectedOnly || readQty(row) > 0) && (!q || norm(row.querySelector('.p-info').textContent).includes(q));
         row.style.display = show ? '' : 'none';
         any = any || show; shown += show ? 1 : 0;
       });
@@ -219,6 +234,7 @@ function applyFilter() {
   });
   document.getElementById('count').textContent = shown;
 }
+document.getElementById('selected-only')?.addEventListener('change', applyFilter);
 document.getElementById('q')?.addEventListener('input', applyFilter);
 document.querySelectorAll('#cat-tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', x === b));
@@ -340,6 +356,7 @@ document.getElementById('c-save')?.addEventListener('click', async () => {
 restoreLocal();
 showStore();
 recalc();
+if (document.getElementById('selected-only')) applyFilter();
 
 </script>
 {% endblock %}
