@@ -115,6 +115,12 @@ check('管理者鍵 期限切れ', admin_cookie_ok('pw1', admin_cookie_value('pw
 check('管理者鍵 合言葉が未設定なら開かない', admin_cookie_ok('', admin_cookie_value('', time() + 600)), false);
 check('管理者鍵 次の画面は、自分のサイトの中だけ', admin_next('//evil.example.com'), '/settings');
 check('管理者鍵 次の画面(正常)', admin_next('/settings/line'), '/settings/line');
+check('管理者鍵 検索条件を引き継ぐ', admin_next('/products?supplier=all'), '/products?supplier=all');
+check('管理者鍵 日本語の条件を引き継ぐ', admin_next('/products?supplier=%E3%83%AA%E3%83%83%E3%83%81'), '/products?supplier=%E3%83%AA%E3%83%83%E3%83%81');
+foreach (["/\\evil.example.com", "https://evil.example.com", "/settings\r\nLocation:evil", '/products#//evil'] as $badNext) {
+    check('管理者鍵 不正な復帰先を拒否', admin_next($badNext), '/settings');
+}
+
 $GLOBALS['CONFIG']['admin_pass'] = 'unit-line-registration';
 $_COOKIE['zadmin'] = 'unit-settings-unlocked';
 check('LINE登録 設定解除のみでは入室不可', line_registration_key_ok('entry', ''), false);

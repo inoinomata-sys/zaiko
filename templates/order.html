@@ -129,7 +129,7 @@
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px">
   <div>
-    <a href="/order" style="font-size:13px; color:var(--fg2)">← 仕入先選択に戻る</a>
+    <a href="/order?store={{ store|urlencode }}" style="font-size:13px; color:var(--fg2)">← 仕入先選択に戻る</a>
     <h1 style="font-size:20px; font-weight:700; margin-top:4px">{{ supplier }} 発注書</h1>
   </div>
   <button class="btn btn-ghost btn-sm" onclick="location.reload()">商品リストを更新</button>
@@ -178,7 +178,7 @@
 <div class="check-warn">
   {% if counts.unchecked %}在庫を数えた記録がない商品（<b>未確認</b>）が <b>{{ counts.unchecked }}</b> 品あります。未確認の商品は在庫数が分からないため、不足数の計算と「不足数を自動入力」の対象外です。{% endif %}
   {% if counts.stale %}{{ stale_days }}日以上数えていない商品が <b>{{ counts.stale }}</b> 品あります。{% endif %}
-  <a href="/?store={{ store|urlencode }}">在庫画面で数える →</a>
+  <a href="/stock?store={{ store|urlencode }}">在庫画面で数える →</a>
 </div>
 {% endif %}
 

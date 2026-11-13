@@ -221,6 +221,7 @@ h1, h2 { font-weight: 500 !important; }
 </head>
 <body>
 {% block navigation %}
+{% set nav_store = (request.args['store'] ?? '') %}
 <nav>
   {% if request.path == '/' %}
   <span class="brand">ダッシュボード</span>
@@ -229,19 +230,19 @@ h1, h2 { font-weight: 500 !important; }
   <a href="/" class="nav-link"><span>トップ</span></a>
   {% if request.path starts with '/shift' %}<a href="/shift/log" class="nav-link {% if request.path == '/shift/log' %}active{% endif %}"><span>変更履歴</span></a>{% endif %}
   {% if request.path starts with '/shift' %}<a href="/shift/default" class="nav-link {% if request.path == '/shift/default' %}active{% endif %}"><span>基本シフト</span></a>{% endif %}
-  {% if request.path == '/shift' and request.(args['view'] ?? 'all') != 'changes' %}<a href="/shift/customer-print?month={{ request.(args['month'] ?? '') }}" class="nav-link"><span>カレンダー印刷</span></a>{% endif %}
+  {% if request.path == '/shift' and (request.args['view'] ?? 'all') != 'changes' %}<a href="/shift/customer-print?month={{ (request.args['month'] ?? '') }}" class="nav-link"><span>カレンダー印刷</span></a>{% endif %}
   {% if request.path == '/schedule' %}<a href="/schedule/pdf?month={{ nav.month }}" id="schedule-print" class="nav-link"><span>予定印刷</span></a>{% endif %}
   {% else %}
   <span class="brand">在庫管理</span>
   <a href="/" class="nav-link"><span>トップ</span></a>
-  <a href="/stock" class="nav-link {% if request.path == '/stock' %}active{% endif %}"><span>在庫</span></a>
-  <a href="/usage" class="nav-link {% if request.path == '/usage' %}active{% endif %}"><span>使用入力</span></a>
-  <a href="/order" class="nav-link {% if request.path starts with '/order' %}active{% endif %}"><span>発注</span></a>
+  <a href="/stock{% if nav_store in stores %}?store={{ nav_store|urlencode }}{% endif %}" class="nav-link {% if request.path == '/stock' %}active{% endif %}"><span>在庫</span></a>
+  <a href="/usage{% if nav_store in stores %}?store={{ nav_store|urlencode }}{% endif %}" class="nav-link {% if request.path == '/usage' %}active{% endif %}"><span>使用入力</span></a>
+  <a href="/order{% if nav_store in stores %}?store={{ nav_store|urlencode }}{% endif %}" class="nav-link {% if request.path starts with '/order' %}active{% endif %}"><span>発注</span></a>
   <a href="/customer-orders" class="nav-link {% if request.path starts with '/customer-orders' or request.path starts with '/prices' %}active{% endif %}"><span>お客様注文</span></a>
   <a href="/settings" class="nav-link {% if request.path starts with '/settings' or request.path starts with '/products' %}active{% endif %}"><span>設定</span></a>
   {% endif %}
   <span class="spacer"></span>
-  <span class="store-badge">イノ</span>
+  <span class="store-badge">{{ ((nav_store in stores) ? (nav_store) : ('イノ')) }}</span>
 </nav>
 {% endblock %}
 <div id="pwa-banner" style="display:none;background:#1a6fbf;color:#fff;padding:10px 20px;align-items:center;gap:12px;font-size:13px;">

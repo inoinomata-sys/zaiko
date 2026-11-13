@@ -84,8 +84,20 @@ document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click'
 }));
 let ofilter = 'all', hfilter = 'all', sfilter = 'イノ';
 try { const sv = localStorage.getItem('co:store'); if (sv === 'イノ' || sv === 'リッチ' || sv === '') sfilter = sv; } catch (e) {}
+try {
+  const saved = JSON.parse(sessionStorage.getItem('co:filters') || 'null');
+  if (saved) {
+    if (['all', 'done', 'todo'].includes(saved.ordered)) ofilter = saved.ordered;
+    if (['all', '0', '1'].includes(saved.hand)) hfilter = saved.hand;
+    if (document.getElementById('q') && typeof saved.query === 'string') document.getElementById('q').value = saved.query;
+  }
+} catch (e) {}
 function applyO() {
-  const q = norm(document.getElementById('q')?.value || '');
+  const query = document.getElementById('q')?.value || '';
+  const q = norm(query);
+  document.querySelectorAll('#o-tabs button').forEach(b => b.classList.toggle('on', b.dataset.f === ofilter));
+  document.querySelectorAll('#h-tabs button').forEach(b => b.classList.toggle('on', b.dataset.h === hfilter));
+  try { sessionStorage.setItem('co:filters', JSON.stringify({ordered: ofilter, hand: hfilter, query})); } catch (e) {}
   document.querySelectorAll('.o-row').forEach(r => {
     const okF = ofilter === 'all' || (ofilter === 'done') === (r.dataset.ordered === '1');
     const okH = hfilter === 'all' || r.dataset.hand === hfilter;

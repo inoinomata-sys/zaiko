@@ -312,6 +312,11 @@ function applyFilter() {
     currentCat = '';
     document.querySelectorAll('#cat-tabs button').forEach(x => x.classList.toggle('on', !x.dataset.cat));
   }
+  document.querySelectorAll('.store-chip').forEach(link => {
+    const url = new URL(link.href, location.href);
+    if (currentCat) url.searchParams.set('cat', currentCat); else url.searchParams.delete('cat');
+    link.href = url.pathname + url.search;
+  });
   document.querySelectorAll('#sup-tabs button').forEach(x => x.classList.toggle('on', x.dataset.sup === currentSup));
   document.querySelectorAll('.cat-card').forEach(card => {
     let any = false;

@@ -92,7 +92,7 @@ def convert_expr(expr):
 
 def fix_common(body):
     body = re.sub(r"request\.path\.startswith\(('[^']*')\)", r"request.path starts with \1", body)
-    body = re.sub(r"(\w+)\.get\(([^,()]+),\s*([^()]+)\)", r"(\1[\2] ?? \3)", body)
+    body = re.sub(r"([\w.]+)\.get\(([^,()]+),\s*([^()]+)\)", r"(\1[\2] ?? \3)", body)
     body = re.sub(r"request\.args\.get\(('[^']*')\)", lambda m: 'request.args.' + m.group(1).strip("'"), body)
     body = body.replace("|replace(' ', '')", "|replace({' ': ''})")
     body = re.sub(r"\bNone\b", "null", body)

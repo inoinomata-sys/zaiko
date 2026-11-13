@@ -7,6 +7,7 @@ $BASE = rtrim($argv[1] ?? 'http://127.0.0.1:8080', '/');
 $fail = 0;
 $count = 0;
 $failures = [];
+require __DIR__ . '/navigation.php';
 
 /** 失敗の説明を短くする（500 のエラー画面なら、PHP のエラー文の部分を取り出す） */
 function brief(string $detail): string
@@ -62,6 +63,7 @@ function http(string $method, string $path, ?array $json = null, ?array $form = 
             $status = (int)$m[1];
         }
     }
+    if ($method === 'GET' && $status === 200 && is_string($body) && str_contains($body, '<html')) $GLOBALS['AUDIT_PAGES'][$path] = $body;
     return [$status, $body === false ? '' : $body, $http_response_header ?? []];
 }
 
@@ -129,7 +131,8 @@ page_ok('/stock', 'ホーユートリートメント');
 [$st, $stockBody] = http('GET', '/stock?store=' . rawurlencode('リッチ'));
 ok($st === 200 && str_contains($stockBody, 'class="chip store-chip on">リッチ'), 'リッチに切り替えても在庫画面を表示');
 preg_match_all('/class="chip store-chip[^"]*"/', $stockBody, $storeChips);
-ok(substr_count($stockBody, 'href="/stock?store=') === count($storeChips[0]) && count($storeChips[0]) === 2, '店舗ボタンはトップでなく在庫画面へ移動');
+preg_match_all('~<a href="(/stock\?store=[^"]+)" class="chip store-chip[^"]*"~', $stockBody, $storeLinks);
+ok(count($storeLinks[1]) === 2 && count($storeChips[0]) === 2, '店舗ボタンはトップでなく在庫画面へ移動');
 page_ok('/', '在庫管理');
 page_ok('/', '出勤スケジュール');
 page_ok('/?store=' . rawurlencode('リッチ'));
@@ -139,6 +142,26 @@ page_ok('/order', '店舗を選択');
 page_ok('/order?store=' . rawurlencode('イノ'), '株式会社ワールド美容');
 page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), 'ミントトリートメント');
 page_ok('/order/form?store=' . rawurlencode('イノ') . '&supplier=' . rawurlencode('株式会社ワールド美容'), 'data-def=');
+// 両店舗のナビゲーションと各仕入先の入口を実画面で検査。
+foreach (['イノ', 'リッチ'] as $testStore) {
+    $storeQuery = rawurlencode($testStore);
+    foreach (['/stock', '/usage', '/order'] as $screen) {
+        $screenBody = page_ok($screen . '?store=' . $storeQuery);
+        foreach (['/stock', '/usage', '/order'] as $destination) {
+            ok(str_contains($screenBody, 'href="' . $destination . '?store=' . $storeQuery . '" class="nav-link'), "{$screen}: {$destination}へ{$testStore}を引き継ぐ");
+        }
+    }
+    $supplierBody = page_ok('/order?store=' . $storeQuery);
+    preg_match_all('~href="(/order/form\?[^"]+)"~', $supplierBody, $supplierLinks);
+    ok(count($supplierLinks[1]) >= 2, "{$testStore}: 仕入先への入口がある");
+    foreach ($supplierLinks[1] as $href) {
+        $formBody = page_ok(html_entity_decode($href, ENT_QUOTES, 'UTF-8'));
+        ok(str_contains($formBody, 'href="/order?store=' . $storeQuery . '"'), "仕入先一覧に{$testStore}を維持して戻る");
+        if (str_contains($formBody, '在庫画面で数える')) {
+            ok(str_contains($formBody, 'href="/stock?store=' . $storeQuery . '"'), "在庫確認へ{$testStore}を維持して戻る");
+        }
+    }
+}
 page_ok('/order/history');
 page_ok('/settings', '発注の取り消し');
 page_ok('/settings/orders');
@@ -348,6 +371,11 @@ $storeCalendar = page_ok('/schedule?month=2026-11', 'href="/schedule/pdf?month=2
 ok(!str_contains($storeCalendar, 'LINE自動送信'), '店舗カレンダーにLINE配信の枠を表示しない');
 pdf_ok('/schedule/pdf?month=2026-11', ['2026年11月', '店舗スケジュール', '店休日', 'ゴミ出し']);
 $NO_ADMIN = true;
+[$filterStatus, , $filterHeaders] = http('GET', '/products?supplier=all');
+$filterLocation = '';
+foreach ($filterHeaders as $header) { if (stripos($header, 'Location:') === 0) $filterLocation = trim(substr($header, 9)); }
+parse_str((string)parse_url($filterLocation, PHP_URL_QUERY), $filterArgs);
+ok($filterStatus === 302 && ($filterArgs['next'] ?? '') === '/products?supplier=all', '管理者解除の後も商品の仕入先条件を維持する');
 [$st] = http('GET', '/settings/line');
 ok($st === 302, 'LINE設定: 鍵がかかっている（合言葉の画面へ）', "status={$st}");
 [$st] = http('GET', '/settings');
@@ -555,6 +583,7 @@ if (getenv('CI') === 'true') {
     passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/staff_line.php'), $staffLineStatus);
     ok($staffLineStatus === 0, '店舗予定・出勤のLINE共有テスト');
 }
+audit_rendered_pages();
 echo "\n{$count} 件を確認、失敗 {$fail} 件\n";
 if ($failures) {
     echo "=== 失敗の一覧 ===\n";

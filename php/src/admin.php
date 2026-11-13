@@ -44,12 +44,15 @@ function require_admin(): void
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {   // 画面の操作（ボタン）は、開いている間だけ。切れていたら、断る
         respond_json(['ok' => false, 'error' => '管理者の合言葉の時間が切れました。設定を開き直してください'], 403);
     }
-    redirect_to('/admin/unlock?next=' . urlencode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/'));
+    redirect_to('/admin/unlock?next=' . urlencode(admin_next((string)($_SERVER['REQUEST_URI'] ?? '/'))));
 }
 
 function admin_next(string $n): string
 {
-    return preg_match('#^/[A-Za-z0-9/_-]*$#', $n) ? $n : '/settings';
+    if (preg_match('/[\x00-\x20\x7f\\\\]/', $n) || str_starts_with($n, '//')) return '/settings';
+    $parts = parse_url($n);
+    if ($parts === false || isset($parts['host']) || isset($parts['scheme']) || isset($parts['fragment'])) return '/settings';
+    return preg_match('#^/[A-Za-z0-9/_-]*$#', $parts['path'] ?? '') ? $n : '/settings';
 }
 
 function h_admin_unlock(): void
@@ -66,12 +69,12 @@ function h_admin_unlock(): void
         }
         // オーナーの指定：正しい番号、または、番号を3回まちがえた時（10分のうちに）、鍵が開く
         $fails = (int)val('SELECT COUNT(*) FROM admin_fail WHERE at > ?', [$since]);
-        if ($right || ($next !== '/settings/line' && $fails >= ADMIN_MAX_FAILS)) {
+        if ($right || (parse_url($next, PHP_URL_PATH) !== '/settings/line' && $fails >= ADMIN_MAX_FAILS)) {
             run('DELETE FROM admin_fail');
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
             if ($right) {
-                if ($next === '/settings/line') {
+                if (parse_url($next, PHP_URL_PATH) === '/settings/line') {
                     setcookie('zline_entry', line_registration_key('entry', time()+60), ['expires' => time()+60, 'path' => '/settings/line', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
                 }
                 redirect_to($next);
