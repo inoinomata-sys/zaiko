@@ -72,7 +72,7 @@
 
 <div class="bar">
   {% for st in stores %}
-  <a href="/?store={{ st|urlencode }}{% if current_cat %}&cat={{ current_cat|urlencode }}{% endif %}" class="chip store-chip {% if st == store %}on{% endif %}">{{ st }}</a>
+  <a href="/stock?store={{ st|urlencode }}{% if current_cat %}&cat={{ current_cat|urlencode }}{% endif %}" class="chip store-chip {% if st == store %}on{% endif %}">{{ st }}</a>
   {% endfor %}
 </div>
 

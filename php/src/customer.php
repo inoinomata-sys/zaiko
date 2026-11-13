@@ -26,9 +26,16 @@ function h_prices(): void
         $editing = row('SELECT id, customer, phone, memo, discount_pct, campaign, store FROM customer_orders WHERE id = ?', [$oid]);
         if ($editing) {
             $editing['discount_pct'] = pct_fmt($editing['discount_pct']);
-            $customs = rows('SELECT name, unit_price, qty FROM customer_order_items WHERE order_id = ? AND price_id IS NULL ORDER BY sort_order, id', [$oid]);
-            foreach (rows('SELECT price_id, qty FROM customer_order_items WHERE order_id = ? AND price_id IS NOT NULL', [$oid]) as $r) {
+            $customs = rows('SELECT name, unit_price, qty, ordered FROM customer_order_items WHERE order_id = ? AND price_id IS NULL ORDER BY sort_order, id', [$oid]);
+            foreach (rows('SELECT price_id, qty, ordered FROM customer_order_items WHERE order_id = ? AND price_id IS NOT NULL', [$oid]) as $r) {
                 $qty[(int)$r['price_id']] = (int)$r['qty'];
+                foreach ($groups as &$group) {
+                    foreach ($group as &$item) {
+                        if ((int)$item['id'] === (int)$r['price_id']) $item['ordered'] = (bool)$r['ordered'];
+                    }
+                    unset($item);
+                }
+                unset($group);
             }
         }
     }

@@ -5,6 +5,10 @@
 <style>
 .p-row { display: flex; align-items: center; gap: 10px 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .p-row:last-child { border-bottom: none; }
+.order-state { display:inline-block; margin-top:6px; padding:3px 9px; border:1px solid #d99762; border-radius:6px; color:#93420d; background:#fff8ee; font-size:13px; font-weight:700; }
+.order-state.done { color:#236840; border-color:#7aaf8c; background:#eef8f0; }
+.p-row:not(.sel) .order-state { display:none; }
+.c-row .order-state { flex-basis:auto; }
 .p-row.sel { background: #fff4d6; }
 .p-info { flex: 1 1 200px; min-width: 0; }
 .p-name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; line-height: 1.4; }
@@ -82,7 +86,7 @@
   <div class="card-head"><span>その他（品名・値段を入れて追加）</span></div>
   <div id="custom-rows">
   {% for c in customs %}
-  <div class="c-row" data-name="{{ c.name }}" data-price="{{ c.unit_price }}" data-qty="{{ c.qty }}"></div>
+  <div class="c-row" data-name="{{ c.name }}" data-price="{{ c.unit_price }}" data-qty="{{ c.qty }}" data-ordered="{{ ((c.ordered) ? (1) : (0)) }}"></div>
   {% endfor %}
   </div>
   <div style="padding:10px 14px"><button type="button" class="btn btn-ghost" id="custom-add">＋ 商品を追加</button></div>
@@ -103,6 +107,7 @@
     <div class="p-info">
       <div class="p-name">{{ it.name }}{% if it.note %} <span class="badge badge-muted" style="font-size:11px">{{ it.note }}</span>{% endif %}</div>
       {% if it.spec %}<div class="p-spec">{{ it.spec }}</div>{% endif %}
+      {% if editing %}<span class="order-state{% if it.ordered %} done{% endif %}">{{ ((it.ordered) ? ('発注済み') : ('未発注')) }}</span>{% endif %}
     </div>
     <div class="p-price">{{ it.price|yen }}</div>
     <div class="stepper">
@@ -185,7 +190,7 @@ let curStore = {{ (((editing) ? (editing.store) : ('イノ')))|tojson }};
 function showStore() { document.querySelectorAll('#c-store button').forEach(b => b.classList.toggle('on', b.dataset.store === curStore)); }
 document.querySelectorAll('#c-store button').forEach(b => b.addEventListener('click', () => { curStore = b.dataset.store; showStore(); saveLocal(); }));
 let discManual = false;   // 割引率を手で入れた時は、自動で書き換えない
-function addCustom(name, price, qty) {
+function addCustom(name, price, qty, ordered = false) {
   const d = document.createElement('div'); d.className = 'c-row';
   d.innerHTML = '<input type="text" class="c-n" maxlength="80" placeholder="品名" autocomplete="off">' +
     '<input type="number" class="c-p" min="0" max="9999999" inputmode="numeric" placeholder="値段">' +
@@ -193,6 +198,12 @@ function addCustom(name, price, qty) {
     '<input class="qty" type="number" min="0" max="9999" inputmode="numeric" value="1">' +
     '<button class="stepper-btn" type="button" data-d="1">＋</button></div>' +
     '<button type="button" class="c-del" aria-label="この行を消す">✕</button>';
+  if (EDIT_ID) {
+    const state = document.createElement('span');
+    state.className = 'order-state' + (ordered ? ' done' : '');
+    state.textContent = ordered ? '発注済み' : '未発注';
+    d.appendChild(state);
+  }
   d.querySelector('.c-n').value = name || ''; d.querySelector('.c-p').value = price || ''; d.querySelector('.qty').value = qty == null ? 1 : qty;
   d.querySelectorAll('.stepper-btn').forEach(b => b.addEventListener('click', () => {
     const q = d.querySelector('.qty'); q.value = Math.max(0, (parseInt(q.value) || 0) + parseInt(b.dataset.d)); recalc();
@@ -202,7 +213,7 @@ function addCustom(name, price, qty) {
   document.getElementById('custom-rows').appendChild(d);
   return d;
 }
-document.querySelectorAll('#custom-rows .c-row[data-name]').forEach(el => { addCustom(el.dataset.name, el.dataset.price, el.dataset.qty); el.remove(); });
+document.querySelectorAll('#custom-rows .c-row[data-name]').forEach(el => { addCustom(el.dataset.name, el.dataset.price, el.dataset.qty, el.dataset.ordered === '1'); el.remove(); });
 // 手入力中は、画面下の合計バーを隠す（iPhoneのキーボードと重なって、入力欄が隠れて動かなくなるのを防ぐ）
 (function () {
   const card = document.getElementById('custom-card'), bar = document.getElementById('cart-bar');

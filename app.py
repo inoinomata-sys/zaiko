@@ -1045,10 +1045,14 @@ def prices():
         editing = cur.fetchone()
         if editing:
             editing['discount_pct'] = pct_fmt(editing['discount_pct'])
-            cur.execute("SELECT name, unit_price, qty FROM customer_order_items WHERE order_id=%s AND price_id IS NULL ORDER BY sort_order, id", (oid,))
+            cur.execute("SELECT name, unit_price, qty, ordered FROM customer_order_items WHERE order_id=%s AND price_id IS NULL ORDER BY sort_order, id", (oid,))
             customs = [dict(r) for r in cur.fetchall()]
-            cur.execute("SELECT price_id, qty FROM customer_order_items WHERE order_id=%s AND price_id IS NOT NULL", (oid,))
-            qty = {r['price_id']: r['qty'] for r in cur.fetchall()}
+            cur.execute("SELECT price_id, qty, ordered FROM customer_order_items WHERE order_id=%s AND price_id IS NOT NULL", (oid,))
+            saved_items = {r['price_id']: r for r in cur.fetchall()}
+            qty = {pid: r['qty'] for pid, r in saved_items.items()}
+            for group in groups.values():
+                for item in group:
+                    item['ordered'] = bool(saved_items.get(item['id'], {}).get('ordered', False))
     return render_template('prices.html', groups=groups, total=sum(len(v) for v in groups.values()),
                            note=PRICE_NOTE, title=PRICE_TITLE, editing=editing, qty=qty, customs=customs)
 
