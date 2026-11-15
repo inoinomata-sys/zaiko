@@ -278,4 +278,13 @@ expect(!schedule_notification_info($plainRule, [], true)['notify'], 'an unshared
 expect(schedule_notification_info($plainRule, [99004=>true], true)['notify'], 'a LINE-shared ordinary schedule is green');
 expect(!schedule_notification_info($notifyRule, [], false)['notify'] && str_contains(schedule_notification_info($notifyRule, [], false)['notify_label'], '通知停止中'), 'disabled delivery is grey and clearly labelled as stopped');
 expect(!schedule_notification_info(array_replace($notifyRule,['is_active'=>0]), [99004=>true], true)['notify'], 'stopped schedules remain grey even if LINE-shared');
+run("INSERT INTO schedule_rules (id,title,store,kind,weekday) VALUES (99006,'キングオブタイム確認','イノ','weekly',3),(99007,'KING OF TIME','リッチ','weekly',4),(99008,'共有しない別の予定','イノ','weekly',3)");
+sl_apply_requested_rule_sharing();
+expect((int)val("SELECT is_public FROM staff_line_visibility WHERE kind='rule' AND entity_id=99006")===1 && (int)val("SELECT is_public FROM staff_line_visibility WHERE kind='rule' AND entity_id=99007")===1, 'King of Time schedules are included in the usual digest, for Japanese and English titles');
+expect((int)val("SELECT COUNT(*) FROM staff_line_visibility WHERE kind='rule' AND entity_id=99008")===0, 'enabling King of Time does not share unrelated schedules');
+expect(isset(sl_snapshot('2026-11-18')['rule:99006']), 'King of Time appears in the normal shared snapshot on its scheduled day');
+expect(sl_rule_reminder_time(['id'=>99006,'title'=>'キングオブタイム確認','kind'=>'weekly','weekday'=>3,'store'=>'イノ','is_active'=>1])==='', 'King of Time does not get an extra 15:00 or 16:50 reminder');
+run("DELETE FROM staff_line_visibility WHERE kind='rule' AND entity_id=99006");
+sl_apply_requested_rule_sharing();
+expect((int)val("SELECT COUNT(*) FROM staff_line_visibility WHERE kind='rule' AND entity_id=99006")===0, 'a later manual opt-out is not silently re-enabled');
 echo "PASS {$n} checks (" . ($mysql ? 'MySQL' : 'SQLite isolated adapter') . ")\n";

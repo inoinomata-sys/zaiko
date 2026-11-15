@@ -20,6 +20,26 @@ function ensure_staff_line_tables(): void
         if (trim($statement) !== '') { run($statement); }
     }
     $done = true;
+    sl_apply_requested_rule_sharing();
+}
+
+/** ユーザー指定の登録済み予定を一度だけ通常共有に追加する。後の手動解除は尊重する。 */
+function sl_apply_requested_rule_sharing(): void
+{
+    run('CREATE TABLE IF NOT EXISTS data_migrations (name VARCHAR(100) NOT NULL PRIMARY KEY, done_at DATETIME NOT NULL) DEFAULT CHARSET=utf8mb4');
+    foreach (schedule_rules_all() as $rule) {
+        $title = preg_replace('/[\s・･_\-]/u', '', nfkc($rule['title']));
+        if (!str_contains($title, 'キングオブタイム') && !str_contains(strtoupper($title), 'KINGOFTIME')) continue;
+        if (!empty($rule['is_closure'])) continue;
+        $key = '2026-11-15-share-king-of-time-' . (int)$rule['id'];
+        if (val('SELECT name FROM data_migrations WHERE name=?', [$key])) continue;
+        transaction(function () use ($rule, $key) {
+            if (val('SELECT name FROM data_migrations WHERE name=?', [$key])) return;
+            run("DELETE FROM staff_line_visibility WHERE kind='rule' AND entity_id=?", [(int)$rule['id']]);
+            run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('rule',?,1)", [(int)$rule['id']]);
+            run('INSERT INTO data_migrations (name,done_at) VALUES (?,?)', [$key, sl_now()]);
+        });
+    }
 }
 
 function sl_stream(): string
