@@ -287,4 +287,24 @@ expect(sl_rule_reminder_time(['id'=>99006,'title'=>'キングオブタイム確�
 run("DELETE FROM staff_line_visibility WHERE kind='rule' AND entity_id=99006");
 sl_apply_requested_rule_sharing();
 expect((int)val("SELECT COUNT(*) FROM staff_line_visibility WHERE kind='rule' AND entity_id=99006")===0, 'a later manual opt-out is not silently re-enabled');
+expect(!sl_holiday_suspended(at('2026-12-30 23:59:59')), 'holiday suspension starts after December 30');
+foreach (['2026-12-31 00:00:00','2027-01-02 15:00:00','2027-01-05 23:59:59','2027-01-06 08:59:59'] as $stamp) expect(sl_holiday_suspended(at($stamp)), 'no LINE delivery during holiday: ' . $stamp);
+expect(!sl_holiday_suspended(at('2027-01-06 09:00:00')), 'delivery resumes at exactly January 6 09:00 JST');
+expect(sl_holiday_suspended(new DateTimeImmutable('2027-01-05 23:59:00+00:00')), 'holiday suspension also converts UTC to JST');
+run("UPDATE staff_line_settings SET enabled=1, mode='auto', notify_changes=0, group_id=? WHERE stream='store'",[$group]);
+run("UPDATE staff_line_groups SET active=1 WHERE group_id=?",[$group]);
+run("UPDATE staff_line_jobs SET state='cancelled' WHERE state IN ('pending','ready','retry','oversized')");
+$holidayCalls=[];
+$holidayTransport=function($payload,$key) use (&$holidayCalls) { $holidayCalls[]=[$payload,$key]; return [200,[]]; };
+foreach (['2026-12-31 16:50:00','2027-01-02 15:00:00','2027-01-05 20:00:00','2027-01-06 08:59:00'] as $stamp) { clock_at($stamp); sl_tick($holidayTransport,sl_clock()); }
+expect(count($holidayCalls)===0, 'holiday suppresses evening summaries, drainage and waste reminders');
+clock_at('2027-01-06 09:00:00'); sl_tick($holidayTransport,sl_clock()); sl_tick($holidayTransport,sl_clock());
+expect(count($holidayCalls)===1, 'January 6 sends exactly one morning restart message');
+$morningText=json_decode($holidayCalls[0][0],true)['messages'][0]['text'];
+expect(str_contains($morningText,'おはようございます') && str_contains($morningText,'1月6日（水曜日）') && !str_contains($morningText,'こんばんは'), 'restart message contains todays schedule and a morning greeting');
+expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE scheduled_at >= '2026-12-31 00:00:00' AND scheduled_at < '2027-01-06 09:00:00' AND state IN ('ready','retry')")===0, 'no holiday backlog is sent after reopening');
+clock_at('2027-01-06 15:00:00'); sl_tick($holidayTransport,sl_clock());
+expect(count($holidayCalls)===2 && str_contains($holidayCalls[1][0],'排水'), 'normal afternoon reminders resume after the morning restart');
+clock_at('2027-01-06 20:00:00'); sl_tick($holidayTransport,sl_clock());
+expect(count($holidayCalls)===3 && str_contains($holidayCalls[2][0],'こんばんは'), 'normal evening summaries resume after the special morning message');
 echo "PASS {$n} checks (" . ($mysql ? 'MySQL' : 'SQLite isolated adapter') . ")\n";

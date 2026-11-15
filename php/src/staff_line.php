@@ -71,6 +71,13 @@ function sl_admin(): void
     if (!hash_equals($expected, (string)($_POST['csrf'] ?? ''))) { throw new HttpError(403); }
 }
 
+/** 正月特別休暇。日本時間の2027年1月6日09:00に配信を再開。 */
+function sl_holiday_suspended(DateTimeImmutable $now): bool
+{
+    $stamp = $now->setTimezone(new DateTimeZone('Asia/Tokyo'))->format('Y-m-d H:i:s');
+    return $stamp >= '2026-12-31 00:00:00' && $stamp < '2027-01-06 09:00:00';
+}
+
 function sl_daily_due(DateTimeImmutable $now): bool
 {
     $now = $now->setTimezone(new DateTimeZone('Asia/Tokyo'));
@@ -138,7 +145,7 @@ function sl_bundle(array $dates, string $stream = 'store'): array
     return $out;
 }
 
-function sl_text(array $snapshot, ?array $before = null, string $stream = 'store'): string
+function sl_text(array $snapshot, ?array $before = null, string $stream = 'store', bool $morning = false): string
 {
     $title = $stream === 'shift' ? '出勤スケジュール' : '店舗スケジュール';
     $lines = ['【' . $title . ($before === null ? '' : 'の変更・削除') . '】'];
@@ -167,7 +174,11 @@ function sl_text(array $snapshot, ?array $before = null, string $stream = 'store
         }
     }
     if ($stream === 'store' && $before === null) {
-        array_unshift($lines, 'こんばんは🌙', '', '本日も一日お疲れ様でございました。', '', '明日以降の店舗スケジュールをお知らせいたします📅', '');
+        if ($morning) {
+            array_unshift($lines, 'おはようございます☀️', '', '本日の店舗スケジュールをお知らせいたします📅', '');
+        } else {
+            array_unshift($lines, 'こんばんは🌙', '', '本日も一日お疲れ様でございました。', '', '明日以降の店舗スケジュールをお知らせいたします📅', '');
+        }
         $lines[] = '';
         $lines[] = 'いつもありがとうございます🙏';
     }
@@ -229,6 +240,7 @@ function sl_reminder_snapshot(string $kind, string $date): array
 
 function sl_job_text(string $kind, array $snapshot, ?array $before, string $stream): string
 {
+    if ($kind === 'resume') return sl_text($snapshot, $before, $stream, true);
     if (!sl_is_reminder($kind)) return sl_text($snapshot, $before, $stream);
     $date = (string)array_key_first($snapshot);
     $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
@@ -244,7 +256,7 @@ function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before,
 {
     if ($s['stream'] !== 'store') { throw new HttpError(400); }
     $text = sl_job_text($kind, $snapshot, $before, $s['stream']);
-    $state = sl_is_reminder($kind) || $s['mode'] === 'auto' ? 'ready' : 'pending';
+    $state = sl_is_reminder($kind) || $kind === 'resume' || $s['mode'] === 'auto' ? 'ready' : 'pending';
     try { sl_messages($text); } catch (LengthException) { $state = 'oversized'; }
     run("UPDATE staff_line_jobs SET slot = CONCAT('superseded:', id) WHERE slot = ? AND state = 'superseded' AND attempts = 0", [$slot]);
     run('INSERT IGNORE INTO staff_line_jobs (slot, kind, stream, group_id, snapshot, before_snapshot, body, content_hash, retry_key, state, expires_at, created_at, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -253,8 +265,12 @@ function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before,
 
 function sl_generate(array $s, DateTimeImmutable $now): void
 {
+    if (sl_holiday_suspended($now)) return;
     $today = $now->format('Y-m-d');
     $expiry = $today . ' 23:59:59';
+    if ($today === '2027-01-06') {
+        sl_enqueue('resume:' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'resume', sl_bundle([$today], $s['stream']), null, $s, $expiry, $today . ' 09:00:00');
+    }
     $drain = sl_drain_snapshot($today);
     if ($drain) {
         sl_enqueue('drain:' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'reminder', $drain, null, $s, $expiry, $today . ' 15:00:00');
@@ -289,6 +305,9 @@ function sl_refresh(array $job, array $s): array
         $snapshot = sl_reminder_snapshot($job['kind'], substr($job['scheduled_at'], 0, 10));
         if (!$snapshot) { run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE id = ?", [$job['id']]); return array_replace($job, ['state' => 'cancelled']); }
         $before = null;
+    } elseif ($job['kind'] === 'resume') {
+        $snapshot = sl_bundle([substr($job['scheduled_at'], 0, 10)], $s['stream']);
+        $before = null;
     } elseif ($job['kind'] === 'daily') {
         $day = new DateTimeImmutable(substr($job['created_at'], 0, 10), new DateTimeZone('Asia/Tokyo'));
         $snapshot = sl_bundle(sl_dates($day, (bool)$s['include_monday'], static fn($date) => sl_snapshot($date, $s['stream']) !== []), $s['stream']);
@@ -303,7 +322,7 @@ function sl_refresh(array $job, array $s): array
     $hash = sl_hash([$snapshot, $before]);
     $body = sl_job_text($job['kind'], $snapshot, $before, $s['stream']);
     if (!hash_equals($job['content_hash'], $hash) || $body !== $job['body']) {
-        $state = sl_is_reminder($job['kind']) || $s['mode'] === 'auto' ? 'ready' : 'pending';
+        $state = sl_is_reminder($job['kind']) || $job['kind'] === 'resume' || $s['mode'] === 'auto' ? 'ready' : 'pending';
         try { sl_messages($body); } catch (LengthException) { $state = 'oversized'; }
         run('UPDATE staff_line_jobs SET snapshot = ?, before_snapshot = ?, body = ?, content_hash = ?, state = ?, approved_by = NULL WHERE id = ?',
             [sl_json($snapshot), $before === null ? null : sl_json($before), $body, $hash, $state, $job['id']]);
@@ -335,6 +354,7 @@ function sl_http(string $payload, string $uuid): array
 
 function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transport): void
 {
+    if (sl_holiday_suspended($now)) return;
     if ($job['stream'] !== 'store' || $s['stream'] !== 'store') { return; }
     $job = sl_refresh($job, $s);
     if ($job['scheduled_at'] > $now->format('Y-m-d H:i:s')) { return; }
@@ -372,6 +392,11 @@ function sl_tick(?callable $transport = null, ?DateTimeImmutable $clock = null):
     ensure_staff_line_tables();
     sl_lock(function () use ($transport, $clock) {
         $now = ($clock ?? sl_clock())->setTimezone(new DateTimeZone('Asia/Tokyo'));
+        if (sl_holiday_suspended($now)) {
+            // 承認済み・再送待ちを含めて休暇中は送らず、休み明けのまとめ送信も防ぐ。
+            run("UPDATE staff_line_jobs SET state = CASE WHEN attempts=0 THEN 'expired' ELSE 'uncertain' END WHERE state IN ('pending','ready','retry','oversized') AND scheduled_at < '2027-01-06 09:00:00'");
+            return;
+        }
         run("UPDATE staff_line_jobs SET state = CASE WHEN attempts = 0 THEN 'expired' ELSE 'uncertain' END WHERE state IN ('pending','ready','retry','oversized') AND expires_at < ?", [$now->format('Y-m-d H:i:s')]);
         // 旧版に出勤共有の設定・配信待ちがあっても、実行できないようにする。
         run("UPDATE staff_line_settings SET enabled = 0 WHERE stream <> 'store'");
