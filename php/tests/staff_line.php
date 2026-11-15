@@ -218,4 +218,28 @@ expect(count($calls) === $beforeCalls && (int)val("SELECT COUNT(*) FROM staff_li
 clock_at('2026-11-15 08:55:00'); sl_tick($transport, sl_clock());
 expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE slot LIKE 'daily:%2026-11-15%'") === 0, 'Sunday creates no daily jobs');
 expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE state = 'expired'") > 0, 'unapproved jobs expire at end of day');
+run("UPDATE staff_line_settings SET enabled=1, mode='approval', notify_changes=0, group_id=? WHERE stream='store'", [$group]);
+run("UPDATE staff_line_jobs SET state='cancelled' WHERE state IN ('pending','ready','retry','oversized')");
+$drainCalls = [];
+$drainTransport = function($payload, $key) use (&$drainCalls) { $drainCalls[] = [$payload, $key]; return [200, []]; };
+clock_at('2026-11-18 14:59:00'); sl_tick($drainTransport, sl_clock());
+expect(count($drainCalls) === 0, 'drain reminder never sends before 15:00');
+expect((int)val("SELECT COUNT(*) FROM staff_line_jobs WHERE kind='reminder' AND scheduled_at='2026-11-18 15:00:00'") === 1, 'Wednesday drain reminder is scheduled at 15:00 JST');
+$baseCount = (int)val('SELECT COUNT(*) FROM staff_line_baselines');
+clock_at('2026-11-18 15:00:00'); sl_tick($drainTransport, sl_clock()); sl_tick($drainTransport, sl_clock());
+expect(count($drainCalls) === 1, 'Wednesday drain reminder sends automatically once even in approval mode');
+$drainPayload = json_decode($drainCalls[0][0], true, 512, JSON_THROW_ON_ERROR);
+expect($drainPayload['to'] === $group && str_contains($drainPayload['messages'][0]['text'], '15時のリマインド') && str_contains($drainPayload['messages'][0]['text'], '11月18日（水曜日）') && str_contains($drainPayload['messages'][0]['text'], 'ドリンク機械の排水'), 'drain reminder uses existing group and clear day, time and task');
+expect(!str_contains($drainPayload['messages'][0]['text'], 'こんばんは') && !str_contains($drainPayload['messages'][0]['text'], '店舗清掃'), '15:00 reminder contains only draining, without evening greeting or unrelated schedules');
+expect((int)val('SELECT COUNT(*) FROM staff_line_baselines') === $baseCount, 'drain reminder does not overwrite daily schedule baselines');
+foreach (['2026-11-19', '2026-11-20', '2026-11-22', '2026-11-23', '2026-11-24'] as $date) {
+    expect(sl_drain_snapshot($date) === [], 'no drain reminder outside Wednesday and Saturday: ' . $date);
+}
+clock_at('2026-11-21 14:59:00'); sl_tick($drainTransport, sl_clock());
+expect(count($drainCalls) === 1, 'Saturday reminder waits until 15:00');
+clock_at('2026-11-21 15:00:00'); sl_tick($drainTransport, sl_clock()); sl_tick($drainTransport, sl_clock());
+expect(count($drainCalls) === 2 && str_contains($drainCalls[1][0], '11月21日（土曜日）'), 'Saturday drain reminder also sends once at 15:00');
+run("UPDATE staff_line_settings SET enabled=0 WHERE stream='store'");
+clock_at('2026-11-25 15:00:00'); sl_tick($drainTransport, sl_clock());
+expect(count($drainCalls) === 2, 'disabling LINE sharing also stops drain reminders');
 echo "PASS {$n} checks (" . ($mysql ? 'MySQL' : 'SQLite isolated adapter') . ")\n";
