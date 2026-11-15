@@ -11,11 +11,19 @@
 .rf input, .rf select { font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; width: 100%; box-sizing: border-box; }
 .rf .opt { display: none; gap: 8px; }
 .rf .opt.on { display: grid; }
+.notify-legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin:10px 0 14px; font-size:13px; color:var(--fg2); }
+.notify-key::before { content:''; display:inline-block; width:12px; height:12px; margin-right:5px; border-radius:3px; background:#e9edf0; border:1px solid #89949c; vertical-align:-1px; }
+.notify-key.yes::before { background:#dff2e6; border-color:#43835d; }
+.notify-badge { display:inline-block; margin-top:5px; padding:2px 7px; border-radius:6px; font-size:12px; font-weight:600; line-height:1.5; color:#52606b; background:#edf0f2; border:1px solid #b7c0c7; overflow-wrap:anywhere; }
+.notify-badge.yes { color:#245c39; background:#e4f4e9; border-color:#80b394; }
+.rl.notify-on { background:#f1faf4; border-color:#80b394; border-left:5px solid #43835d; }
+.rl.notify-off { background:#f5f6f7; border-color:#c6cdd2; border-left:5px solid #a9b2b9; }
 </style>
 {% endblock %}
 {% block content %}
 <p style="margin-bottom:8px"><a href="/schedule">← 予定にもどる</a></p>
 <h1 style="font-size:20px;font-weight:700;margin-bottom:8px">予定を足す・直す</h1>
+<div class="notify-legend no-print"><span class="notify-key yes">緑：通知する予定</span><span class="notify-key">灰色：通知なし・停止中</span></div>
 <form class="rf" method="post" action="/schedule/rules/add">
   <input name="title" placeholder="予定の名前（例：大掃除）" required maxlength="80">
   <select name="store"><option value="">両方の店</option><option>イノ</option><option>リッチ</option></select>
@@ -29,8 +37,8 @@
   <button class="btn" type="submit">足す</button>
 </form>
 {% for r in rules %}
-<div class="rl{% if not r.is_active %} off{% endif %}">
-  <div class="t">{{ r.title }}<small>{{ r.text }}{% if r.store %}・{{ r.store }}{% else %}・両方の店{% endif %}</small></div>
+<div class="rl {{ r.notify ? 'notify-on' : 'notify-off' }}{% if not r.is_active %} off{% endif %}">
+  <div class="t">{{ r.title }}<small>{{ r.text }}{% if r.store %}・{{ r.store }}{% else %}・両方の店{% endif %}</small><span class="notify-badge{% if r.notify %} yes{% endif %}">{{ r.notify_label }}</span></div>
   <form method="post" action="/schedule/rules/{{ r.id }}/toggle"><button class="btn btn-ghost btn-sm" type="submit">{{ r.is_active ? '止める' : '戻す' }}</button></form>
   <form method="post" action="/schedule/rules/{{ r.id }}/delete" onsubmit="return confirm('「{{ r.title|e('js') }}」を消しますか？')"><button class="btn btn-ghost btn-sm" style="color:var(--danger)" type="submit">消す</button></form>
 </div>

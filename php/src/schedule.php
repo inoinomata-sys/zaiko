@@ -67,10 +67,37 @@ function schedule_on(array $rules, DateTimeImmutable $d): array
     $out = [];
     foreach ($rules as $r) {
         if ((int)$r['is_active'] === 1 && schedule_matches($r, $d)) {
-            $out[] = ['title' => $r['title'], 'store' => $r['store']];
+            $out[] = ['title' => $r['title'], 'store' => $r['store'], 'notify' => $r['notify'] ?? false, 'notify_label' => $r['notify_label'] ?? '通知なし'];
         }
     }
     return $out;
+}
+
+/** 通知対象と、全体停止中を区別して表示する。送信設定は変更しない。 */
+function schedule_notification_info(array $rule, array $shared, bool $running): array
+{
+    $active = !empty($rule['is_active']);
+    $time = sl_rule_reminder_time($rule);
+    $line = $active && empty($rule['is_closure']) && isset($shared[(int)$rule['id']]);
+    $target = $time !== '' || $line;
+    $detail = implode('・', array_filter([$time, $line ? 'LINE共有' : '']));
+    return [
+        'notify' => $target && $running,
+        'notify_label' => !$active ? '予定停止中' : (!$target ? '通知なし' : ($running ? $detail : '通知停止中（' . $detail . '）')),
+    ];
+}
+
+function schedule_with_notifications(array $rules): array
+{
+    ensure_staff_line_tables();
+    $shared = [];
+    foreach (rows("SELECT entity_id FROM staff_line_visibility WHERE kind='rule' AND is_public=1") as $v) $shared[(int)$v['entity_id']] = true;
+    $settings = sl_settings('store');
+    $running = !empty($settings['enabled']) && !empty($settings['group_id']) && !empty(sl_config()['delivery_enabled'])
+        && (bool)val('SELECT active FROM staff_line_groups WHERE group_id=?', [$settings['group_id']]);
+    foreach ($rules as &$rule) $rule = array_merge($rule, schedule_notification_info($rule, $shared, $running));
+    unset($rule);
+    return $rules;
 }
 
 function schedule_rules_all(): array
@@ -98,7 +125,7 @@ function h_menu(): void
 function schedule_calendar(DateTimeImmutable $first): array
 {
     ensure_schedule_tables();
-    $rules = schedule_rules_for_period($first, $first->modify('last day of this month'));
+    $rules = schedule_with_notifications(schedule_rules_for_period($first, $first->modify('last day of this month')));
     $days = [];
     foreach (shift_days($first) as $day) {
         $d = new DateTimeImmutable($day['date'], new DateTimeZone('Asia/Tokyo'));
@@ -124,7 +151,7 @@ function h_schedule_pdf(): void
 function h_schedule_rules(): void
 {
     ensure_schedule_tables();
-    $rules = schedule_rules_all();
+    $rules = schedule_with_notifications(schedule_rules_all());
     foreach ($rules as &$r) {
         $r['text'] = match ($r['kind']) {
             'weekly' => '毎週' . SHIFT_WEEK[(int)$r['weekday']] . '曜日',

@@ -116,6 +116,14 @@
  .sc-closed{font-size:7pt!important;color:#000!important}
  *{text-shadow:none!important;color:#000!important}
 }
+.notify-legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin:10px 0 14px; font-size:13px; color:var(--fg2); }
+.notify-key::before { content:''; display:inline-block; width:12px; height:12px; margin-right:5px; border-radius:3px; background:#e9edf0; border:1px solid #89949c; vertical-align:-1px; }
+.notify-key.yes::before { background:#dff2e6; border-color:#43835d; }
+.notify-badge { display:inline-block; margin-top:5px; padding:2px 7px; border-radius:6px; font-size:12px; font-weight:600; line-height:1.5; color:#52606b; background:#edf0f2; border:1px solid #b7c0c7; overflow-wrap:anywhere; }
+.notify-badge.yes { color:#245c39; background:#e4f4e9; border-color:#80b394; }
+@media screen { .cal-ev.notify-on { background:#e4f4e9; color:#245c39; border-left-color:#43835d; } .cal-ev.notify-off { background:#edf0f2; color:#52606b; border-left-color:#a9b2b9; } }
+.cal-ev .notify-badge { display:block; padding:0; border:0; font-size:10px; background:transparent; }
+@media print { .notify-badge { display:none!important; } }
 </style>
 {% endblock %}
 {% block content %}
@@ -124,6 +132,7 @@
 <div class="sc-top"><h1>店舗スケジュール</h1>
   <div class="sh-nav"><a href="/schedule?month={{ nav.prev }}" aria-label="前の月">‹</a><b>{{ nav.label }}</b><a href="/schedule?month={{ nav.next }}" aria-label="次の月">›</a></div></div>
 <p class="sc-hint no-print">日付を押すと、その日の予定を追加できます。出勤予定は別のカレンダーで管理します。</p>
+<div class="notify-legend no-print"><span class="notify-key yes">緑：通知する予定</span><span class="notify-key">灰色：通知なし・停止中</span></div>
 <div class="cal">
   <div class="cal-head"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div></div>
   {% for week in weeks %}
@@ -133,7 +142,7 @@
     <div class="cal-cell{% if day.today %} today{% endif %}" data-add-url="/schedule/add?date={{ day.date }}">
       <a class="cal-d{% if day.sun %} sun{% elseif day.sat %} sat{% endif %}" href="/schedule/add?date={{ day.date }}" aria-label="{{ day.date }}の予定を追加">{{ day.d }}{% if day.hol %}<span class="cal-hol">{{ day.hol }}</span>{% endif %}</a>
       {% if day.closed %}<div class="sc-closed">店休日</div>{% endif %}
-      {% for e in day.events %}<div class="cal-ev">{{ e.title }}{% if e.store %}<small>（{{ e.store }}）</small>{% endif %}</div>{% endfor %}
+      {% for e in day.events %}<div class="cal-ev {{ e.notify ? 'notify-on' : 'notify-off' }}">{{ e.title }}{% if e.store %}<small>（{{ e.store }}）</small>{% endif %}<span class="notify-badge{% if e.notify %} yes{% endif %}">{{ e.notify_label }}</span></div>{% endfor %}
     </div>
     {% else %}<div class="cal-cell blank"></div>{% endif %}
     {% endfor %}

@@ -177,6 +177,16 @@ function sl_drain_snapshot(string $date): array
     return [$date => ['drain' => ['label' => 'ドリンク機械の排水', 'value' => '水が溜まる前に、排水をお願いします。']]];
 }
 
+/** 予定一覧と実際の通知で同じ時刻判定を使う。 */
+function sl_rule_reminder_time(array $rule): string
+{
+    if (empty($rule['is_active']) || !empty($rule['is_closure'])) return '';
+    $title = nfkc($rule['title']);
+    if ($rule['kind'] === 'weekly' && in_array((int)($rule['weekday'] ?? -1), [3,6], true) && str_contains($title, 'ドリンク') && str_contains($title, '排水')) return '15:00';
+    if (($rule['store'] ?? '') === 'イノ' && in_array($rule['kind'], ['weekly','nth'], true) && (int)($rule['weekday'] ?? -1) === 4 && in_array($title, ['ゴミ出し(リマインド)', '瓶のゴミまとめる'], true)) return '16:50';
+    return '';
+}
+
 /** 登録済みのイノの2件だけ。停止・削除や第3木曜の条件も元の予定に従う。 */
 function sl_waste_snapshot(string $date): array
 {
@@ -184,7 +194,7 @@ function sl_waste_snapshot(string $date): array
     if ($day->format('N') !== '4') return [];
     $items = [];
     foreach (schedule_rules_all() as $rule) {
-        if (!(int)$rule['is_active'] || !empty($rule['is_closure']) || $rule['store'] !== 'イノ' || !schedule_matches($rule, $day)) continue;
+        if (sl_rule_reminder_time($rule) !== '16:50' || !schedule_matches($rule, $day)) continue;
         $title = nfkc($rule['title']);
         if (!in_array($title, ['ゴミ出し(リマインド)', '瓶のゴミまとめる'], true)) continue;
         $items['rule:' . $rule['id']] = ['label' => $title === '瓶のゴミまとめる' ? '瓶のゴミをまとめる' : 'ゴミ出し', 'value' => 'イノ'];
