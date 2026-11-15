@@ -243,4 +243,28 @@ expect(count($drainCalls) === 2 && str_contains($drainCalls[1][0], '11月21日�
 run("UPDATE staff_line_settings SET enabled=0 WHERE stream='store'");
 clock_at('2026-11-25 15:00:00'); sl_tick($drainTransport, sl_clock());
 expect(count($drainCalls) === 2, 'disabling LINE sharing also stops drain reminders');
+// イノの登録済み2件を当日16:50にまとめる。外部LINEはモック。
+run("INSERT INTO schedule_rules (id,title,store,kind,weekday,nth) VALUES (99003,'ゴミ出し(リマインド)','イノ','weekly',4,NULL),(99004,'瓶のゴミまとめる','イノ','nth',4,3)");
+run("UPDATE staff_line_settings SET enabled=1, mode='approval', notify_changes=0 WHERE stream='store'");
+run("UPDATE staff_line_jobs SET state='cancelled' WHERE state IN ('pending','ready','retry','oversized')");
+$wasteCalls=[];
+$wasteTransport=function($payload,$key) use (&$wasteCalls) { $wasteCalls[]=[$payload,$key]; return [200,[]]; };
+expect(sl_waste_snapshot('2026-11-18') === [], 'waste reminders never appear on non-Thursdays');
+clock_at('2026-11-19 16:49:00'); sl_tick($wasteTransport,sl_clock());
+expect(count($wasteCalls) === 0, 'waste reminder never sends before 16:50');
+clock_at('2026-11-19 16:50:00'); sl_tick($wasteTransport,sl_clock()); sl_tick($wasteTransport,sl_clock());
+expect(count($wasteCalls) === 1, 'third Thursday sends a single reminder at 16:50');
+$wasteText=json_decode($wasteCalls[0][0],true)['messages'][0]['text'];
+expect(str_contains($wasteText,'16時50分') && str_contains($wasteText,'11月19日（木曜日）') && str_contains($wasteText,'【イノ】') && str_contains($wasteText,'・ゴミ出し') && str_contains($wasteText,'・瓶のゴミをまとめる'), 'third Thursday includes both tasks and the correct store and date');
+expect(!str_contains($wasteText,'排水'), '16:50 waste reminder does not include the 15:00 drainage task');
+clock_at('2026-11-26 16:50:00'); sl_tick($wasteTransport,sl_clock());
+expect(count($wasteCalls) === 2 && !str_contains($wasteCalls[1][0],'瓶のゴミ'), 'fourth Thursday sends only weekly waste collection, not bottles');
+run("UPDATE schedule_rules SET is_active=0 WHERE id=99003");
+clock_at('2026-12-03 16:50:00'); sl_tick($wasteTransport,sl_clock());
+expect(count($wasteCalls) === 2, 'stopping the source schedule also stops its reminder');
+run("UPDATE schedule_rules SET is_active=1 WHERE id=99003");
+clock_at('2026-12-10 16:49:00'); sl_tick($wasteTransport,sl_clock());
+run("DELETE FROM schedule_rules WHERE id=99003");
+clock_at('2026-12-10 16:50:00'); sl_tick($wasteTransport,sl_clock());
+expect(count($wasteCalls) === 2, 'deleting a source before the reminder cancels its queued message');
 echo "PASS {$n} checks (" . ($mysql ? 'MySQL' : 'SQLite isolated adapter') . ")\n";

@@ -177,11 +177,37 @@ function sl_drain_snapshot(string $date): array
     return [$date => ['drain' => ['label' => 'ドリンク機械の排水', 'value' => '水が溜まる前に、排水をお願いします。']]];
 }
 
+/** 登録済みのイノの2件だけ。停止・削除や第3木曜の条件も元の予定に従う。 */
+function sl_waste_snapshot(string $date): array
+{
+    $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
+    if ($day->format('N') !== '4') return [];
+    $items = [];
+    foreach (schedule_rules_all() as $rule) {
+        if (!(int)$rule['is_active'] || !empty($rule['is_closure']) || $rule['store'] !== 'イノ' || !schedule_matches($rule, $day)) continue;
+        $title = nfkc($rule['title']);
+        if (!in_array($title, ['ゴミ出し(リマインド)', '瓶のゴミまとめる'], true)) continue;
+        $items['rule:' . $rule['id']] = ['label' => $title === '瓶のゴミまとめる' ? '瓶のゴミをまとめる' : 'ゴミ出し', 'value' => 'イノ'];
+    }
+    return $items ? [$date => $items] : [];
+}
+
+function sl_is_reminder(string $kind): bool { return in_array($kind, ['reminder', 'waste'], true); }
+function sl_reminder_snapshot(string $kind, string $date): array
+{
+    return $kind === 'waste' ? sl_waste_snapshot($date) : sl_drain_snapshot($date);
+}
+
 function sl_job_text(string $kind, array $snapshot, ?array $before, string $stream): string
 {
-    if ($kind !== 'reminder') return sl_text($snapshot, $before, $stream);
+    if (!sl_is_reminder($kind)) return sl_text($snapshot, $before, $stream);
     $date = (string)array_key_first($snapshot);
     $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
+    if ($kind === 'waste') {
+        $tasks = [];
+        foreach ($snapshot[$date] as $item) $tasks[] = '・' . $item['label'];
+        return "【16時50分のリマインド】\n\n" . $day->format('n月j日') . '（' . SHIFT_WEEK[(int)$day->format('w')] . "曜日）\n\n【イノ】\n\n" . implode("\n", $tasks) . "\n\n忘れずにお願いいたします🤲";
+    }
     return "【15時のリマインド】\n\n" . $day->format('n月j日') . '（' . SHIFT_WEEK[(int)$day->format('w')] . "曜日）\n\nドリンク機械の排水をお願いします。\n\n溜まったら腰くだけそうになるので、溜まる前にお願いいたします🤲";
 }
 
@@ -189,7 +215,7 @@ function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before,
 {
     if ($s['stream'] !== 'store') { throw new HttpError(400); }
     $text = sl_job_text($kind, $snapshot, $before, $s['stream']);
-    $state = $kind === 'reminder' || $s['mode'] === 'auto' ? 'ready' : 'pending';
+    $state = sl_is_reminder($kind) || $s['mode'] === 'auto' ? 'ready' : 'pending';
     try { sl_messages($text); } catch (LengthException) { $state = 'oversized'; }
     run("UPDATE staff_line_jobs SET slot = CONCAT('superseded:', id) WHERE slot = ? AND state = 'superseded' AND attempts = 0", [$slot]);
     run('INSERT IGNORE INTO staff_line_jobs (slot, kind, stream, group_id, snapshot, before_snapshot, body, content_hash, retry_key, state, expires_at, created_at, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -203,6 +229,10 @@ function sl_generate(array $s, DateTimeImmutable $now): void
     $drain = sl_drain_snapshot($today);
     if ($drain) {
         sl_enqueue('drain:' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'reminder', $drain, null, $s, $expiry, $today . ' 15:00:00');
+    }
+    $waste = sl_waste_snapshot($today);
+    if ($waste) {
+        sl_enqueue('waste:' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'waste', $waste, null, $s, $expiry, $today . ' 16:50:00');
     }
     if (sl_daily_due($now->setTime(20, 0))) {
         $dates = sl_dates($now, (bool)$s['include_monday'], static fn($date) => sl_snapshot($date, $s['stream']) !== []);
@@ -226,8 +256,9 @@ function sl_refresh(array $job, array $s): array
     if ((int)$job['attempts'] > 0) { return $job; }
     $snapshot = json_decode($job['snapshot'], true, 512, JSON_THROW_ON_ERROR);
     $before = $job['before_snapshot'] === null ? null : json_decode($job['before_snapshot'], true, 512, JSON_THROW_ON_ERROR);
-    if ($job['kind'] === 'reminder') {
-        $snapshot = sl_drain_snapshot(substr($job['scheduled_at'], 0, 10));
+    if (sl_is_reminder($job['kind'])) {
+        $snapshot = sl_reminder_snapshot($job['kind'], substr($job['scheduled_at'], 0, 10));
+        if (!$snapshot) { run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE id = ?", [$job['id']]); return array_replace($job, ['state' => 'cancelled']); }
         $before = null;
     } elseif ($job['kind'] === 'daily') {
         $day = new DateTimeImmutable(substr($job['created_at'], 0, 10), new DateTimeZone('Asia/Tokyo'));
@@ -243,7 +274,7 @@ function sl_refresh(array $job, array $s): array
     $hash = sl_hash([$snapshot, $before]);
     $body = sl_job_text($job['kind'], $snapshot, $before, $s['stream']);
     if (!hash_equals($job['content_hash'], $hash) || $body !== $job['body']) {
-        $state = $job['kind'] === 'reminder' || $s['mode'] === 'auto' ? 'ready' : 'pending';
+        $state = sl_is_reminder($job['kind']) || $s['mode'] === 'auto' ? 'ready' : 'pending';
         try { sl_messages($body); } catch (LengthException) { $state = 'oversized'; }
         run('UPDATE staff_line_jobs SET snapshot = ?, before_snapshot = ?, body = ?, content_hash = ?, state = ?, approved_by = NULL WHERE id = ?',
             [sl_json($snapshot), $before === null ? null : sl_json($before), $body, $hash, $state, $job['id']]);
@@ -286,7 +317,7 @@ function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transpo
     }
     if ($job['expires_at'] < $now->format('Y-m-d H:i:s')) { run("UPDATE staff_line_jobs SET state = 'expired' WHERE id = ?", [$job['id']]); return; }
     $sentSnapshot = json_decode($job['snapshot'], true, 512, JSON_THROW_ON_ERROR);
-    $currentSnapshot = $job['kind'] === 'reminder' ? sl_drain_snapshot(substr($job['scheduled_at'], 0, 10)) : sl_bundle(array_keys($sentSnapshot), $s['stream']);
+    $currentSnapshot = sl_is_reminder($job['kind']) ? sl_reminder_snapshot($job['kind'], substr($job['scheduled_at'], 0, 10)) : sl_bundle(array_keys($sentSnapshot), $s['stream']);
     if ((int)$job['attempts'] > 0 && $currentSnapshot !== $sentSnapshot) {
         run("UPDATE staff_line_jobs SET state = 'uncertain' WHERE id = ?", [$job['id']]); return;
     }
@@ -299,7 +330,7 @@ function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transpo
     transaction(function () use ($job, $state, $status, $now, $s) {
         run('UPDATE staff_line_jobs SET state = ?, http_status = ?, accepted_at = ? WHERE id = ?', [$state, $status, $state === 'accepted' ? $now->format('Y-m-d H:i:s') : null, $job['id']]);
         run('INSERT INTO staff_line_attempts (job_id, attempted_at, http_status, result) VALUES (?,?,?,?)', [$job['id'], $now->format('Y-m-d H:i:s'), $status, $state]);
-        if ($state === 'accepted' && $job['kind'] !== 'reminder') {
+        if ($state === 'accepted' && !sl_is_reminder($job['kind'])) {
             foreach (json_decode($job['snapshot'], true, 512, JSON_THROW_ON_ERROR) as $date => $items) {
                 run('INSERT INTO staff_line_baselines (stream, group_id, work_date, snapshot, job_id) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE snapshot = VALUES(snapshot), job_id = VALUES(job_id)', [$s['stream'], $job['group_id'], $date, sl_json($items), $job['id']]);
             }
