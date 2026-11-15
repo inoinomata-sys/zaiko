@@ -34,10 +34,9 @@ function sl_apply_requested_rule_sharing(): void
         $key = '2026-11-15-share-king-of-time-' . (int)$rule['id'];
         if (val('SELECT name FROM data_migrations WHERE name=?', [$key])) continue;
         transaction(function () use ($rule, $key) {
-            if (val('SELECT name FROM data_migrations WHERE name=?', [$key])) return;
+            if (!run('INSERT IGNORE INTO data_migrations (name,done_at) VALUES (?,?)', [$key, sl_now()])) return;
             run("DELETE FROM staff_line_visibility WHERE kind='rule' AND entity_id=?", [(int)$rule['id']]);
             run("INSERT INTO staff_line_visibility (kind,entity_id,is_public) VALUES ('rule',?,1)", [(int)$rule['id']]);
-            run('INSERT INTO data_migrations (name,done_at) VALUES (?,?)', [$key, sl_now()]);
         });
     }
 }
