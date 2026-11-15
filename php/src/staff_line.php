@@ -182,7 +182,7 @@ function sl_job_text(string $kind, array $snapshot, ?array $before, string $stre
     if ($kind !== 'reminder') return sl_text($snapshot, $before, $stream);
     $date = (string)array_key_first($snapshot);
     $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
-    return "【15時のリマインド】\n\n" . $day->format('n月j日') . '（' . SHIFT_WEEK[(int)$day->format('w')] . "曜日）\n\nドリンク機械の排水をお願いします。\n水が溜まると大変なので、忘れずにご確認ください。";
+    return "【15時のリマインド】\n\n" . $day->format('n月j日') . '（' . SHIFT_WEEK[(int)$day->format('w')] . "曜日）\n\nドリンク機械の排水をお願いします。\n\n溜まったら腰くだけそうになるので、溜まる前にお願いいたします🤲";
 }
 
 function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before, array $s, string $expires, ?string $scheduled = null): void

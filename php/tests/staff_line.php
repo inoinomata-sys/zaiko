@@ -230,6 +230,7 @@ clock_at('2026-11-18 15:00:00'); sl_tick($drainTransport, sl_clock()); sl_tick($
 expect(count($drainCalls) === 1, 'Wednesday drain reminder sends automatically once even in approval mode');
 $drainPayload = json_decode($drainCalls[0][0], true, 512, JSON_THROW_ON_ERROR);
 expect($drainPayload['to'] === $group && str_contains($drainPayload['messages'][0]['text'], '15時のリマインド') && str_contains($drainPayload['messages'][0]['text'], '11月18日（水曜日）') && str_contains($drainPayload['messages'][0]['text'], 'ドリンク機械の排水'), 'drain reminder uses existing group and clear day, time and task');
+expect(str_contains($drainPayload['messages'][0]['text'], "\n\n溜まったら腰くだけそうになるので、溜まる前にお願いいたします🤲"), 'drain reminder includes the requested personal message verbatim');
 expect(!str_contains($drainPayload['messages'][0]['text'], 'こんばんは') && !str_contains($drainPayload['messages'][0]['text'], '店舗清掃'), '15:00 reminder contains only draining, without evening greeting or unrelated schedules');
 expect((int)val('SELECT COUNT(*) FROM staff_line_baselines') === $baseCount, 'drain reminder does not overwrite daily schedule baselines');
 foreach (['2026-11-19', '2026-11-20', '2026-11-22', '2026-11-23', '2026-11-24'] as $date) {
