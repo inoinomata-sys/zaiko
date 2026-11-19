@@ -1,0 +1,35 @@
+{% extends 'base.twig' %}
+{% block title %}Web注文{% endblock %}
+{% block head %}
+<style>
+.web-orders {max-width:640px;margin:0 auto;padding:6px 0 24px}
+.web-back {display:inline-flex;align-items:center;min-height:44px;font-size:13px;color:var(--fg2);margin-bottom:10px}
+.web-orders h1 {font-size:24px;font-weight:600;letter-spacing:.03em;margin-bottom:8px}
+.web-intro {font-size:13px;color:var(--fg2);line-height:1.8;margin-bottom:24px}
+.web-list {display:grid;gap:12px}
+.web-site {display:flex;align-items:center;gap:16px;padding:20px;background:#fff;border:1px solid var(--border);border-radius:16px;color:var(--fg);min-height:90px;text-decoration:none}
+.web-site:hover {background:#fafaf8;text-decoration:none}
+.web-site:focus-visible {outline:2px solid var(--acc);outline-offset:4px}
+.web-info {flex:1;min-width:0}
+.web-name {display:block;font-size:17px;font-weight:600;line-height:1.5}
+.web-host {display:block;margin-top:5px;font-size:12px;color:var(--fg2);overflow-wrap:anywhere}
+.web-open {display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:13px;color:var(--fg2)}
+.web-open svg {width:17px;height:17px}
+@media(max-width:360px){.web-site{padding:17px 14px;gap:10px}.web-name{font-size:16px}}
+</style>
+{% endblock %}
+{% block content %}
+<section class="web-orders">
+<a class="web-back" href="/">← トップに戻る</a>
+<h1>Web注文</h1>
+<p class="web-intro">各社の注文サイトを別タブで開きます。</p>
+<div class="web-list">
+{% for site in sites %}
+<a class="web-site" href="{{ site.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ site.name }}の注文サイトを開く（別タブ）">
+  <span class="web-info"><span class="web-name">{{ site.name }}</span><span class="web-host">{{ site.host }}</span></span>
+  <span class="web-open">開く<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6 M20 4l-10 10 M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></span>
+</a>
+{% endfor %}
+</div>
+</section>
+{% endblock %}

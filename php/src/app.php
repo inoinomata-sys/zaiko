@@ -7,6 +7,7 @@ use Twig\TwigFilter;
 
 require __DIR__ . '/stock.php';
 require __DIR__ . '/orders.php';
+require __DIR__ . '/web_orders.php';
 require __DIR__ . '/customer.php';
 require __DIR__ . '/products.php';
 require __DIR__ . '/shift.php';
@@ -80,6 +81,7 @@ function routes(): array
         ['GET', '/usage', 'h_usage'],
         ['POST', '/api/usage', 'h_api_usage'],
         ['GET', '/order', 'h_order_top'],
+        ['GET', '/web-orders', 'h_web_orders'],
         ['GET', '/order/form', 'h_order_form'],
         ['POST', '/api/order_draft', 'h_api_order_draft'],
         ['POST', '/api/order_draft/clear', 'h_api_order_draft_clear'],

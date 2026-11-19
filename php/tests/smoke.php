@@ -135,6 +135,20 @@ preg_match_all('~<a href="(/stock\?store=[^"]+)" class="chip store-chip[^"]*"~',
 ok(count($storeLinks[1]) === 2 && count($storeChips[0]) === 2, '店舗ボタンはトップでなく在庫画面へ移動');
 page_ok('/', '在庫管理');
 page_ok('/', '出勤スケジュール');
+page_ok('/', 'href="/web-orders"');
+$webOrders = page_ok('/web-orders', 'Web注文');
+$webLinks = [
+    'アリミノコアミー' => 'https://market.arimino.co.jp/shop/salontop.aspx',
+    'ナプラ' => 'https://www.naplatag.jp/Form/Salon/SalonLogin.aspx',
+    'オーガニックノート' => 'https://www.dresspoint.co.jp/NoteOrder/',
+    'リファ' => 'https://b2b-online.mtg.gr.jp',
+    'リーディアル' => 'https://ledeal-ec.com/aec/user/login',
+];
+foreach ($webLinks as $brand => $url) {
+    ok(str_contains($webOrders, $brand) && str_contains($webOrders, 'href="' . $url . '" target="_blank" rel="noopener noreferrer"'), "Web注文: {$brand}の指定URLを別タブで開く");
+}
+ok(substr_count($webOrders, 'class="web-site"') === 5, 'Web注文: 指定の5社だけを掲載');
+
 page_ok('/?store=' . rawurlencode('リッチ'));
 page_ok('/usage', 'NCSシャンプー');
 page_ok('/usage?supplier=' . rawurlencode('株式会社ワールド美容'));
