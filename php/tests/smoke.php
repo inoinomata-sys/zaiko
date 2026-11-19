@@ -148,6 +148,40 @@ foreach ($webLinks as $brand => $url) {
     ok(str_contains($webOrders, $brand) && str_contains($webOrders, 'href="' . $url . '" target="_blank" rel="noopener noreferrer"'), "Web注文: {$brand}の指定URLを別タブで開く");
 }
 ok(substr_count($webOrders, 'class="web-site"') === 5, 'Web注文: 指定の5社だけを掲載');
+page_ok('/settings', 'href="/settings/web-orders"');
+$webSettings = page_ok('/settings/web-orders', '会社を追加');
+preg_match('/name="form_key" value="([^"]+)"/', $webSettings, $webKey);
+$webKey = $webKey[1] ?? '';
+ok($webKey !== '', 'Web注文管理: 保存用の鍵がある');
+$firstWebId = (int)db_val("SELECT id FROM web_order_sites WHERE seed_key='initial-0'");
+$editWeb = ['id'=>$firstWebId,'form_key'=>$webKey,'name'=>'アリミノコアミー','url'=>'https://example.com/updated-order','is_active'=>'1'];
+[$st] = http('POST', '/settings/web-orders/save', null, array_replace($editWeb, ['form_key'=>'wrong']));
+ok($st === 403, 'Web注文管理: 正しい画面から以外の保存を拒否');
+[$st] = http('POST', '/settings/web-orders/save', null, array_replace($editWeb, ['url'=>'javascript:alert(1)']));
+ok($st === 400 && db_val("SELECT url FROM web_order_sites WHERE id={$firstWebId}") === $webLinks['アリミノコアミー'], 'Web注文管理: 危険なURLは保存せず元の値を維持');
+[$st] = http('POST', '/settings/web-orders/save', null, array_replace($editWeb, ['url'=>'https://user:password@example.com']));
+ok($st === 400, 'Web注文管理: パスワードを含んだURLは保存しない');
+[$st] = http('POST', '/settings/web-orders/save', null, $editWeb);
+ok($st === 302, 'Web注文管理: URL変更を保存');
+page_ok('/web-orders', 'https://example.com/updated-order');
+ok(db_val("SELECT url FROM web_order_sites WHERE id={$firstWebId}") === $editWeb['url'], 'Web注文管理: 開き直しても初期URLで上書きされない');
+[$st] = http('POST', '/settings/web-orders/save', null, array_replace($editWeb, ['is_active'=>'0']));
+$hiddenWeb = page_ok('/web-orders');
+ok($st === 302 && !str_contains($hiddenWeb, 'class="web-name">アリミノコアミー'), 'Web注文管理: 非表示にした会社を一覧から外す');
+[$st] = http('POST', '/settings/web-orders/save', null, array_replace($editWeb, ['url'=>$webLinks['アリミノコアミー']]));
+ok($st === 302 && str_contains(page_ok('/web-orders'), $webLinks['アリミノコアミー']), 'Web注文管理: 再表示して元のURLに戻せる');
+$addWeb = ['id'=>0,'form_key'=>$webKey,'name'=>'試験用メーカー','url'=>'https://example.com/new-order','is_active'=>'1'];
+[$st] = http('POST', '/settings/web-orders/save', null, $addWeb);
+$newWebId = (int)db_val("SELECT id FROM web_order_sites WHERE name='試験用メーカー'");
+ok($st === 302 && $newWebId > 0 && str_contains(page_ok('/web-orders'), '試験用メーカー'), 'Web注文管理: 新しい会社を追加できる');
+http('POST', '/settings/web-orders/save', null, array_replace($addWeb, ['id'=>$newWebId,'is_active'=>'0']));
+$NO_ADMIN = true;
+[$st] = http('GET', '/settings/web-orders');
+ok($st === 302, 'Web注文管理: 管理者解除なしでは編集画面を開けない');
+[$st] = http('POST', '/settings/web-orders/save', null, $editWeb);
+ok($st === 403, 'Web注文管理: 管理者解除なしでは保存できない');
+$NO_ADMIN = false;
+
 
 page_ok('/?store=' . rawurlencode('リッチ'));
 page_ok('/usage', 'NCSシャンプー');

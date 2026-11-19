@@ -1,0 +1,45 @@
+{% extends 'base.twig' %}
+{% block title %}Web注文の管理{% endblock %}
+{% block head %}<style>
+.wo-settings {max-width:680px;margin:0 auto}
+.wo-back {display:inline-block;font-size:13px;color:var(--fg2);padding:10px 0;margin-bottom:12px}
+.wo-settings h1 {font-size:22px;margin-bottom:8px}
+.wo-note {font-size:13px;color:var(--fg2);line-height:1.8;margin-bottom:20px}
+.wo-form {display:grid;gap:12px;padding:18px;background:#fff;border:1px solid var(--border);border-radius:14px;margin-bottom:14px;scroll-margin-top:80px}
+.wo-form.off {background:#f6f6f4}
+.wo-form h2 {font-size:17px;font-weight:600;margin:0}
+.wo-form label {display:grid;gap:6px;font-size:13px;color:var(--fg2)}
+.wo-form input[type=text],.wo-form input[type=url] {width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;color:var(--fg);background:#fff}
+.wo-form label.wo-active {display:flex;align-items:center;gap:8px;min-height:36px;color:var(--fg);font-size:14px}
+.wo-active input {width:18px;height:18px}
+.wo-form .btn {min-height:44px;justify-self:start;padding:10px 24px}
+.wo-status {padding:12px;border-radius:8px;margin:0 0 16px;font-size:14px;background:#edf6ef;color:#286a51}
+.wo-error {background:#fff0e9;color:#9a3412}
+</style>{% endblock %}
+{% block content %}
+<section class="wo-settings">
+<a href="/settings" class="wo-back">← 設定に戻る</a>
+<h1>Web注文の管理</h1>
+<p class="wo-note">会社名と注文サイトのURLを登録・変更できます。保存するとトップの「Web注文」に反映されます。</p>
+{% if saved %}<p class="wo-status" role="status">保存しました。</p>{% endif %}
+{% if error %}<p class="wo-status wo-error" role="alert">{{ error }}</p>{% endif %}
+{% for site in sites %}
+<form method="post" action="/settings/web-orders/save" class="wo-form{% if not site.is_active %} off{% endif %}" id="site-{{ site.id }}">
+  <h2>{{ site.name }}</h2>
+  <input type="hidden" name="form_key" value="{{ form_key }}"><input type="hidden" name="id" value="{{ site.id }}">
+  <label>会社名<input type="text" name="name" value="{{ site.name }}" maxlength="80" required></label>
+  <label>注文サイトのURL<input type="url" name="url" value="{{ site.url }}" maxlength="2048" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" required></label>
+  <label class="wo-active"><input type="checkbox" name="is_active" value="1"{% if site.is_active %} checked{% endif %}>Web注文の一覧に表示する</label>
+  <button class="btn btn-primary" type="submit">保存</button>
+</form>
+{% endfor %}
+<form method="post" action="/settings/web-orders/save" class="wo-form" id="site-new">
+  <h2>会社を追加</h2>
+  <input type="hidden" name="form_key" value="{{ form_key }}"><input type="hidden" name="id" value="0">
+  <label>会社名<input type="text" name="name" value="{{ ((draft) ? (draft.name) : ('')) }}" maxlength="80" placeholder="メーカー・業者名" required></label>
+  <label>注文サイトのURL<input type="url" name="url" value="{{ ((draft) ? (draft.url) : ('')) }}" maxlength="2048" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" required></label>
+  <label class="wo-active"><input type="checkbox" name="is_active" value="1"{% if not draft or draft.is_active %} checked{% endif %}>Web注文の一覧に表示する</label>
+  <button class="btn btn-primary" type="submit">追加する</button>
+</form>
+</section>
+{% endblock %}

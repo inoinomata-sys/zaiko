@@ -16,6 +16,15 @@ EXCEL_PATH = os.path.expanduser(
 )
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS web_order_sites (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    url TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    seed_key VARCHAR(40) UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS products (
     id          SERIAL PRIMARY KEY,
     col_group   INTEGER NOT NULL,

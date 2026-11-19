@@ -174,3 +174,12 @@ CREATE TABLE IF NOT EXISTS shift_entries (
   PRIMARY KEY (staff_id, work_date),
   KEY idx_shift_date (work_date)
 ) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS web_order_sites (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(80) NOT NULL,
+  url TEXT NOT NULL,
+  is_active TINYINT NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  seed_key VARCHAR(40) NULL UNIQUE
+) DEFAULT CHARSET=utf8mb4;
