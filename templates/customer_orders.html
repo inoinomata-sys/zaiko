@@ -3,16 +3,22 @@
 
 {% block head %}
 <style>
-.o-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--fg); }
+.o-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); border-left:6px solid #c2410c; background:#fff7ed; text-decoration: none; color: var(--fg); }
 .o-row:last-child { border-bottom: none; }
 .o-row:hover { background: #f8f6f0; text-decoration: none; color: var(--fg); }
 .o-name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .o-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
-.o-row.done { background: #fafaf8; }
+.o-row > div:first-child { min-width:0; flex:1; }
+.o-row.done { background:#f0fdf4; border-left-color:#15803d; }
+.o-row.partial { background:#fffbeb; border-left-color:#a16207; }
+.o-row.done:hover { background:#dcfce7; }
+.o-row:not(.done):hover { background:#ffedd5; }
 .o-done,.o-todo,.o-part,.o-ready,.o-hand { display:inline-block;font-size:12px;font-weight:500;line-height:1.6;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;white-space:nowrap;color:#56534c;background:#fff; }
-.o-done {background:#f1f1ee;border-color:#d6d5ce;color:#555750}
-.o-todo {background:#fff;border-color:#b5a57e;color:#655c48}
-.o-part {background:#f7f4ec;border-color:#d3c7a8;color:#655c48}
+.o-done {background:#166534;border-color:#166534;color:#fff;font-weight:700;font-size:13px;padding:2px 8px}
+.o-done::before {content:"✓ ";}
+.o-todo {background:#9a3412;border-color:#9a3412;color:#fff;font-weight:700;font-size:13px;padding:2px 8px}
+.o-todo::before {content:"! ";}
+.o-part {background:#fef08a;border-color:#a16207;color:#713f12;font-weight:700;font-size:13px;padding:2px 8px}
 .o-ready {background:#eceeea;border-color:#ced2c9;color:#4d554b}
 .o-hand {background:#555;border-color:#555;color:#fff}
 .o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -53,7 +59,7 @@
 </div>
 <div class="card">
   {% for o in orders %}
-  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}" data-store="{{ o.store }}" data-hand="{{ 1 if o.delivered_at else 0 }}">
+  <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% elif o.n_ordered %} partial{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}" data-store="{{ o.store }}" data-hand="{{ 1 if o.delivered_at else 0 }}">
     <div>
       <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}{% if o.delivered_at %}<span class="o-hand">お渡し済</span>{% elif o.ready_at %}<span class="o-ready">準備済</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
