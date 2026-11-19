@@ -30,11 +30,7 @@ main:has(.home) {padding:0 18px}
 .home-links .home-schedule b {font-size:14px}
 .home-links .home-schedule small {font-size:10px}
 .home-links .home-chevron {font-size:18px}
-.home-agenda summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;color:var(--fg);font-size:13px;list-style:none}
-.home-agenda summary::-webkit-details-marker {display:none}
-.home-agenda summary::after {content:"＋";margin-left:auto}
-.home-agenda[open] summary::after {content:"−"}
-.home-agenda {margin-top:6px;border-top:1px solid var(--border);padding-top:0;color:var(--fg2);font-size:13px;line-height:1.9}
+.home-agenda {margin-top:6px;border-top:1px solid var(--border);padding-top:12px;color:var(--fg2);font-size:13px;line-height:1.9}
 .home-agenda h2 {font-size:14px;color:var(--fg);margin-bottom:8px}
 .home-event {color:var(--fg)}
 @media(min-width:800px){.home {padding-top:28px}.home-brand{margin-bottom:24px}}
@@ -55,7 +51,7 @@ main:has(.home) {padding:0 18px}
 <h2 class="home-section">スケジュール<span lang="en">CALENDAR</span></h2>
 <a class="home-schedule" href="/schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2 M14 17h2"/></svg><div><b>店舗スケジュール</b><small>店舗の予定</small></div><span class="home-chevron" aria-hidden="true">›</span></a>
 <a class="home-schedule" href="/shift"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21v-2a7 7 0 0 1 14 0v2 M17 4a4 4 0 0 1 0 8 M21 21v-2a7 7 0 0 0-3-5"/></svg><div><b>出勤スケジュール</b><small>スタッフの出勤・休み</small></div><span class="home-chevron" aria-hidden="true">›</span></a>
-<details class="home-agenda"><summary>今日・明日の予定</summary><h2>今日の予定</h2>
+<section class="home-agenda" aria-label="今日・明日の予定"><h2>今日の予定</h2>
 {% for e in today %}<div class="home-event">{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}</div>{% else %}<div>ありません</div>{% endfor %}
-<div>明日：{% for e in tomorrow %}{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}{% if not loop.last %}、{% endif %}{% else %}ありません{% endfor %}</div></details>
+<div>明日：{% for e in tomorrow %}{{ e.title }}{% if e.store %}（{{ e.store }}）{% endif %}{% if not loop.last %}、{% endif %}{% else %}ありません{% endfor %}</div></section>
 </div>{% endblock %}
