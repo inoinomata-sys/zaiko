@@ -27,7 +27,7 @@
 <a href="/settings" class="wo-back">← 設定に戻る</a>
 <h1>Web注文の管理</h1>
 <p class="wo-note">会社名・注文サイトのURL・ログインID・パスワードを管理できます。パスワードは暗号化して保存します。</p>
-{% if not secrets_access %}<p class="wo-status">ログイン情報の保存・表示には、<a href="/admin/unlock?next=/settings/web-orders">管理者の合言葉で開く</a>操作が必要です。</p>{% endif %}
+{% if not secrets_access %}<p class="wo-status">ログイン情報の保存・表示には、<a href="/admin/unlock?next=/settings/web-orders">管理者の暗証番号で開く</a>操作が必要です。</p>{% endif %}
 {% if saved %}<p class="wo-status" role="status">保存しました。</p>{% endif %}
 {% if error %}<p class="wo-status wo-error" role="alert">{{ error }}</p>{% endif %}
 {% for site in sites %}
@@ -91,7 +91,7 @@ document.querySelectorAll('.wo-form').forEach(form => {
       panel.querySelector('[data-value="login_id"]').textContent = data.login_id;
       panel.querySelector('[data-value="password"]').textContent = data.password;
       panel.hidden = false; clearTimeout(timer); timer = setTimeout(hide, 60000);
-    } catch (e) { hide(); feedback.textContent = '表示できませんでした。管理者の合言葉で設定を開き直してください。'; }
+    } catch (e) { hide(); feedback.textContent = '表示できませんでした。管理者の暗証番号で設定を開き直してください。'; }
     finally { reveal.disabled = false; }
   });
   form.querySelectorAll('.wo-copy').forEach(button => button.addEventListener('click', async () => {

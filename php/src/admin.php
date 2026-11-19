@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// 管理者の合言葉。LINE の送り先など、間違えると困る画面に鍵をかける。合言葉は config.php の 'admin_pass'（ログインのパスワードとは別）。
+// 管理者の暗証番号。LINE の送り先など、間違えると困る画面に鍵をかける。暗証番号は config.php の 'admin_pass'（ログインのパスワードとは別）。
 const ADMIN_UNLOCK_MINUTES = 60;
 
 function admin_cookie_value(string $pass, int $expires): string
@@ -34,7 +34,7 @@ function admin_pass(): string
     return (string)($GLOBALS['CONFIG']['admin_pass'] ?? '');
 }
 
-/** 鍵がかかった画面の最初に呼ぶ。開いていなければ、合言葉の画面を出して、そこで止まる */
+/** 鍵がかかった画面の最初に呼ぶ。開いていなければ、暗証番号の画面を出して、そこで止まる */
 function require_admin(): void
 {
     $pass = admin_pass();
@@ -42,7 +42,7 @@ function require_admin(): void
         return;
     }
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {   // 画面の操作（ボタン）は、開いている間だけ。切れていたら、断る
-        respond_json(['ok' => false, 'error' => '管理者の合言葉の時間が切れました。設定を開き直してください'], 403);
+        respond_json(['ok' => false, 'error' => '管理者の暗証番号の時間が切れました。設定を開き直してください'], 403);
     }
     redirect_to('/admin/unlock?next=' . urlencode(admin_next((string)($_SERVER['REQUEST_URI'] ?? '/'))));
 }

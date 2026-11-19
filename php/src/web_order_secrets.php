@@ -53,7 +53,7 @@ function h_web_order_credentials(int $id): void
 {
     require_admin();
     header('Cache-Control: no-store, private'); header('Pragma: no-cache');
-    if (!web_order_secrets_access() || !hash_equals(web_order_form_key(), (string)($_POST['form_key'] ?? ''))) throw new HttpError(403, '管理者の合言葉で設定を開き直してください');
+    if (!web_order_secrets_access() || !hash_equals(web_order_form_key(), (string)($_POST['form_key'] ?? ''))) throw new HttpError(403, '管理者の暗証番号で設定を開き直してください');
     ensure_web_order_sites();
     $site = row('SELECT credentials FROM web_order_sites WHERE id=?', [$id]);
     if (!$site) throw new HttpError(404);

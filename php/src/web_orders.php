@@ -74,7 +74,7 @@ function h_web_order_site_save(): void
     $password = (string)($_POST['password'] ?? '');
     $clear = ($_POST['clear_credentials'] ?? '') === '1';
     if ($loginId !== '' || $password !== '' || $clear) {
-        if (!web_order_secrets_access()) throw new HttpError(403, 'ログイン情報の保存には管理者の合言葉で設定を開き直してください');
+        if (!web_order_secrets_access()) throw new HttpError(403, 'ログイン情報の保存には管理者の暗証番号で設定を開き直してください');
         if (strlen($loginId) > 512 || strlen($password) > 2048) $error = 'ログインIDまたはパスワードが長すぎます。';
     }
     $active = ($_POST['is_active'] ?? '') === '1' ? 1 : 0;
