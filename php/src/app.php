@@ -84,6 +84,7 @@ function routes(): array
         ['GET', '/web-orders', 'h_web_orders'],
         ['GET', '/settings/web-orders', 'h_web_order_settings'],
         ['POST', '/settings/web-orders/save', 'h_web_order_site_save'],
+        ['POST', '/settings/web-orders/<int:id>/credentials', 'h_web_order_credentials'],
         ['GET', '/order/form', 'h_order_form'],
         ['POST', '/api/order_draft', 'h_api_order_draft'],
         ['POST', '/api/order_draft/clear', 'h_api_order_draft_clear'],

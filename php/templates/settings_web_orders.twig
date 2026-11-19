@@ -9,18 +9,25 @@
 .wo-form.off {background:#f6f6f4}
 .wo-form h2 {font-size:17px;font-weight:600;margin:0}
 .wo-form label {display:grid;gap:6px;font-size:13px;color:var(--fg2)}
-.wo-form input[type=text],.wo-form input[type=url] {width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;color:var(--fg);background:#fff}
+.wo-form input[type=text],.wo-form input[type=url],.wo-form input[type=password] {width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;color:var(--fg);background:#fff}
 .wo-form label.wo-active {display:flex;align-items:center;gap:8px;min-height:36px;color:var(--fg);font-size:14px}
 .wo-active input {width:18px;height:18px}
 .wo-form .btn {min-height:44px;justify-self:start;padding:10px 24px}
 .wo-status {padding:12px;border-radius:8px;margin:0 0 16px;font-size:14px;background:#edf6ef;color:#286a51}
 .wo-error {background:#fff0e9;color:#9a3412}
+.wo-secret-fields {display:grid;gap:12px;border:0;padding:0;margin:0;min-width:0}
+.wo-secret-note {font-size:12px;color:var(--fg2);line-height:1.7}
+.wo-secret-result {padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;overflow-wrap:anywhere}
+.wo-secret-result[hidden] {display:none}
+.wo-secret-result .btn {margin:8px 4px 0 0;font-size:13px}
+.wo-secret-actions {display:flex;gap:8px;flex-wrap:wrap}
 </style>{% endblock %}
 {% block content %}
 <section class="wo-settings">
 <a href="/settings" class="wo-back">← 設定に戻る</a>
 <h1>Web注文の管理</h1>
-<p class="wo-note">会社名と注文サイトのURLを登録・変更できます。保存するとトップの「Web注文」に反映されます。</p>
+<p class="wo-note">会社名・注文サイトのURL・ログインID・パスワードを管理できます。パスワードは暗号化して保存します。</p>
+{% if not secrets_access %}<p class="wo-status">ログイン情報の保存・表示には、<a href="/admin/unlock?next=/settings/web-orders">管理者の合言葉で開く</a>操作が必要です。</p>{% endif %}
 {% if saved %}<p class="wo-status" role="status">保存しました。</p>{% endif %}
 {% if error %}<p class="wo-status wo-error" role="alert">{{ error }}</p>{% endif %}
 {% for site in sites %}
@@ -29,6 +36,20 @@
   <input type="hidden" name="form_key" value="{{ form_key }}"><input type="hidden" name="id" value="{{ site.id }}">
   <label>会社名<input type="text" name="name" value="{{ site.name }}" maxlength="80" required></label>
   <label>注文サイトのURL<input type="url" name="url" value="{{ site.url }}" maxlength="2048" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" required></label>
+  <fieldset class="wo-secret-fields"{% if not secrets_access %} disabled{% endif %}>
+    <label>ログインID・メールアドレス<input type="text" name="login_id" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="512" placeholder="{% if site.has_credentials %}保存済み（変更するときだけ入力）{% else %}任意{% endif %}"></label>
+    <label>パスワード<input type="password" name="password" autocomplete="new-password" maxlength="2048" placeholder="{% if site.has_credentials %}保存済み（変更するときだけ入力）{% else %}任意{% endif %}"></label>
+    <p class="wo-secret-note">空欄で保存すると、保存済みのログイン情報はそのまま残ります。</p>
+    {% if site.has_credentials %}
+    <button class="btn btn-ghost wo-reveal" type="button" data-id="{{ site.id }}">保存したログイン情報を表示</button>
+    <label class="wo-active"><input type="checkbox" name="clear_credentials" value="1">保存したログイン情報を消す</label>
+    {% endif %}
+  </fieldset>
+  <div class="wo-secret-result" hidden>
+    <div>ID：<span data-value="login_id"></span></div><div>パスワード：<span data-value="password"></span></div>
+    <div class="wo-secret-actions"><button class="btn btn-ghost wo-copy" type="button" data-field="login_id">IDをコピー</button><button class="btn btn-ghost wo-copy" type="button" data-field="password">パスワードをコピー</button><button class="btn btn-ghost wo-hide" type="button">閉じる</button></div>
+  </div>
+  <span class="wo-secret-note wo-feedback" role="status"></span>
   <label class="wo-active"><input type="checkbox" name="is_active" value="1"{% if site.is_active %} checked{% endif %}>Web注文の一覧に表示する</label>
   <button class="btn btn-primary" type="submit">保存</button>
 </form>
@@ -38,8 +59,45 @@
   <input type="hidden" name="form_key" value="{{ form_key }}"><input type="hidden" name="id" value="0">
   <label>会社名<input type="text" name="name" value="{{ ((draft) ? (draft.name) : ('')) }}" maxlength="80" placeholder="メーカー・業者名" required></label>
   <label>注文サイトのURL<input type="url" name="url" value="{{ ((draft) ? (draft.url) : ('')) }}" maxlength="2048" placeholder="https://" inputmode="url" autocapitalize="none" spellcheck="false" required></label>
+  <fieldset class="wo-secret-fields"{% if not secrets_access %} disabled{% endif %}>
+    <label>ログインID・メールアドレス<input type="text" name="login_id" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="512" placeholder="任意"></label>
+    <label>パスワード<input type="password" name="password" autocomplete="new-password" maxlength="2048" placeholder="任意"></label>
+  </fieldset>
   <label class="wo-active"><input type="checkbox" name="is_active" value="1"{% if not draft or draft.is_active %} checked{% endif %}>Web注文の一覧に表示する</label>
   <button class="btn btn-primary" type="submit">追加する</button>
 </form>
 </section>
 {% endblock %}
+
+{% block scripts %}<script>
+document.querySelectorAll('.wo-form').forEach(form => {
+  const panel = form.querySelector('.wo-secret-result');
+  if (!panel) return;
+  const feedback = form.querySelector('.wo-feedback');
+  const reveal = form.querySelector('.wo-reveal');
+  let timer;
+  function hide() { clearTimeout(timer); panel.hidden = true; panel.querySelectorAll('[data-value]').forEach(el => el.textContent = ''); }
+  form.querySelector('.wo-hide')?.addEventListener('click', hide);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); });
+  window.addEventListener('pagehide', hide);
+  reveal?.addEventListener('click', async () => {
+    reveal.disabled = true; feedback.textContent = '';
+    try {
+      const body = new URLSearchParams({form_key: form.elements.form_key.value});
+      const response = await fetch('/settings/web-orders/' + reveal.dataset.id + '/credentials', {method:'POST', body, cache:'no-store'});
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      if (document.hidden) return;
+      panel.querySelector('[data-value="login_id"]').textContent = data.login_id;
+      panel.querySelector('[data-value="password"]').textContent = data.password;
+      panel.hidden = false; clearTimeout(timer); timer = setTimeout(hide, 60000);
+    } catch (e) { hide(); feedback.textContent = '表示できませんでした。管理者の合言葉で設定を開き直してください。'; }
+    finally { reveal.disabled = false; }
+  });
+  form.querySelectorAll('.wo-copy').forEach(button => button.addEventListener('click', async () => {
+    if (panel.hidden) return;
+    try { await navigator.clipboard.writeText(panel.querySelector('[data-value="' + button.dataset.field + '"]').textContent); feedback.textContent = 'コピーしました。'; }
+    catch (e) { feedback.textContent = 'コピーできませんでした。表示された文字を選んでコピーしてください。'; }
+  }));
+});
+</script>{% endblock %}

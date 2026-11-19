@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS web_order_sites (
     id SERIAL PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
     url TEXT NOT NULL,
+    credentials TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     sort_order INTEGER NOT NULL DEFAULT 0,
     seed_key VARCHAR(40) UNIQUE

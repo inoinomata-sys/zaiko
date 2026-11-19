@@ -8,6 +8,7 @@ require BASE_DIR . '/src/schedule.php';
 require BASE_DIR . '/src/shift.php';
 require BASE_DIR . '/src/line.php';
 require BASE_DIR . '/src/admin.php';
+require BASE_DIR . '/src/web_order_secrets.php';
 
 // 正解データが読めない・空の時は、何も確かめないまま成功にせず、失敗にする
 $raw = @file_get_contents(__DIR__ . '/vectors.json');
@@ -107,6 +108,15 @@ check('リンク署名 期限が違えば別', line_order_sig(12, 2000000001, 's
 check('リンク署名 シークレットが違えば別', line_order_sig(12, 2000000000, 'secretY') !== $sg, true);
 check('リンク署名 長さ', strlen($sg), 32);
 check('UUID の形', (bool)preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', line_uuid4()), true);
+// Web注文の保存情報：暗号化・サイト間の取り違え・改ざんを検査（すべて仮データ）。
+$GLOBALS['CONFIG']['web_orders_key'] = str_repeat('2',64);
+$fakeCredentials = ['login_id'=>'fake-id','password'=>'fake-password'];
+$sealed = web_order_encrypt($fakeCredentials, 7);
+check('Web注文のログイン情報を復号', web_order_decrypt($sealed,7), $fakeCredentials);
+check('Web注文の暗号化は毎回異なる', web_order_encrypt($fakeCredentials,7) !== $sealed, true);
+try { web_order_decrypt($sealed,8); check('別サイトの暗号文は拒否',true,false); } catch (RuntimeException $e) { check('別サイトの暗号文は拒否',true,true); }
+$tampered = base64_decode(substr($sealed,3)); $tampered[30] = chr(ord($tampered[30]) ^ 1);
+try { web_order_decrypt('v1:'.base64_encode($tampered),7); check('暗号文の改ざんを拒否',true,false); } catch (RuntimeException $e) { check('暗号文の改ざんを拒否',true,true); }
 // 管理者の鍵
 $ac = admin_cookie_value('pw1', time() + 600);
 check('管理者鍵 正しい', admin_cookie_ok('pw1', $ac), true);

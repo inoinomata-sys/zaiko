@@ -35,16 +35,17 @@ require_once dirname(__DIR__) . '/src/admin.php';
 $cfgPath = dirname(__DIR__) . '/config.php';
 $cfgSrc = is_file($cfgPath) ? (string)file_get_contents($cfgPath) : '';
 if ($cfgSrc !== '' && !str_contains($cfgSrc, "'admin_pass'")) {
-    file_put_contents($cfgPath, preg_replace('/return \[/', "return [\n    'admin_pass' => 'ci-admin-pass',", $cfgSrc, 1));
+    file_put_contents($cfgPath, preg_replace('/return \[/', "return [\n    'admin_pass' => 'ci-admin-pass',\n    'web_orders_key' => str_repeat('1',64),", $cfgSrc, 1));
     sleep(4);   // サーバーが、書き換えた設定を読み直すまで待つ（PHP の読み込みの保存が、数秒残るため）
 }
 $ADMIN_COOKIE = '';
+$WEB_SECRET_COOKIE = '';
 $NO_ADMIN = true;
 
 function http(string $method, string $path, ?array $json = null, ?array $form = null, string $accept = 'text/html'): array
 {
-    global $BASE, $ADMIN_COOKIE, $NO_ADMIN, $LINE_ENTRY_COOKIE;
-    $header = "Accept: {$accept}\r\n" . ($NO_ADMIN ? '' : "Cookie: {$ADMIN_COOKIE}; " . ($LINE_ENTRY_COOKIE ?? '') . "\r\n");
+    global $BASE, $ADMIN_COOKIE, $NO_ADMIN, $LINE_ENTRY_COOKIE, $WEB_SECRET_COOKIE;
+    $header = "Accept: {$accept}\r\n" . ($NO_ADMIN ? '' : "Cookie: {$ADMIN_COOKIE}; " . ($LINE_ENTRY_COOKIE ?? '') . "; {$WEB_SECRET_COOKIE}\r\n");
     $opts = ['http' => ['method' => $method, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 180]];
     if ($json !== null) {
         $header .= "Content-Type: application/json\r\n";
@@ -118,6 +119,7 @@ foreach ($hdr as $h) {
     if (preg_match('/^Set-Cookie:\s*(zadmin=[^;]+)/i', $h, $m)) {
         $ADMIN_COOKIE = $m[1];
     }
+    if (preg_match('/^Set-Cookie:\s*(zweborders=[^;]+)/i', $h, $m)) $WEB_SECRET_COOKIE = $m[1];
 }
 ok($ADMIN_COOKIE !== '', '管理者の鍵: 暗証番号で開けられる', 'status=' . $st . ' / config に admin_pass が入っているか: ' . (str_contains((string)@file_get_contents(dirname(__DIR__) . '/config.php'), 'admin_pass') ? 'はい' : 'いいえ'));
 $NO_ADMIN = false;
@@ -181,6 +183,34 @@ ok($st === 302, 'Web注文管理: 管理者解除なしでは編集画面を開�
 [$st] = http('POST', '/settings/web-orders/save', null, $editWeb);
 ok($st === 403, 'Web注文管理: 管理者解除なしでは保存できない');
 $NO_ADMIN = false;
+$secretForm = ['id'=>$newWebId,'form_key'=>$webKey,'name'=>'試験用メーカー','url'=>'https://example.com/new-order','is_active'=>'0','login_id'=>'fake-salon@example.test','password'=>'TestOnly-Not-A-Real-Password!'];
+$correctSecretCookie = $WEB_SECRET_COOKIE;
+$WEB_SECRET_COOKIE = '';
+[$st] = http('POST','/settings/web-orders/save',null,$secretForm);
+ok($st===403, 'Web注文ログイン情報: 通常の設定解除だけでは保存不可');
+$WEB_SECRET_COOKIE = $correctSecretCookie;
+ok($WEB_SECRET_COOKIE !== '', 'Web注文ログイン情報: 正しい管理者合言葉で専用の鍵が発行される');
+[$st] = http('POST','/settings/web-orders/save',null,$secretForm);
+$encrypted = (string)db_val("SELECT credentials FROM web_order_sites WHERE id={$newWebId}");
+ok($st===302 && str_starts_with($encrypted,'v1:') && !str_contains($encrypted,$secretForm['password']) && !str_contains($encrypted,$secretForm['login_id']), 'Web注文ログイン情報: IDとパスワードを暗号化して保存');
+$secretPage=page_ok('/settings/web-orders','保存したログイン情報を表示');
+ok(!str_contains($secretPage,$secretForm['password']) && !str_contains($secretPage,$secretForm['login_id']) && !str_contains($secretPage,$encrypted), 'Web注文ログイン情報: HTMLに平文や暗号文を埋め込まない');
+[$st,$secretBody,$secretHeaders]=http('POST',"/settings/web-orders/{$newWebId}/credentials",null,['form_key'=>$webKey]);
+$revealed=json_decode($secretBody,true);
+ok($st===200 && ($revealed['password']??'')===$secretForm['password'] && ($revealed['login_id']??'')===$secretForm['login_id'], 'Web注文ログイン情報: 管理者だけが表示用に復号できる');
+ok((bool)array_filter($secretHeaders,static fn($h)=>stripos($h,'Cache-Control:')===0 && str_contains($h,'no-store')), 'Web注文ログイン情報: 復号結果をキャッシュしない');
+[$st]=http('POST',"/settings/web-orders/{$newWebId}/credentials",null,['form_key'=>'wrong']);
+ok($st===403,'Web注文ログイン情報: 不正な表示リクエストを拒否');
+$WEB_SECRET_COOKIE='';
+[$st]=http('POST',"/settings/web-orders/{$newWebId}/credentials",null,['form_key'=>$webKey]);
+ok($st===403,'Web注文ログイン情報: 専用の解除なしでは復号不可');
+$WEB_SECRET_COOKIE=$correctSecretCookie;
+$blankSecret=array_replace($secretForm,['login_id'=>'','password'=>'']);
+[$st]=http('POST','/settings/web-orders/save',null,$blankSecret);
+ok($st===302 && db_val("SELECT credentials FROM web_order_sites WHERE id={$newWebId}")===$encrypted,'Web注文ログイン情報: 空欄でURLを保存してもログイン情報は消えない');
+[$st]=http('POST','/settings/web-orders/save',null,array_replace($blankSecret,['clear_credentials'=>'1']));
+ok($st===302 && db_val("SELECT credentials FROM web_order_sites WHERE id={$newWebId}")===null,'Web注文ログイン情報: 明示した時だけ保存情報を削除');
+
 
 
 page_ok('/?store=' . rawurlencode('リッチ'));

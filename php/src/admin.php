@@ -74,6 +74,7 @@ function h_admin_unlock(): void
             $exp = time() + ADMIN_UNLOCK_MINUTES * 60;
             setcookie('zadmin', admin_cookie_value($pass, $exp), ['expires' => $exp, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
             if ($right) {
+                setcookie('zweborders', admin_cookie_value('web-order-secrets|' . $pass, $exp), ['expires'=>$exp, 'path'=>'/settings/web-orders', 'secure'=>true, 'httponly'=>true, 'samesite'=>'Strict']);
                 if (parse_url($next, PHP_URL_PATH) === '/settings/line') {
                     setcookie('zline_entry', line_registration_key('entry', time()+60), ['expires' => time()+60, 'path' => '/settings/line', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
                 }
