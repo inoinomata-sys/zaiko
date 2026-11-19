@@ -3,22 +3,21 @@
 
 {% block head %}
 <style>
-.o-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); border-left:6px solid #c2410c; background:#fff7ed; text-decoration: none; color: var(--fg); }
+.o-row { display: flex; align-items: center; gap: 12px; padding: 16px 14px; border-bottom: 1px solid var(--border); border-left:3px solid #bc7841; background:#fff; text-decoration: none; color: var(--fg); }
 .o-row:last-child { border-bottom: none; }
 .o-row:hover { background: #f8f6f0; text-decoration: none; color: var(--fg); }
 .o-name { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .o-meta { font-size: 12px; color: var(--fg2); margin-top: 2px; }
 .o-row > div:first-child { min-width:0; flex:1; }
-.o-row.done { background:#f0fdf4; border-left-color:#15803d; }
-.o-row.partial { background:#fffbeb; border-left-color:#a16207; }
-.o-row.done:hover { background:#dcfce7; }
-.o-row:not(.done):hover { background:#ffedd5; }
+.o-row.done { background:#fff; border-left-color:#4c866e; }
+.o-row.partial { background:#fff; border-left-color:#a68b42; }
+.o-row.done:hover, .o-row:not(.done):hover { background:#fafaf8; }
 .o-done,.o-todo,.o-part,.o-ready,.o-hand { display:inline-block;font-size:12px;font-weight:500;line-height:1.6;border:1px solid var(--border);border-radius:6px;padding:1px 7px;margin-left:6px;vertical-align:2px;white-space:nowrap;color:#56534c;background:#fff; }
-.o-done {background:#166534;border-color:#166534;color:#fff;font-weight:700;font-size:13px;padding:2px 8px}
-.o-done::before {content:"✓ ";}
-.o-todo {background:#9a3412;border-color:#9a3412;color:#fff;font-weight:700;font-size:13px;padding:2px 8px}
-.o-todo::before {content:"! ";}
-.o-part {background:#fef08a;border-color:#a16207;color:#713f12;font-weight:700;font-size:13px;padding:2px 8px}
+.o-done,.o-todo,.o-part { border:0; border-radius:5px; font-size:12px; font-weight:600; padding:2px 7px; }
+.o-done { background:#eaf5ef; color:#286a51; }
+.o-todo { background:#fff0df; color:#96521c; }
+.o-part { background:#faf1d9; color:#82601c; }
+.o-done::before,.o-todo::before,.o-part::before { content:''; display:inline-block; width:5px; height:5px; margin-right:5px; border-radius:50%; background:currentColor; vertical-align:2px; }
 .o-ready {background:#eceeea;border-color:#ced2c9;color:#4d554b}
 .o-hand {background:#555;border-color:#555;color:#fff}
 .o-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
