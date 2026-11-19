@@ -304,6 +304,15 @@ ok((int)db_val("SELECT COUNT(*) FROM order_items WHERE order_id={$oid}") === 3, 
 ok((int)db_val('SELECT COUNT(*) FROM order_drafts') === 0, '確定すると下書きが消える');
 [$st, $j2] = api('/order/save', $payload);
 ok($st === 200 && ($j2['order_id'] ?? 0) === $oid && !empty($j2['repeated']), '同じ鍵の二重送信は、最初の1件を返す', json_encode($j2));
+// 前年の同じ月日は、今年の二重発注として扱わない。
+$originalCreatedAt = db_val("SELECT created_at FROM orders WHERE id={$oid}");
+db_val("UPDATE orders SET created_at=DATE_SUB(created_at, INTERVAL 1 YEAR) WHERE id={$oid}");
+$priorYearPayload = $payload;
+$priorYearPayload['request_key'] = bin2hex(random_bytes(16));
+[$st, $prior] = api('/order/save', $priorYearPayload);
+ok($st === 200 && !empty($prior['order_id']), '前年の同じ月日の発注は今年の重複にならない', json_encode($prior));
+if (!empty($prior['order_id'])) api('/order/' . (int)$prior['order_id'] . '/delete', []);
+db_val("UPDATE orders SET created_at='" . (new DateTimeImmutable($originalCreatedAt))->format('Y-m-d H:i:s') . "' WHERE id={$oid}");
 $payload['request_key'] = bin2hex(random_bytes(16));
 [$st, $j3] = api('/order/save', $payload);
 ok($st === 409 && !empty($j3['duplicate']), '同じ日・同じ仕入先は、確認なしでは確定しない', json_encode($j3, JSON_UNESCAPED_UNICODE));

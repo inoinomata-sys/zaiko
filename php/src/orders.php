@@ -51,8 +51,8 @@ function h_order_form(): void
     $usageUpto = (int)val('SELECT COALESCE(MAX(id), 0) FROM usage_log');
     $usageMap = pending_usage($store, $supplier);
     $orderedToday = in_array($supplier, NO_HISTORY_SUPPLIERS, true) ? 0 : (int)val(
-        'SELECT COUNT(*) FROM orders WHERE store = ? AND supplier = ? AND order_month = ? AND order_day = ?',
-        [$store, $supplier, (int)$now->format('n'), (int)$now->format('j')]
+        'SELECT COUNT(*) FROM orders WHERE store = ? AND supplier = ? AND order_month = ? AND order_day = ? AND created_at >= ? AND created_at < ?',
+        [$store, $supplier, (int)$now->format('n'), (int)$now->format('j'), $now->format('Y-01-01 00:00'), $now->modify('+1 year')->format('Y-01-01 00:00')]
     );
     $draftRow = row('SELECT data, saved_at FROM order_drafts WHERE store = ? AND supplier = ?', [$store, $supplier]);
     $draft = $draftRow ? (json_decode((string)$draftRow['data'], true) ?: []) : [];
@@ -187,8 +187,8 @@ function h_order_save(): void
         }
         // 同じ店舗・仕入先・発注日の発注が既にあれば、確認なしでは確定しない
         if (empty($d['allow_duplicate']) && !in_array($supplier, NO_HISTORY_SUPPLIERS, true)) {
-            if (val('SELECT COUNT(*) FROM orders WHERE store = ? AND supplier = ? AND order_month = ? AND order_day = ?',
-                [$store, $supplier, $month, $day])) {
+            if (val('SELECT COUNT(*) FROM orders WHERE store = ? AND supplier = ? AND order_month = ? AND order_day = ? AND created_at >= ? AND created_at < ?',
+                [$store, $supplier, $month, $day, now_jst()->format('Y-01-01 00:00'), now_jst()->modify('+1 year')->format('Y-01-01 00:00')])) {
                 return [['ok' => false, 'duplicate' => true,
                     'error' => "{$month}月{$day}日の {$store}・{$supplier} の発注はすでに確定済みです。"], 409];
             }

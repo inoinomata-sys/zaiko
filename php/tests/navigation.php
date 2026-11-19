@@ -51,5 +51,10 @@ function audit_rendered_pages(): void
     $err = stream_get_contents($pipes[2]); fclose($pipes[2]);
     $status = proc_close($proc);
     ok($status === 0, '全画面のJavaScriptに構文エラーがない', $out . $err);
+    $proc = proc_open(['node', __DIR__ . '/browser_state.js'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    if (!is_resource($proc)) { ok(false, '通信失敗時の画面テストを起動'); return; }
+    $outState = stream_get_contents($pipes[1]); fclose($pipes[1]);
+    $errState = stream_get_contents($pipes[2]); fclose($pipes[2]);
+    ok(proc_close($proc) === 0, '通信・キャッシュ・下書きの振る舞い', $outState . $errState);
     echo '導線検査: ' . count($AUDIT_PAGES) . '画面 / ' . count($checked) . "リンク・フォーム\n" . $out;
 }

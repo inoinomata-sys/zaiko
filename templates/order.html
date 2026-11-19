@@ -372,10 +372,16 @@ async function discardDraft() {
   if (!confirm('保存した発注数を消して、最初の状態（使用入力の数）に戻しますか？')) return;
   draftLocked = true;
   try {
-    await fetch('/api/order_draft/clear', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    const res = await fetch('/api/order_draft/clear', {method: 'POST', headers: {'Content-Type': 'application/json'},
                                            body: JSON.stringify({store: STORE, supplier: SUPPLIER})});
-  } catch (e) {}
-  location.reload();
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('clear failed');
+    location.reload();
+  } catch (e) {
+    draftLocked = false;
+    setDraftStatus('下書きを消せませんでした。通信を確認して、もう一度お試しください。', true);
+    toast('下書きを消せませんでした。入力内容はそのまま残しています');
+  }
 }
 
 function scheduleDraftSave() {
