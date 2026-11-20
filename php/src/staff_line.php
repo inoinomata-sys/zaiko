@@ -258,7 +258,7 @@ function sl_enqueue(string $slot, string $kind, array $snapshot, ?array $before,
     $text = sl_job_text($kind, $snapshot, $before, $s['stream']);
     $state = sl_is_reminder($kind) || $kind === 'resume' || $s['mode'] === 'auto' ? 'ready' : 'pending';
     try { sl_messages($text); } catch (LengthException) { $state = 'oversized'; }
-    run("UPDATE staff_line_jobs SET slot = CONCAT('superseded:', id) WHERE slot = ? AND state = 'superseded' AND attempts = 0", [$slot]);
+    run("UPDATE staff_line_jobs SET slot = CONCAT('superseded:', id) WHERE slot = ? AND state IN ('superseded','cancelled') AND attempts = 0", [$slot]);
     run('INSERT IGNORE INTO staff_line_jobs (slot, kind, stream, group_id, snapshot, before_snapshot, body, content_hash, retry_key, state, expires_at, created_at, scheduled_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
         [$slot, $kind, $s['stream'], $s['group_id'], sl_json($snapshot), $before === null ? null : sl_json($before), $text, sl_hash([$snapshot, $before]), line_uuid4(), $state, $expires, sl_now(), $scheduled ?? sl_now()]);
 }
@@ -283,15 +283,21 @@ function sl_generate(array $s, DateTimeImmutable $now): void
         $dates = sl_dates($now, (bool)$s['include_monday'], static fn($date) => sl_snapshot($date, $s['stream']) !== []);
         sl_enqueue('daily:' . $s['stream'] . ':' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20), 'daily', sl_bundle($dates, $s['stream']), null, $s, $expiry, $today . ' 20:00:00');
     }
-    if (!$s['notify_changes']) { return; }
+    // 夜に共有済みの内容との違いだけを、翌朝9時の1通にまとめる。
+    // 9時以降の編集は即時送信せず、夜の定期配信（または翌朝）へ回す。
+    if (!$s['notify_changes'] || $now->format('H:i') > '09:00') { return; }
     $baselines = rows('SELECT * FROM staff_line_baselines WHERE stream = ? AND group_id = ? AND work_date >= ? ORDER BY work_date', [$s['stream'], $s['group_id'], $today]);
+    $before = []; $current = [];
     foreach ($baselines as $base) {
-        $before = [$base['work_date'] => json_decode($base['snapshot'], true, 512, JSON_THROW_ON_ERROR)];
-        $current = sl_bundle([$base['work_date']], $s['stream']);
-        if ($before === $current) { continue; }
-        // 基準job IDも含める。A→B→A→Bを別々の変更として扱う。
-        $slot = 'change:' . sl_hash([$s['stream'], $s['revision'], $base['job_id'], $current]);
-        sl_enqueue($slot, 'change', $current, $before, $s, $expiry);
+        $date = $base['work_date'];
+        $old = json_decode($base['snapshot'], true, 512, JSON_THROW_ON_ERROR);
+        $new = sl_snapshot($date, $s['stream']);
+        if ($old === $new) { continue; }
+        $before[$date] = $old; $current[$date] = $new;
+    }
+    if ($current) {
+        $slot = 'morning-change:' . $s['stream'] . ':' . $today . ':' . substr(sl_hash($s['group_id']), 0, 20);
+        sl_enqueue($slot, 'change', $current, $before, $s, $expiry, $today . ' 09:00:00');
     }
 }
 
@@ -312,13 +318,17 @@ function sl_refresh(array $job, array $s): array
         $day = new DateTimeImmutable(substr($job['created_at'], 0, 10), new DateTimeZone('Asia/Tokyo'));
         $snapshot = sl_bundle(sl_dates($day, (bool)$s['include_monday'], static fn($date) => sl_snapshot($date, $s['stream']) !== []), $s['stream']);
     } else {
-        foreach (array_keys($snapshot) as $date) {
-            $b = row('SELECT snapshot FROM staff_line_baselines WHERE stream = ? AND group_id = ? AND work_date = ?', [$s['stream'], $job['group_id'], $date]);
-            $before[$date] = $b ? json_decode($b['snapshot'], true, 512, JSON_THROW_ON_ERROR) : [];
+        $before = []; $snapshot = [];
+        $date = substr($job['scheduled_at'], 0, 10);
+        foreach (rows('SELECT * FROM staff_line_baselines WHERE stream = ? AND group_id = ? AND work_date >= ? ORDER BY work_date', [$s['stream'], $job['group_id'], $date]) as $base) {
+            $old = json_decode($base['snapshot'], true, 512, JSON_THROW_ON_ERROR);
+            $new = sl_snapshot($base['work_date'], $s['stream']);
+            if ($old === $new) continue;
+            $before[$base['work_date']] = $old; $snapshot[$base['work_date']] = $new;
         }
-        $snapshot = sl_bundle(array_keys($snapshot), $s['stream']);
-        if ($snapshot === $before) { run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE id = ?", [$job['id']]); return array_replace($job, ['state' => 'cancelled']); }
+        if (!$snapshot) { run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE id = ?", [$job['id']]); return array_replace($job, ['state' => 'cancelled']); }
     }
+
     $hash = sl_hash([$snapshot, $before]);
     $body = sl_job_text($job['kind'], $snapshot, $before, $s['stream']);
     if (!hash_equals($job['content_hash'], $hash) || $body !== $job['body']) {
@@ -356,7 +366,11 @@ function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transpo
 {
     if (sl_holiday_suspended($now)) return;
     if ($job['stream'] !== 'store' || $s['stream'] !== 'store') { return; }
+    if ($job['kind'] === 'change') {
+        if (!$s['notify_changes'] || !str_starts_with($job['slot'], 'morning-change:')) return;
+    }
     $job = sl_refresh($job, $s);
+    if ($job['kind'] === 'change' && $now->format('H:i') < '09:00') return;
     if ($job['scheduled_at'] > $now->format('Y-m-d H:i:s')) { return; }
     if (!in_array($job['state'], ['ready', 'retry'], true)) { return; }
     if ($job['group_id'] !== $s['group_id'] || !val('SELECT active FROM staff_line_groups WHERE group_id = ?', [$job['group_id']])) { return; }
@@ -398,6 +412,8 @@ function sl_tick(?callable $transport = null, ?DateTimeImmutable $clock = null):
             return;
         }
         run("UPDATE staff_line_jobs SET state = CASE WHEN attempts = 0 THEN 'expired' ELSE 'uncertain' END WHERE state IN ('pending','ready','retry','oversized') AND expires_at < ?", [$now->format('Y-m-d H:i:s')]);
+        // 旧方式の即時変更通知を持ち越さない。試行済みは本文を変えず要確認へ。
+        run("UPDATE staff_line_jobs SET state = CASE WHEN attempts=0 THEN 'superseded' ELSE 'uncertain' END WHERE kind='change' AND slot NOT LIKE 'morning-change:%' AND state IN ('pending','ready','retry','oversized')");
         // 旧版に出勤共有の設定・配信待ちがあっても、実行できないようにする。
         run("UPDATE staff_line_settings SET enabled = 0 WHERE stream <> 'store'");
         run("UPDATE staff_line_jobs SET state = 'cancelled' WHERE stream <> 'store' AND state IN ('pending','ready','retry','failed','oversized')");

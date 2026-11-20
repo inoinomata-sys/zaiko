@@ -9,7 +9,7 @@
 <p>イノの「ゴミ出し(リマインド)」は毎週木曜、「瓶のゴミまとめる」は第3木曜の当日16時50分に自動通知します。元の予定を止める・消すと、この通知も止まります。</p>
 <h1>店舗スケジュールのLINE共有</h1><p>出勤スケジュールは共有対象に含めません。</p><div class="sl-steps">① 共有する店舗予定を選ぶ　→　② 内容を確認する　→　③ 承認する</div>
 <p>月〜金の夜20:00（日本時間）に翌日分を配信します。金曜は土曜分に加え、共有する予定や勤務変更がある日曜・月曜分もまとめます。土日の通常配信はありません。</p>
-<p>変更・削除通知は、共有済みの今日以降の予定を対象に毎分確認します。日月も変更通知は動きます。</p>
+<p>夜に共有済みの今日以降の予定に変更・削除があれば、朝9時にまとめて通知します。変更がなければ送りません。日月も同じ時刻です。</p>
 {% if not delivery_enabled %}<p class="sl-note">実送信は停止中です。サーバー側の送信許可が必要です。</p>{% endif %}
 {% if not configured %}<p class="sl-note">スタッフ用LINE認証情報または管理者ロックが未設定です。</p>{% endif %}
 <form method="post" action="/settings/staff-line/save" class="sl-card">
@@ -20,7 +20,7 @@
 <label>送信先グループ <select name="group_id"><option value="">未選択</option>{% for g in groups %}<option value="{{ g.group_id }}" {% if settings.group_id == g.group_id %}selected{% endif %}>グループ …{{ g.group_id|slice(-8) }}</option>{% endfor %}</select></label>
 <p>スタッフ専用公式アカウントを招待し、一言投稿すると候補に出ます。送信先は末尾の番号で管理者が照合してください。</p>
 
-<label><input type="checkbox" name="notify_changes" {% if settings.notify_changes %}checked{% endif %}> 共有済み予定の変更・削除を通知する</label>
+<label><input type="checkbox" name="notify_changes" {% if settings.notify_changes %}checked{% endif %}> 共有済み予定の変更・削除を朝9時にまとめて通知する</label>
 <h3>LINEで共有を許可する店舗予定</h3>
 <p>予定名に顧客名や個人の事情を入力しないでください。日ごとの自由メモは共有しません。</p>
 {% for r in rules %}<label><input type="checkbox" name="rule[]" value="{{ r.id }}" {% if visibility['rule:' ~ r.id] is defined %}checked{% endif %}> {{ r.title }}{% if not r.is_active %}（停止中）{% endif %}</label>{% endfor %}
