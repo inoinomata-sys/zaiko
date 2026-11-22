@@ -19,6 +19,7 @@ SCHEMA = """
 DO $$ BEGIN
     IF to_regclass('public.customer_order_items') IS NOT NULL THEN
         ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ready BOOLEAN NOT NULL DEFAULT false;
+        ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ready_qty INTEGER NOT NULL DEFAULT 0;
     END IF;
 END $$;
 

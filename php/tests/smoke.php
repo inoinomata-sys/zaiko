@@ -383,10 +383,16 @@ ok($st === 200 && (int)db_val("SELECT ordered FROM customer_order_items WHERE id
 ok($st === 200 && str_contains($editBody, 'class="order-state done">発注済み') && str_contains($editBody, 'class="order-state">未発注'), '注文編集に未発注と発注済みを表示');
 [$st, $j] = api("/customer-orders/{$cid}/items/99999/ordered", ['ordered' => true]);
 ok($st === 404, '存在しない商品は 404');
+[$st,$part] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>1]);
+ok($st===200 && $part['ready_units']===1 && !$part['ready'], '同じ商品7個のうち1個だけ準備済みにできる');
+[$st] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>8]);
+ok($st===400, '注文数を超える準備数は拒否する');
+[$st] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>-1]);
+ok($st===400, '準備数のマイナスは拒否する');
 [$st, $j] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['ready'=>true]);
 ok($st===200 && $j['ready_count']===1 && !$j['ready'], '商品1つだけ準備済みにでき、注文全体は未準備のまま');
-page_ok('/customer-orders', '一部準備 1/4');
-page_ok("/customer-orders/{$cid}", 'ready-chip on');
+page_ok('/customer-orders', '一部準備 7/13点');
+page_ok("/customer-orders/{$cid}", 'ready-control');
 [$st] = api('/customer-orders/' . ($cid+9999) . "/items/{$iid}/ready", ['ready'=>true]);
 ok($st===404, '別注文の商品を準備済みにできない');
 [$st] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['ready'=>'yes']);
@@ -396,12 +402,18 @@ $cust['items'][] = ['price_id' => 4, 'qty' => 1];
 $cust['request_key'] = null;
 [$st, $j] = api('/customer-orders/save', $cust);
 ok($st === 200 && ($j['id'] ?? 0) === $cid, '直して保存');
+page_ok("/prices?order={$cid}", 'id="edit-save"');
+page_ok("/prices?order={$cid}", '変更を保存');
 ok((int)db_val("SELECT ordered FROM customer_order_items WHERE order_id={$cid} AND price_id=2") === 1, '直して保存しても、発注済みの印は残る');
 ok((int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid}") === 5, '商品が増えた分だけ行が増える');
 ok((int)db_val("SELECT ready FROM customer_order_items WHERE order_id={$cid} AND price_id=2")===1, '編集しても数量が同じ商品の準備済みは残る');
 $cust['items'][1]['qty']=8;
 [$st] = api('/customer-orders/save',$cust);
 ok($st===200 && (int)db_val("SELECT ready FROM customer_order_items WHERE order_id={$cid} AND price_id=2")===0, '数量を変更した商品は再確認のため未準備に戻る');
+$partialId=(int)db_val("SELECT id FROM customer_order_items WHERE order_id={$cid} AND price_id=2");
+api("/customer-orders/{$cid}/items/{$partialId}/ready",['qty'=>1]);
+api('/customer-orders/save',$cust);
+ok((int)db_val("SELECT ready_qty FROM customer_order_items WHERE order_id={$cid} AND price_id=2")===1,'編集保存でも1個だけ準備済の状態を保持する');
 $cust['items'][1]['qty']=7;
 api('/customer-orders/save',$cust);
 
@@ -422,7 +434,7 @@ ok($st===200 && $j['ready'] && !$j['delivered'] && $j['ready_count']===5, '全�
 api("/customer-orders/{$cid}/status",['field'=>'delivered','on'=>true]);
 // 旧DBからの移行を再現。従来の一括準備済が失われないことを確認する。
 db_val('ALTER TABLE customer_order_items DROP COLUMN ready');
-page_ok("/customer-orders/{$cid}", 'ready-chip on');
+page_ok("/customer-orders/{$cid}", 'ready-control');
 ok((int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid} AND ready=1")===5, '既存DB移行で一括準備済を商品別に引き継ぐ');
 
 page_ok("/customer-orders/{$cid}", 'お渡し済');

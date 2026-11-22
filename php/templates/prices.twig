@@ -47,6 +47,9 @@
 @media (max-width: 767px) {
   .cart-bar { position: static; box-shadow: none; margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; }
 }
+.order-edit {padding-bottom:82px}
+.edit-actions {position:fixed;bottom:0;left:0;right:0;z-index:80;display:flex;gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--border)}
+.edit-actions .btn {flex:1;justify-content:center;min-height:46px}
 .order-edit .cart-bar { position: static; box-shadow: none; margin: 0 0 14px; border: 1px solid var(--border); border-radius: 12px; }
 .order-filter { display:flex; align-items:center; gap:8px; margin:0 0 12px; padding:10px 0; font-size:16px; }
 .order-filter input { width:22px; height:22px; accent-color:var(--acc); }
@@ -71,6 +74,7 @@
 {% endblock %}
 
 {% block content %}
+{% if editing %}<div style="margin-bottom:12px"><a href="/customer-orders/{{ editing.id }}">← 注文に戻る</a><h1 style="font-size:20px;margin-top:8px">注文内容を編集</h1></div>{% endif %}
 {% include '_order_tabs.twig' %}
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:10px">
   <h1 style="font-size:20px; font-weight:700">{% if editing %}注文を直す{% else %}お客様の注文を作る{% endif %}</h1>
@@ -140,7 +144,7 @@
   </details>
   <div class="cart-btns">
     <button class="btn btn-ghost" type="button" id="c-clear">クリア</button>
-    <button class="btn btn-primary" type="button" id="c-save">{% if editing %}注文を保存{% else %}注文用紙を作る{% endif %}</button>
+    <button class="btn btn-primary" type="button" id="c-save">{% if editing %}変更を保存{% else %}注文用紙を作る{% endif %}</button>
   </div>
 </div>
 </div>
@@ -149,11 +153,17 @@
   まだ商品が登録されていません。<br>商品名と値段のExcelを渡すと、ここに一覧が出て、注文用紙が作れます。
 </div>
 {% endif %}
+{% if editing %}<div class="edit-actions"><a class="btn btn-ghost" href="/customer-orders/{{ editing.id }}">戻る</a><button type="button" class="btn btn-primary" id="edit-save">変更を保存</button></div>{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 const EDIT_ID = {{ (((editing) ? (editing.id) : (null)))|tojson }};
+if (document.getElementById('edit-save')) {
+  const source=document.getElementById('c-save'), proxy=document.getElementById('edit-save');
+  proxy.addEventListener('click',()=>source?.click());
+  if(source) new MutationObserver(()=>{proxy.disabled=source.disabled;proxy.textContent=source.textContent;}).observe(source,{attributes:true,childList:true,subtree:true});
+}
 if (EDIT_ID) {
   const bar = document.getElementById('cart-bar');
   if (bar) document.getElementById('order-details-slot').appendChild(bar);

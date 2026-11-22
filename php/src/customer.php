@@ -70,6 +70,15 @@ function ensure_customer_status_columns(): void
             }
         } finally { val("SELECT RELEASE_LOCK('customer-item-ready-schema')"); }
     }
+    if (!(int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='customer_order_items' AND column_name='ready_qty'")) {
+        if (!(int)val("SELECT GET_LOCK('customer-item-ready-schema',10)")) throw new RuntimeException('準備状況を更新中です');
+        try {
+            if (!(int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='customer_order_items' AND column_name='ready_qty'")) {
+                run('ALTER TABLE customer_order_items ADD COLUMN ready_qty INT NOT NULL DEFAULT 0');
+                run('UPDATE customer_order_items SET ready_qty=qty WHERE ready=1');
+            }
+        } finally {val("SELECT RELEASE_LOCK('customer-item-ready-schema')");}
+    }
 }
 
 function load_customer_order(int $oid): array
@@ -79,7 +88,7 @@ function load_customer_order(int $oid): array
     if (!$order) {
         throw new HttpError(404);
     }
-    $items = rows('SELECT i.id, i.ordered, i.ready, i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
+    $items = rows('SELECT i.id, i.ordered, i.ready, i.ready_qty, i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
                           COALESCE(i.discount_pct, ?) AS pct, p.category
                    FROM customer_order_items i LEFT JOIN price_items p ON p.id = i.price_id
                    WHERE i.order_id = ? ORDER BY i.sort_order, i.id', [$order['discount_pct'], $oid]);
@@ -121,7 +130,7 @@ function h_customer_orders(): void
     ensure_customer_status_columns();
     $orders = rows('
         SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, o.ready_at, o.delivered_at, COUNT(i.id) AS n,
-               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(i.ready), 0) AS n_ready
+               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(i.ready), 0) AS n_ready, COALESCE(SUM(i.ready_qty), 0) AS ready_units, COALESCE(SUM(i.qty),0) AS total_units
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY (o.delivered_at IS NOT NULL), o.created_at DESC LIMIT 300');   // お渡し済は下にまとめる
     $lines = [];
@@ -222,9 +231,9 @@ function h_customer_order_save(): void
             foreach (rows('SELECT price_id, name FROM customer_order_items WHERE order_id = ? AND ordered = 1', [$oid]) as $r) {
                 $wasOrdered[$r['price_id'] === null ? 'n' . $r['name'] : 'p' . $r['price_id']] = true;
             }
-            foreach (rows('SELECT price_id,name,qty FROM customer_order_items WHERE order_id=? AND ready=1', [$oid]) as $r) {
+            foreach (rows('SELECT price_id,name,ready_qty FROM customer_order_items WHERE order_id=? AND ready_qty>0', [$oid]) as $r) {
                 $key = $r['price_id'] === null ? 'n' . $r['name'] : 'p' . $r['price_id'];
-                $wasReady[$key] = (int)$r['qty'];
+                $wasReady[$key] = (int)$r['ready_qty'];
             }
             run('DELETE FROM customer_order_items WHERE order_id = ?', [$oid]);
         } else {
@@ -242,14 +251,14 @@ function h_customer_order_save(): void
         $linePct = static fn(string $kind, int $unit = 0) => $campaign ? kind_rate($kind, $disc, $unit) : null;
         $rowsData = [];
         foreach ($customs as $n => [$cn, $cp, $cq]) {
-            $rowsData[] = [$oid, null, $cn, null, $cp, $cq, $n, $linePct('n'), isset($wasOrdered['n' . $cn]), ($wasReady['n' . $cn] ?? null) === $cq];
+            $rowsData[] = [$oid, null, $cn, null, $cp, $cq, $n, $linePct('n'), isset($wasOrdered['n' . $cn]), ($wasReady['n' . $cn] ?? 0) >= $cq, min($wasReady['n' . $cn] ?? 0,$cq)];
         }
         foreach ($items as $n => [$pid, $q]) {
             $s = $snap[$pid];
             $rowsData[] = [$oid, $pid, $s['name'], $s['spec'], (int)$s['price'], $q, count($customs) + $n,
-                $linePct(price_kind($s['category'], $s['name']), (int)$s['price']), isset($wasOrdered['p' . $pid]), ($wasReady['p' . $pid] ?? null) === $q];
+                $linePct(price_kind($s['category'], $s['name']), (int)$s['price']), isset($wasOrdered['p' . $pid]), ($wasReady['p' . $pid] ?? 0) >= $q, min($wasReady['p' . $pid] ?? 0,$q)];
         }
-        insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered', 'ready'], $rowsData);
+        insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered', 'ready', 'ready_qty'], $rowsData);
         sync_customer_ready($oid);
         return [['ok' => true, 'id' => $oid], 200];
     });
@@ -267,7 +276,8 @@ function h_customer_order_view(int $id): void
 /** 商品別の準備状況から注文全体の印をそろえる。呼び出し側で親注文をロックする。 */
 function sync_customer_ready(int $id): array
 {
-    $items = rows('SELECT id,ready FROM customer_order_items WHERE order_id=? ORDER BY id', [$id]);
+    run('UPDATE customer_order_items SET ready=(ready_qty>=qty) WHERE order_id=?',[$id]);
+    $items = rows('SELECT id,ready,qty,ready_qty FROM customer_order_items WHERE order_id=? ORDER BY id', [$id]);
     $ready = array_values(array_map(static fn($i)=>(int)$i['id'], array_filter($items, static fn($i)=>(bool)$i['ready'])));
     $all = count($items)>0 && count($ready)===count($items);
     if ($all) run('UPDATE customer_orders SET ready_at=COALESCE(ready_at,?) WHERE id=?', [now_jst(),$id]);
@@ -275,7 +285,7 @@ function sync_customer_ready(int $id): array
     $o = row('SELECT ready_at,delivered_at FROM customer_orders WHERE id=?', [$id]);
     return ['ok'=>true,'ready'=>$all,'delivered'=>$o['delivered_at']!==null,
         'ready_at'=>status_stamp($o['ready_at']),'delivered_at'=>status_stamp($o['delivered_at']),
-        'ready_items'=>$ready,'ready_count'=>count($ready),'item_count'=>count($items)];
+        'ready_items'=>$ready,'ready_quantities'=>(object)array_column($items,'ready_qty','id'),'ready_units'=>array_sum(array_column($items,'ready_qty')),'total_units'=>array_sum(array_column($items,'qty')),'ready_count'=>count($ready),'item_count'=>count($items)];
 }
 
 /** 一括操作も商品別フラグと同時に更新する。 */
@@ -287,7 +297,7 @@ function h_customer_order_status(int $id): void
     if (!in_array($field,['ready','delivered'],true)) bad_input();
     $result = transaction(function() use ($id,$field,$on) {
         if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
-        if ($field==='ready' || $on) run('UPDATE customer_order_items SET ready=? WHERE order_id=?',[$on,$id]);
+        if ($field==='ready' || $on) run('UPDATE customer_order_items SET ready=?,ready_qty=IF(?,qty,0) WHERE order_id=?',[$on,$on,$id]);
         if ($field==='delivered') run('UPDATE customer_orders SET delivered_at=? WHERE id=?',[$on ? now_jst() : null,$id]);
         return sync_customer_ready($id);
     });
@@ -298,11 +308,16 @@ function h_customer_order_item_ready(int $id, int $iid): void
 {
     ensure_customer_status_columns();
     $d = req_json() ?? [];
-    if (!isset($d['ready']) || !is_bool($d['ready'])) bad_input();
+    if (array_key_exists('qty',$d)) {
+        if (!is_int($d['qty']) || $d['qty']<0) bad_input();
+    } elseif (!isset($d['ready']) || !is_bool($d['ready'])) bad_input();
     $result = transaction(function() use ($id,$iid,$d) {
         if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
-        if (!val('SELECT id FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id])) throw new HttpError(404);
-        run('UPDATE customer_order_items SET ready=? WHERE id=? AND order_id=?',[$d['ready'],$iid,$id]);
+        $item=row('SELECT qty FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id]);
+        if (!$item) throw new HttpError(404);
+        $qty=$d['qty'] ?? ($d['ready'] ? (int)$item['qty'] : 0);
+        if ($qty>(int)$item['qty']) throw new HttpError(400);
+        run('UPDATE customer_order_items SET ready_qty=? WHERE id=? AND order_id=?',[$qty,$iid,$id]);
         return sync_customer_ready($id);
     });
     respond_json($result);

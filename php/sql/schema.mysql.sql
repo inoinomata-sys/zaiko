@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS customer_order_items (
   discount_pct DECIMAL(6,2) NULL,
   ordered      TINYINT(1) NOT NULL DEFAULT 0,
   ready        TINYINT(1) NOT NULL DEFAULT 0,
+  ready_qty    INT NOT NULL DEFAULT 0,
   KEY customer_order_items_order (order_id),
   CONSTRAINT coi_order FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
   CONSTRAINT coi_price FOREIGN KEY (price_id) REFERENCES price_items(id) ON DELETE SET NULL

@@ -15,9 +15,10 @@
 .slip .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; font-size: 14px; }
 .slip .sum strong { font-size: 26px; }
 .ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #ead3b9; color: #96521c; background: #fff0df; font-family: inherit; cursor: pointer; }
-.ready-chip {margin:5px 0 0 5px;min-height:44px;padding:4px 9px;font-size:12px;font-weight:600;border:1px solid #d4d5d0;border-radius:6px;color:#65685f;background:#fff;font-family:inherit;cursor:pointer}
-.ready-chip.on {background:#eceeea;border-color:#aebba9;color:#40553b}
-.ready-chip:disabled,.st-btn:disabled {opacity:.6;cursor:wait}
+.ready-control {display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--fg2)}
+.ready-step {width:44px;height:44px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--fg);font-size:20px;font-weight:600;font-family:inherit;cursor:pointer}
+.ready-progress {min-width:60px;text-align:center;font-size:12px}
+.ready-step:disabled,.st-btn:disabled {opacity:.5;cursor:default}
 .ord-chip.on { background:#eaf5ef; border-color:#c1dccc; color:#286a51; }
 .st-btn { flex: 1; padding: 14px 8px; font-size: 17px; font-weight: 700; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); font-family: inherit; cursor: pointer; }
 .st-btn.on { background: #eceeea; border-color: #ced2c9; color: #4d554b; }
@@ -39,7 +40,7 @@
     {% for it in items %}
       <tr>
         <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div>
-          <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('未発注')) }}</button><button type="button" class="ready-chip{% if it.ready %} on{% endif %}" data-id="{{ it.id }}" aria-pressed="{{ ((it.ready) ? ('true') : ('false')) }}">{{ ((it.ready) ? ('✔ 準備済') : ('未準備')) }}</button></td>
+          <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('未発注')) }}</button><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}"><span>準備</span><button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button><span class="ready-progress">{{ it.ready_qty }}／{{ it.qty }}</span><button type="button" class="ready-step" data-step="1" aria-label="{{ it.name }}の準備数を1増やす">＋</button></div></td>
         <td class="q">{{ it.qty }}</td>
         <td class="a">{{ it.amount|yen }}</td>
       </tr>
@@ -112,15 +113,16 @@ showOrdered();
 // 商品別と注文全体の準備状態は、サーバーの確定結果を一緒に表示する。
 const stState = {ready: {{ ((order.ready_at) ? ('true') : ('false')) }}, delivered: {{ ((order.delivered_at) ? ('true') : ('false')) }}};
 const stStamp = {ready: '{% if order.ready_at %}{{ order.ready_at|jst }}{% endif %}', delivered: '{% if order.delivered_at %}{{ order.delivered_at|jst }}{% endif %}'};
-const readyChips = () => [...document.querySelectorAll('.ready-chip')];
+const readyChips = () => [...document.querySelectorAll('.ready-control')];
 let readyBusy = false;
 function showStatus() {
   for (const f of ['ready', 'delivered']) {
     const b = document.getElementById('st-' + f), label = f === 'ready' ? (stState.ready ? '全部を未準備に戻す' : '全部を準備済にする') : 'お渡し済';
     b.classList.toggle('on', stState[f]); b.textContent = (stState[f] ? '✔ ' : '') + label;
   }
-  const all = readyChips(), count = all.filter(c => c.classList.contains('on')).length;
-  const parts = ['準備済 ' + count + '／' + all.length + ' 品'];
+  const all = readyChips(), count = all.reduce((n,c)=>n+Number(c.dataset.ready),0), total=all.reduce((n,c)=>n+Number(c.dataset.total),0);
+  all.forEach(c=>c.querySelectorAll('.ready-step').forEach(b=>b.disabled=readyBusy || (Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total))));
+  const parts = ['準備済 ' + count + '／' + total + ' 点'];
   if (stState.ready && stStamp.ready) parts.push('準備 ' + stStamp.ready);
   if (stState.delivered && stStamp.delivered) parts.push('お渡し ' + stStamp.delivered);
   document.getElementById('st-note').textContent = parts.join('　');
@@ -128,7 +130,7 @@ function showStatus() {
 async function saveReady(url, data) {
   if (readyBusy) return;
   readyBusy = true;
-  const controls = [...readyChips(), ...document.querySelectorAll('.st-btn')];
+  const controls = [...document.querySelectorAll('.ready-step,.st-btn')];
   controls.forEach(c => c.disabled = true);
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
   try {
@@ -136,17 +138,19 @@ async function saveReady(url, data) {
     if (!res.ok) throw new Error();
     const j = await res.json();
     if (!j.ok) throw new Error();
-    const ids = new Set(j.ready_items.map(String));
     readyChips().forEach(c => {
-      const on = ids.has(c.dataset.id); c.classList.toggle('on',on);
-      c.textContent = on ? '✔ 準備済' : '未準備'; c.setAttribute('aria-pressed',String(on));
+      const qty=Number(j.ready_quantities[c.dataset.id] || 0);
+      c.dataset.ready=qty; c.querySelector('.ready-progress').textContent=qty+'／'+c.dataset.total;
     });
     stState.ready=j.ready; stState.delivered=j.delivered;
     stStamp.ready=j.ready_at; stStamp.delivered=j.delivered_at; showStatus();
   } catch (e) { toast('保存結果を確認できませんでした。画面を開き直して確認してください'); }
-  finally {clearTimeout(timer); readyBusy=false; controls.forEach(c => c.disabled=false);}
+  finally {clearTimeout(timer); readyBusy=false; controls.forEach(c => c.disabled=false);showStatus();}
 }
-readyChips().forEach(c => c.addEventListener('click', () => saveReady('/customer-orders/{{ order.id }}/items/' + c.dataset.id + '/ready', {ready:!c.classList.contains('on')})));
+document.querySelectorAll('.ready-step').forEach(b=>b.addEventListener('click',()=>{
+  const c=b.closest('.ready-control');
+  saveReady('/customer-orders/{{ order.id }}/items/'+c.dataset.id+'/ready',{qty:Math.max(0,Math.min(Number(c.dataset.total),Number(c.dataset.ready)+Number(b.dataset.step)))});
+}));
 document.querySelectorAll('.st-btn').forEach(b => b.addEventListener('click', () => saveReady('/customer-orders/{{ order.id }}/status', {field:b.dataset.field,on:!stState[b.dataset.field]})));
 showStatus();
 document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
