@@ -15,7 +15,15 @@
 .slip .sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; font-size: 14px; }
 .slip .sum strong { font-size: 26px; }
 .ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #ead3b9; color: #96521c; background: #fff0df; font-family: inherit; cursor: pointer; }
-.ready-control {display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--fg2)}
+.ready-control {display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;margin:0;font-size:12px;color:var(--fg2)}
+.item-tools {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ready-center {display:flex;flex-direction:column;align-items:center;min-width:60px;line-height:1.35}
+.ready-caption {font-size:10px;color:var(--fg2)}
+.slip .item-info td {border-bottom:0;padding-bottom:4px}
+.slip .item-actions td {padding-top:4px;padding-bottom:12px;border-bottom:1px solid #ddd}
+.slip .order-product tr {background:transparent}
+.item-tools .ord-chip {margin-top:0;white-space:nowrap;flex-shrink:0}
+.ready-progress {font-weight:600;color:var(--fg)}
 .ready-step {width:44px;height:44px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--fg);font-size:20px;font-weight:600;font-family:inherit;cursor:pointer}
 .ready-progress {min-width:60px;text-align:center;font-size:12px}
 .ready-step:disabled,.st-btn:disabled {opacity:.5;cursor:default}
@@ -36,16 +44,23 @@
   <div class="meta">{% if order.phone %}TEL {{ order.phone }}{% endif %}</div>
   <table>
     <thead><tr><th>商品名</th><th class="q">数量</th><th class="a">金額</th></tr></thead>
-    <tbody>
     {% for it in items %}
-      <tr>
-        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div>
-          <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('未発注')) }}</button><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}"><span>準備</span><button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button><span class="ready-progress">{{ it.ready_qty }}／{{ it.qty }}</span><button type="button" class="ready-step" data-step="1" aria-label="{{ it.name }}の準備数を1増やす">＋</button></div></td>
+    <tbody class="order-product">
+      <tr class="item-info">
+        <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div></td>
         <td class="q">{{ it.qty }}</td>
         <td class="a">{{ it.amount|yen }}</td>
       </tr>
-    {% endfor %}
+      <tr class="item-actions"><td colspan="3"><div class="item-tools">
+        <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('未発注')) }}</button>
+        <div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
+          <button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button>
+          <span class="ready-center"><span class="ready-caption">準備</span><span class="ready-progress">{{ it.ready_qty }}／{{ it.qty }}</span></span>
+          <button type="button" class="ready-step" data-step="1" aria-label="{{ it.name }}の準備数を1増やす">＋</button>
+        </div>
+      </div></td></tr>
     </tbody>
+    {% endfor %}
   </table>
   {% if disc %}
   <div class="sum"><span>小計 {{ items|length }} 品</span><span>{{ subtotal|yen }}</span></div>
