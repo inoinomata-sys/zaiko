@@ -59,6 +59,17 @@ function ensure_customer_status_columns(): void
             run("ALTER TABLE customer_orders ADD COLUMN {$col} DATETIME NULL");
         }
     }
+    $has = (int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='customer_order_items' AND column_name='ready'");
+    if (!$has) {
+        if (!(int)val("SELECT GET_LOCK('customer-item-ready-schema',10)")) throw new RuntimeException('準備状況の更新をしばらくしてからお試しください');
+        try {
+            if (!(int)val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='customer_order_items' AND column_name='ready'")) {
+                run('ALTER TABLE customer_order_items ADD COLUMN ready TINYINT(1) NOT NULL DEFAULT 0');
+                // 従来の一括準備済みは、商品ごとの準備済みとして引き継ぐ。
+                run('UPDATE customer_order_items i JOIN customer_orders o ON o.id=i.order_id SET i.ready=1 WHERE o.ready_at IS NOT NULL');
+            }
+        } finally { val("SELECT RELEASE_LOCK('customer-item-ready-schema')"); }
+    }
 }
 
 function load_customer_order(int $oid): array
@@ -68,7 +79,7 @@ function load_customer_order(int $oid): array
     if (!$order) {
         throw new HttpError(404);
     }
-    $items = rows('SELECT i.id, i.ordered, i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
+    $items = rows('SELECT i.id, i.ordered, i.ready, i.name, i.spec, i.unit_price, i.qty, i.unit_price * i.qty AS amount,
                           COALESCE(i.discount_pct, ?) AS pct, p.category
                    FROM customer_order_items i LEFT JOIN price_items p ON p.id = i.price_id
                    WHERE i.order_id = ? ORDER BY i.sort_order, i.id', [$order['discount_pct'], $oid]);
@@ -110,7 +121,7 @@ function h_customer_orders(): void
     ensure_customer_status_columns();
     $orders = rows('
         SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, o.ready_at, o.delivered_at, COUNT(i.id) AS n,
-               COALESCE(SUM(i.ordered), 0) AS n_ordered
+               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(i.ready), 0) AS n_ready
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY (o.delivered_at IS NOT NULL), o.created_at DESC LIMIT 300');   // お渡し済は下にまとめる
     $lines = [];
@@ -130,6 +141,7 @@ function h_customer_orders(): void
 
 function h_customer_order_save(): void
 {
+    ensure_customer_status_columns();
     $d = req_json();
     if ($d === null) {
         bad_input();
@@ -199,6 +211,7 @@ function h_customer_order_save(): void
             return [['ok' => false, 'error' => '価格表にない商品が含まれています。画面を読み込み直してください'], 400];
         }
         $wasOrdered = [];
+        $wasReady = [];
         if ($oid) {
             if (!val('SELECT id FROM customer_orders WHERE id = ? FOR UPDATE', [$oid])) {
                 return [['ok' => false, 'error' => '注文が見つかりません'], 404];
@@ -208,6 +221,10 @@ function h_customer_order_save(): void
             // 直して保存しても、発注済みの印は残す（商品と、手書きの品名で照らし合わせる）
             foreach (rows('SELECT price_id, name FROM customer_order_items WHERE order_id = ? AND ordered = 1', [$oid]) as $r) {
                 $wasOrdered[$r['price_id'] === null ? 'n' . $r['name'] : 'p' . $r['price_id']] = true;
+            }
+            foreach (rows('SELECT price_id,name,qty FROM customer_order_items WHERE order_id=? AND ready=1', [$oid]) as $r) {
+                $key = $r['price_id'] === null ? 'n' . $r['name'] : 'p' . $r['price_id'];
+                $wasReady[$key] = (int)$r['qty'];
             }
             run('DELETE FROM customer_order_items WHERE order_id = ?', [$oid]);
         } else {
@@ -225,14 +242,15 @@ function h_customer_order_save(): void
         $linePct = static fn(string $kind, int $unit = 0) => $campaign ? kind_rate($kind, $disc, $unit) : null;
         $rowsData = [];
         foreach ($customs as $n => [$cn, $cp, $cq]) {
-            $rowsData[] = [$oid, null, $cn, null, $cp, $cq, $n, $linePct('n'), isset($wasOrdered['n' . $cn])];
+            $rowsData[] = [$oid, null, $cn, null, $cp, $cq, $n, $linePct('n'), isset($wasOrdered['n' . $cn]), ($wasReady['n' . $cn] ?? null) === $cq];
         }
         foreach ($items as $n => [$pid, $q]) {
             $s = $snap[$pid];
             $rowsData[] = [$oid, $pid, $s['name'], $s['spec'], (int)$s['price'], $q, count($customs) + $n,
-                $linePct(price_kind($s['category'], $s['name']), (int)$s['price']), isset($wasOrdered['p' . $pid])];
+                $linePct(price_kind($s['category'], $s['name']), (int)$s['price']), isset($wasOrdered['p' . $pid]), ($wasReady['p' . $pid] ?? null) === $q];
         }
-        insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered'], $rowsData);
+        insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered', 'ready'], $rowsData);
+        sync_customer_ready($oid);
         return [['ok' => true, 'id' => $oid], 200];
     });
     respond_json($data, $status);
@@ -246,30 +264,48 @@ function h_customer_order_view(int $id): void
         'total' => $payable, 'pct' => $label, 'note' => PRICE_NOTE]);
 }
 
-/** 準備済・お渡し済の印を付ける／外す。お渡し済にすると準備済にもなり、準備済を外すとお渡し済も外れる */
+/** 商品別の準備状況から注文全体の印をそろえる。呼び出し側で親注文をロックする。 */
+function sync_customer_ready(int $id): array
+{
+    $items = rows('SELECT id,ready FROM customer_order_items WHERE order_id=? ORDER BY id', [$id]);
+    $ready = array_values(array_map(static fn($i)=>(int)$i['id'], array_filter($items, static fn($i)=>(bool)$i['ready'])));
+    $all = count($items)>0 && count($ready)===count($items);
+    if ($all) run('UPDATE customer_orders SET ready_at=COALESCE(ready_at,?) WHERE id=?', [now_jst(),$id]);
+    else run('UPDATE customer_orders SET ready_at=NULL,delivered_at=NULL WHERE id=?', [$id]);
+    $o = row('SELECT ready_at,delivered_at FROM customer_orders WHERE id=?', [$id]);
+    return ['ok'=>true,'ready'=>$all,'delivered'=>$o['delivered_at']!==null,
+        'ready_at'=>status_stamp($o['ready_at']),'delivered_at'=>status_stamp($o['delivered_at']),
+        'ready_items'=>$ready,'ready_count'=>count($ready),'item_count'=>count($items)];
+}
+
+/** 一括操作も商品別フラグと同時に更新する。 */
 function h_customer_order_status(int $id): void
 {
     ensure_customer_status_columns();
     $d = req_json() ?? [];
-    $field = (string)($d['field'] ?? '');
-    $on = !empty($d['on']);
-    if (!in_array($field, ['ready', 'delivered'], true)) {
-        bad_input();
-    }
-    if (!val('SELECT id FROM customer_orders WHERE id = ?', [$id])) {
-        respond_json(['ok' => false, 'error' => '注文が見つかりません'], 404);
-    }
-    $now = now_jst()->format('Y-m-d H:i:s');
-    if ($field === 'ready') {
-        run('UPDATE customer_orders SET ready_at = ?' . ($on ? '' : ', delivered_at = NULL') . ' WHERE id = ?', $on ? [$now, $id] : [null, $id]);
-    } elseif ($on) {
-        run('UPDATE customer_orders SET delivered_at = ?, ready_at = COALESCE(ready_at, ?) WHERE id = ?', [$now, $now, $id]);
-    } else {
-        run('UPDATE customer_orders SET delivered_at = NULL WHERE id = ?', [$id]);
-    }
-    $o = row('SELECT ready_at, delivered_at FROM customer_orders WHERE id = ?', [$id]);
-    respond_json(['ok' => true, 'ready' => $o['ready_at'] !== null, 'delivered' => $o['delivered_at'] !== null,
-        'ready_at' => status_stamp($o['ready_at']), 'delivered_at' => status_stamp($o['delivered_at'])]);
+    $field = (string)($d['field'] ?? ''); $on = !empty($d['on']);
+    if (!in_array($field,['ready','delivered'],true)) bad_input();
+    $result = transaction(function() use ($id,$field,$on) {
+        if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
+        if ($field==='ready' || $on) run('UPDATE customer_order_items SET ready=? WHERE order_id=?',[$on,$id]);
+        if ($field==='delivered') run('UPDATE customer_orders SET delivered_at=? WHERE id=?',[$on ? now_jst() : null,$id]);
+        return sync_customer_ready($id);
+    });
+    respond_json($result);
+}
+
+function h_customer_order_item_ready(int $id, int $iid): void
+{
+    ensure_customer_status_columns();
+    $d = req_json() ?? [];
+    if (!isset($d['ready']) || !is_bool($d['ready'])) bad_input();
+    $result = transaction(function() use ($id,$iid,$d) {
+        if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
+        if (!val('SELECT id FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id])) throw new HttpError(404);
+        run('UPDATE customer_order_items SET ready=? WHERE id=? AND order_id=?',[$d['ready'],$iid,$id]);
+        return sync_customer_ready($id);
+    });
+    respond_json($result);
 }
 
 function status_stamp($at): string

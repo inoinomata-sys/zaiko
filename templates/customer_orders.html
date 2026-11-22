@@ -60,7 +60,7 @@
   {% for o in orders %}
   <a class="o-row{% if o.n and o.n_ordered == o.n %} done{% elif o.n_ordered %} partial{% endif %}" href="/customer-orders/{{ o.id }}" data-name="{{ o.customer }}" data-ordered="{{ 1 if o.n and o.n_ordered == o.n else 0 }}" data-store="{{ o.store }}" data-hand="{{ 1 if o.delivered_at else 0 }}">
     <div>
-      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}{% if o.delivered_at %}<span class="o-hand">お渡し済</span>{% elif o.ready_at %}<span class="o-ready">準備済</span>{% endif %}</div>
+      <div class="o-name"><span class="o-store">{{ o.store }}</span>{{ o.customer|sama }}{% if o.n and o.n_ordered == o.n %}<span class="o-done">発注済</span>{% elif o.n_ordered %}<span class="o-part">一部発注 {{ o.n_ordered }}/{{ o.n }}</span>{% else %}<span class="o-todo">未発注</span>{% endif %}{% if o.delivered_at %}<span class="o-hand">お渡し済</span>{% elif o.ready_at %}<span class="o-ready">準備済</span>{% elif o.n_ready %}<span class="o-ready">一部準備 {{ o.n_ready }}/{{ o.n }}</span>{% endif %}</div>
       <div class="o-meta">{{ o.created_at|jst }} ／ {{ o.n }} 品{% if o.phone %} ／ {{ o.phone }}{% endif %}</div>
     </div>
     <div class="o-total">{{ o.total|yen }}</div>
