@@ -102,6 +102,7 @@ function routes(): array
         ['GET', '/customer-orders/<int:id>', 'h_customer_order_view'],
         ['POST', '/customer-orders/<int:id>/ordered', 'h_customer_order_ordered'],
         ['POST', '/customer-orders/<int:id>/status', 'h_customer_order_status'],
+        ['POST', '/customer-orders/<int:id>/history/<int:hid>/undo', 'h_customer_order_undo'],
         ['POST', '/customer-orders/<int:id>/items/<int:iid>/ordered', 'h_customer_order_item_ordered'],
         ['POST', '/customer-orders/<int:id>/items/<int:iid>/ready', 'h_customer_order_item_ready'],
         ['GET', '/customer-orders/<int:id>/pdf', 'h_customer_order_pdf'],

@@ -16,6 +16,8 @@ EXCEL_PATH = os.path.expanduser(
 )
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS customer_order_history (id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL, action VARCHAR(100) NOT NULL, before_state TEXT NOT NULL, after_state TEXT NOT NULL, created_at TIMESTAMP NOT NULL, undone_at TIMESTAMP);
+
 DO $$ BEGIN
     IF to_regclass('public.customer_order_items') IS NOT NULL THEN
         ALTER TABLE customer_order_items ADD COLUMN IF NOT EXISTS ready BOOLEAN NOT NULL DEFAULT false;

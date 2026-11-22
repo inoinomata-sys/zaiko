@@ -186,3 +186,5 @@ CREATE TABLE IF NOT EXISTS web_order_sites (
   sort_order INT NOT NULL DEFAULT 0,
   seed_key VARCHAR(40) NULL UNIQUE
 ) DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS customer_order_history (id INT AUTO_INCREMENT PRIMARY KEY, order_id INT NOT NULL, action VARCHAR(100) NOT NULL, before_state MEDIUMTEXT NOT NULL, after_state MEDIUMTEXT NOT NULL, created_at DATETIME NOT NULL, undone_at DATETIME NULL, KEY coi_history_order(order_id,id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

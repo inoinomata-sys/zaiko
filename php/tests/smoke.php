@@ -376,6 +376,25 @@ pdf_ok("/customer-orders/unordered/pdf?order={$cid}&store=" . rawurlencode('リ�
 [$st, $j] = api("/customer-orders/{$cid}/ordered", ['ordered' => true]);
 ok($st === 200 && (int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid} AND ordered=1") === 4, '全部を発注済みにする');
 [$st, $j] = api("/customer-orders/{$cid}/ordered", ['ordered' => false]);
+// 今後の変更には操作履歴と取り消しがある。部分発注を丸ごと戻しても直前を復元できる。
+$historyBody=page_ok("/customer-orders/{$cid}",'直前の操作を元に戻す');
+preg_match('/const historyKey = "([a-f0-9]+)"/', $historyBody,$hm);
+$historyKey=$hm[1]??'';
+ok($historyKey!=='','操作を戻すための画面の鍵がある');
+$firstIid=(int)db_val("SELECT MIN(id) FROM customer_order_items WHERE order_id={$cid}");
+[$st,$marked]=api("/customer-orders/{$cid}/items/{$firstIid}/ordered",['ordered'=>true]);
+[$st,$cleared]=api("/customer-orders/{$cid}/ordered",['ordered'=>false]);
+$hid=(int)($cleared['history'][0]['id']??0);
+[$st]=api("/customer-orders/{$cid}/history/{$hid}/undo",['form_key'=>'wrong']);
+ok($st===403,'履歴を戻す操作は画面の鍵が必要');
+[$st,$restored]=api("/customer-orders/{$cid}/history/{$hid}/undo",['form_key'=>$historyKey,'state_key'=>$cleared['state_key']]);
+ok($st===200 && count($restored['ordered_items'])===1 && (int)$restored['ordered_items'][0]===$firstIid,'一括で未発注にした直前の部分発注を正確に戻せる');
+[$st]=api("/customer-orders/{$cid}/history/{$hid}/undo",['form_key'=>$historyKey]);
+ok($st===409,'同じ操作の取り消しを繰り返して適用しない');
+[$st]=api("/customer-orders/{$cid}/items/{$firstIid}/ready",['qty'=>1,'state_key'=>$cleared['state_key']]);
+ok($st===409,'古い画面から最新の状態を上書きしない');
+api("/customer-orders/{$cid}/ordered",['ordered'=>false]);
+
 $iid = (int)db_val("SELECT id FROM customer_order_items WHERE order_id={$cid} AND price_id=2");
 [$st, $j] = api("/customer-orders/{$cid}/items/{$iid}/ordered", ['ordered' => true]);
 ok($st === 200 && (int)db_val("SELECT ordered FROM customer_order_items WHERE id={$iid}") === 1, '商品1つを発注済みにする');
@@ -385,6 +404,11 @@ ok($st === 200 && str_contains($editBody, 'class="order-state done">発注済み
 ok($st === 404, '存在しない商品は 404');
 [$st,$part] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>1]);
 ok($st===200 && $part['ready_units']===1 && !$part['ready'], '同じ商品7個のうち1個だけ準備済みにできる');
+$partialHistory=(int)$part['history'][0]['id'];
+[$st,$undone]=api("/customer-orders/{$cid}/history/{$partialHistory}/undo",['form_key'=>$historyKey]);
+ok($st===200 && $undone['ready_units']===0,'準備数量の変更も直前の個数へ戻せる');
+api("/customer-orders/{$cid}/items/{$iid}/ready",['qty'=>1]);
+
 [$st] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>8]);
 ok($st===400, '注文数を超える準備数は拒否する');
 [$st] = api("/customer-orders/{$cid}/items/{$iid}/ready", ['qty'=>-1]);

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . "/customer_history.php";
 
 // ── お客様向けの価格表 ─────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ function ensure_customer_status_columns(): void
 function load_customer_order(int $oid): array
 {
     ensure_customer_status_columns();
+    ensure_customer_history();
     $order = row('SELECT * FROM customer_orders WHERE id = ?', [$oid]);
     if (!$order) {
         throw new HttpError(404);
@@ -151,6 +153,7 @@ function h_customer_orders(): void
 function h_customer_order_save(): void
 {
     ensure_customer_status_columns();
+    ensure_customer_history();
     $d = req_json();
     if ($d === null) {
         bad_input();
@@ -221,10 +224,12 @@ function h_customer_order_save(): void
         }
         $wasOrdered = [];
         $wasReady = [];
+        $editBefore = null;
         if ($oid) {
             if (!val('SELECT id FROM customer_orders WHERE id = ? FOR UPDATE', [$oid])) {
                 return [['ok' => false, 'error' => '注文が見つかりません'], 404];
             }
+            $editBefore = customer_state($oid);
             run('UPDATE customer_orders SET customer = ?, phone = ?, memo = ?, discount_pct = ?, campaign = ?, store = ?, updated_at = ? WHERE id = ?',
                 [$customer, $phone, $memo, $disc, $campaign, $store, $now, $oid]);
             // 直して保存しても、発注済みの印は残す（商品と、手書きの品名で照らし合わせる）
@@ -260,6 +265,7 @@ function h_customer_order_save(): void
         }
         insert_many('customer_order_items', ['order_id', 'price_id', 'name', 'spec', 'unit_price', 'qty', 'sort_order', 'discount_pct', 'ordered', 'ready', 'ready_qty'], $rowsData);
         sync_customer_ready($oid);
+        if ($editBefore!==null) customer_history_record($oid,'注文内容を編集',$editBefore);
         return [['ok' => true, 'id' => $oid], 200];
     });
     respond_json($data, $status);
@@ -270,7 +276,7 @@ function h_customer_order_view(int $id): void
     [$order, $items, $total] = load_customer_order($id);
     [$disc, $payable, $label] = order_discount($order, $items);
     render('customer_order', ['order' => $order, 'items' => $items, 'subtotal' => $total, 'disc' => $disc,
-        'total' => $payable, 'pct' => $label, 'note' => PRICE_NOTE]);
+        'total' => $payable, 'pct' => $label, 'note' => PRICE_NOTE, 'state_key'=>customer_state_key(customer_state($id)), 'history'=>customer_history_list($id), 'history_key'=>customer_history_form_key()]);
 }
 
 /** 商品別の準備状況から注文全体の印をそろえる。呼び出し側で親注文をロックする。 */
@@ -295,11 +301,14 @@ function h_customer_order_status(int $id): void
     $d = req_json() ?? [];
     $field = (string)($d['field'] ?? ''); $on = !empty($d['on']);
     if (!in_array($field,['ready','delivered'],true)) bad_input();
+    ensure_customer_history();
     $result = transaction(function() use ($id,$field,$on) {
-        if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
+        $before=customer_lock_state($id);
         if ($field==='ready' || $on) run('UPDATE customer_order_items SET ready=?,ready_qty=IF(?,qty,0) WHERE order_id=?',[$on,$on,$id]);
         if ($field==='delivered') run('UPDATE customer_orders SET delivered_at=? WHERE id=?',[$on ? now_jst() : null,$id]);
-        return sync_customer_ready($id);
+        sync_customer_ready($id);
+        customer_history_record($id,($field==='ready' ? '全商品の準備' : 'お渡し状況').($on ? 'を完了' : 'を解除'),$before);
+        return customer_status_response($id);
     });
     respond_json($result);
 }
@@ -311,14 +320,18 @@ function h_customer_order_item_ready(int $id, int $iid): void
     if (array_key_exists('qty',$d)) {
         if (!is_int($d['qty']) || $d['qty']<0) bad_input();
     } elseif (!isset($d['ready']) || !is_bool($d['ready'])) bad_input();
+    ensure_customer_history();
     $result = transaction(function() use ($id,$iid,$d) {
-        if (!val('SELECT id FROM customer_orders WHERE id=? FOR UPDATE',[$id])) throw new HttpError(404);
+        $before=customer_lock_state($id);
         $item=row('SELECT qty FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id]);
         if (!$item) throw new HttpError(404);
         $qty=$d['qty'] ?? ($d['ready'] ? (int)$item['qty'] : 0);
         if ($qty>(int)$item['qty']) throw new HttpError(400);
         run('UPDATE customer_order_items SET ready_qty=? WHERE id=? AND order_id=?',[$qty,$iid,$id]);
-        return sync_customer_ready($id);
+        sync_customer_ready($id);
+        $name=(string)val('SELECT name FROM customer_order_items WHERE id=?',[$iid]);
+        customer_history_record($id,$name.'：準備数を'.$qty.'個に変更',$before);
+        return customer_status_response($id);
     });
     respond_json($result);
 }
@@ -331,20 +344,25 @@ function status_stamp($at): string
 /** 注文の全商品を、発注済みにする／未発注に戻す */
 function h_customer_order_ordered(int $id): void
 {
-    $on = !empty((req_json() ?? [])['ordered']);
-    run('UPDATE customer_order_items SET ordered = ? WHERE order_id = ?', [$on, $id]);
-    respond_json(['ok' => true, 'ordered' => $on]);
+    customer_change_ordered($id,null);
 }
-
-/** 商品1つの発注済みの印を付ける／外す */
-function h_customer_order_item_ordered(int $id, int $iid): void
+function h_customer_order_item_ordered(int $id,int $iid): void
 {
-    $on = !empty((req_json() ?? [])['ordered']);
-    if (!val('SELECT id FROM customer_order_items WHERE id = ? AND order_id = ?', [$iid, $id])) {
-        respond_json(['ok' => false, 'error' => '商品が見つかりません'], 404);
-    }
-    run('UPDATE customer_order_items SET ordered = ? WHERE id = ? AND order_id = ?', [$on, $iid, $id]);
-    respond_json(['ok' => true, 'ordered' => $on]);
+    customer_change_ordered($id,$iid);
+}
+function customer_change_ordered(int $id,?int $iid): void
+{
+    ensure_customer_status_columns(); ensure_customer_history();
+    $on=!empty((req_json()??[])['ordered']);
+    $result=transaction(function()use($id,$iid,$on){
+        $before=customer_lock_state($id);
+        if($iid!==null && !val('SELECT id FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id]))throw new HttpError(404);
+        if($iid===null)run('UPDATE customer_order_items SET ordered=? WHERE order_id=?',[$on,$id]);
+        else run('UPDATE customer_order_items SET ordered=? WHERE id=? AND order_id=?',[$on,$iid,$id]);
+        $name=$iid===null ? '全商品' : (string)val('SELECT name FROM customer_order_items WHERE id=?',[$iid]);
+        customer_history_record($id,$name.($on ? 'を発注済に変更' : 'を未発注に戻す'),$before);
+        return customer_status_response($id)+['ordered'=>$on];
+    });respond_json($result);
 }
 
 function h_customer_order_delete(int $id): void

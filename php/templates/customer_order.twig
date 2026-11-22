@@ -16,7 +16,18 @@
 .slip .sum strong { font-size: 26px; }
 .ord-chip { margin-top: 5px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 6px; border: 1px solid #ead3b9; color: #96521c; background: #fff0df; font-family: inherit; cursor: pointer; }
 .ready-control {display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;margin:0;font-size:12px;color:var(--fg2)}
-.item-tools {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.item-tools {display:flex;flex-direction:column;gap:10px}
+.item-order-line,.item-prepare-line {display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.item-label {font-size:12px;color:var(--fg2)}
+.item-tools .ord-chip {min-height:44px;padding:7px 12px}
+.order-summary {max-width:640px;margin:0 auto 12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px}
+#undo-btn[hidden] {display:none}
+.order-history {max-width:640px;margin:12px auto;font-size:13px}
+.order-history summary {padding:12px 0;cursor:pointer}
+.order-history li {padding:8px 0;border-bottom:1px solid var(--border);list-style:none;overflow-wrap:anywhere}
+.bulk-actions {max-width:640px;margin:12px auto}
+.bulk-actions summary {padding:12px 0;cursor:pointer}
+.bulk-actions .btn {width:100%;white-space:normal;margin:6px 0;min-height:44px}
 .ready-center {display:flex;flex-direction:column;align-items:center;min-width:60px;line-height:1.35}
 .ready-caption {font-size:10px;color:var(--fg2)}
 .slip .item-info td {border-bottom:0;padding-bottom:4px}
@@ -52,12 +63,12 @@
         <td class="a">{{ it.amount|yen }}</td>
       </tr>
       <tr class="item-actions"><td colspan="3"><div class="item-tools">
-        <button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('未発注')) }}</button>
-        <div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
+        <div class="item-order-line"><span class="item-label">業者への発注</span><button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('発注済に記録')) }}</button></div>
+        <div class="item-prepare-line"><span class="item-label">店で用意した数</span><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
           <button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button>
           <span class="ready-center"><span class="ready-caption">準備</span><span class="ready-progress">{{ it.ready_qty }}／{{ it.qty }}</span></span>
           <button type="button" class="ready-step" data-step="1" aria-label="{{ it.name }}の準備数を1増やす">＋</button>
-        </div>
+        </div></div>
       </div></td></tr>
     </tbody>
     {% endfor %}
@@ -70,104 +81,83 @@
   {% if order.memo %}<div class="meta" style="margin-top:10px">メモ: {{ order.memo }}</div>{% endif %}
 </div>
 
-<div class="card" id="ord-box" style="padding:12px 14px; margin-bottom:10px">
-  <div id="ord-state" style="font-weight:700; font-size:16px; margin-bottom:10px"></div>
-  <button class="btn btn-primary" type="button" id="ord-btn" style="width:100%; justify-content:center; padding:13px 10px; font-size:16px; white-space:normal; line-height:1.4; text-align:center"></button>
+<div class="order-summary">
+  <div id="ord-state"></div><div id="st-note" style="margin-top:5px"></div>
+  <p style="font-size:12px;color:var(--fg2);margin-top:6px">発注は業者への注文の記録、準備数は店で用意できた個数です。</p>
+  <div id="action-feedback" role="status" style="margin-top:8px"></div>
+  <button class="btn btn-ghost" type="button" id="undo-btn" hidden style="margin-top:8px">直前の操作を元に戻す</button>
 </div>
-<div class="card" style="padding:12px 14px; margin-bottom:10px">
-  <div style="display:flex; gap:8px">
-    <button type="button" class="st-btn{% if order.ready_at %} on{% endif %}" id="st-ready" data-field="ready">{% if order.ready_at %}✔ 準備済{% else %}準備済{% endif %}</button>
-    <button type="button" class="st-btn{% if order.delivered_at %} on{% endif %}" id="st-delivered" data-field="delivered">{% if order.delivered_at %}✔ お渡し済{% else %}お渡し済{% endif %}</button>
-  </div>
-  <div id="st-note" style="font-size:12px; color:var(--fg2); margin-top:6px"></div>
-</div>
+<div style="max-width:640px;margin:0 auto 12px"><button class="st-btn" style="width:100%" type="button" id="st-delivered" data-field="delivered">お渡し済にする</button></div>
+<details class="bulk-actions"><summary>まとめて操作する</summary>
+  <p style="font-size:12px;color:var(--fg2)">商品の個別操作は、上の商品ごとの欄から行えます。</p>
+  <button class="btn btn-ghost" type="button" id="ord-btn">未発注の商品を発注済に記録</button>
+  <button class="btn btn-ghost st-btn" type="button" id="st-ready" data-field="ready">全商品の準備を完了</button>
+  <details><summary>準備数をすべて0に戻す</summary><button class="btn btn-ghost" type="button" id="reset-ready">確認して0に戻す</button></details>
+</details>
+<div class="order-history"><details><summary>操作履歴を見る（今後の操作を記録）</summary><ul id="history-list"></ul></details></div>
 <div class="act" style="margin-bottom:8px">
   <button class="btn btn-ghost pdf-un" type="button" data-url="/customer-orders/unordered/pdf?order={{ order.id }}">この注文の未発注の商品をPDFに</button>
 </div>
 <div class="act">
   <a class="btn btn-primary" id="pdf-btn" href="/customer-orders/{{ order.id }}/pdf" download>注文用紙 PDF</a>
-  <a class="btn btn-ghost" href="/prices?order={{ order.id }}">直す</a>
-  <button class="btn btn-ghost" type="button" id="del-btn" style="color:var(--danger)">削除</button>
+  <a class="btn btn-ghost" href="/prices?order={{ order.id }}">注文内容を編集</a>
+
 </div>
+<details class="bulk-actions"><summary>注文を削除する</summary><button class="btn btn-ghost" type="button" id="del-btn" style="color:var(--danger)">確認して注文を削除</button></details>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const chips = () => [...document.querySelectorAll('.ord-chip')];
-function showOrdered() {
-  const all = chips(), n = all.length, k = all.filter(c => c.classList.contains('on')).length;
-  const st = document.getElementById('ord-state'), btn = document.getElementById('ord-btn');
-  st.textContent = k === n ? '✔ 全部発注済み' : k ? '一部発注 ' + k + '／' + n + ' 品（残り ' + (n - k) + ' 品）' : '未発注（' + n + ' 品）';
-  st.style.color = k === n ? '#4d554b' : '#655c48';
-  btn.textContent = k === n ? '全部を未発注に戻す' : '✔ 未発注の ' + (n - k) + ' 品を、発注済みに確定する';
-  btn.className = 'btn ' + (k === n ? 'btn-ghost' : 'btn-primary');
+const ORDER_ID = {{ order.id|tojson }};
+let stateKey = {{ state_key|tojson }}, historyRows = {{ history|tojson }}, busy = false;
+const historyKey = {{ history_key|tojson }};
+const chips=()=>[...document.querySelectorAll('.ord-chip')];
+const readyChips=()=>[...document.querySelectorAll('.ready-control')];
+const stState={ready:{{ ((order.ready_at) ? ('true') : ('false')) }},delivered:{{ ((order.delivered_at) ? ('true') : ('false')) }}};
+function showStatus(){
+  const ordered=chips().filter(c=>c.classList.contains('on')).length;
+  document.getElementById('ord-state').textContent='業者への発注：'+ordered+'／'+chips().length+'品 発注済';
+  const ready=readyChips().reduce((n,c)=>n+Number(c.dataset.ready),0),total=readyChips().reduce((n,c)=>n+Number(c.dataset.total),0);
+  document.getElementById('st-note').textContent='店で準備：'+ready+'／'+total+'個'+(stState.delivered?' ・ お渡し済':'');
+  chips().forEach(c=>{c.disabled=busy;c.textContent=c.classList.contains('on')?'✔ 発注済（変更）':'発注済に記録';});
+  readyChips().forEach(c=>c.querySelectorAll('.ready-step').forEach(b=>b.disabled=busy||(Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total))));
+  const ob=document.getElementById('ord-btn');ob.disabled=busy||ordered===chips().length;ob.textContent=ordered===chips().length?'全商品 発注済':'未発注の'+(chips().length-ordered)+'品を発注済に記録';
+  const rb=document.getElementById('st-ready');rb.disabled=busy||stState.ready;rb.textContent=stState.ready?'全商品 準備完了':'全商品の準備を完了';
+  const db=document.getElementById('st-delivered');db.disabled=busy;db.textContent=stState.delivered?'✔ お渡し済（変更）':'お渡し済にする';
+  document.getElementById('reset-ready').disabled=busy;
+  const latest=historyRows[0],undo=document.getElementById('undo-btn');undo.hidden=!latest?.can_undo;undo.disabled=busy;
 }
-function setChip(c, on) { c.classList.toggle('on', on); c.textContent = on ? '✔ 発注済' : '未発注'; }
-async function postOrdered(url, on) {
-  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
-  try {
-    const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ordered: on}), signal: ctl.signal});
-    if (!res.ok) throw 0;
-  } finally { clearTimeout(to); }
+function showHistory(){
+  const list=document.getElementById('history-list');list.replaceChildren();
+  if(!historyRows.length){const li=document.createElement('li');li.textContent='これからの操作を記録します。過去の状態は復元できません。';list.append(li);}
+  historyRows.forEach(h=>{const li=document.createElement('li');li.textContent=h.stamp+'　'+h.action+(h.undone_at?'（取り消し済み）':'');list.append(li);});
 }
-// 画面は先に変えて（反応を速く）、保存に失敗した時だけ元に戻す
-chips().forEach(c => c.addEventListener('click', async () => {
-  const on = !c.classList.contains('on');
-  setChip(c, on); showOrdered();
-  try { await postOrdered('/customer-orders/{{ order.id }}/items/' + c.dataset.id + '/ordered', on); }
-  catch (e) { setChip(c, !on); showOrdered(); toast('保存できませんでした。もう一度お試しください'); }
+async function changeStatus(path,data,message){
+  if(busy)return;busy=true;showStatus();
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),15000);
+  try{
+    const res=await fetch('/customer-orders/'+ORDER_ID+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...data,state_key:stateKey}),signal:ctl.signal});
+    if(!res.ok)throw new Error(res.status===409?'他の操作で内容が変わっています。画面を開き直してください。':'保存結果を確認できません。画面を開き直してください。');
+    const j=await res.json();if(!j.ok)throw new Error('保存できませんでした');
+    const ids=new Set(j.ordered_items.map(String));chips().forEach(c=>c.classList.toggle('on',ids.has(c.dataset.id)));
+    readyChips().forEach(c=>{c.dataset.ready=Number(j.ready_quantities[c.dataset.id]||0);c.querySelector('.ready-progress').textContent=c.dataset.ready+'／'+c.dataset.total;});
+    stState.ready=j.ready;stState.delivered=j.delivered;stateKey=j.state_key;historyRows=j.history;
+    document.getElementById('action-feedback').textContent=message;showHistory();
+  }catch(e){document.getElementById('action-feedback').textContent=e.message;toast(e.message,5000);}
+  finally{clearTimeout(timer);busy=false;showStatus();}
+}
+chips().forEach(c=>c.addEventListener('click',()=>{
+  const on=!c.classList.contains('on');
+  if(!on && !confirm('この商品の発注済の記録を外しますか？準備した個数は変わりません。'))return;
+  changeStatus('/items/'+c.dataset.id+'/ordered',{ordered:on},on?'発注済として記録しました。':'未発注に戻しました。');
 }));
-document.getElementById('ord-btn').addEventListener('click', async () => {
-  const on = !chips().every(c => c.classList.contains('on'));
-  const before = chips().map(c => c.classList.contains('on'));
-  chips().forEach(c => setChip(c, on)); showOrdered();
-  try { await postOrdered('/customer-orders/{{ order.id }}/ordered', on); }
-  catch (e) { chips().forEach((c, i) => setChip(c, before[i])); showOrdered(); toast('保存できませんでした。もう一度お試しください'); }
-});
-showOrdered();
-// 商品別と注文全体の準備状態は、サーバーの確定結果を一緒に表示する。
-const stState = {ready: {{ ((order.ready_at) ? ('true') : ('false')) }}, delivered: {{ ((order.delivered_at) ? ('true') : ('false')) }}};
-const stStamp = {ready: '{% if order.ready_at %}{{ order.ready_at|jst }}{% endif %}', delivered: '{% if order.delivered_at %}{{ order.delivered_at|jst }}{% endif %}'};
-const readyChips = () => [...document.querySelectorAll('.ready-control')];
-let readyBusy = false;
-function showStatus() {
-  for (const f of ['ready', 'delivered']) {
-    const b = document.getElementById('st-' + f), label = f === 'ready' ? (stState.ready ? '全部を未準備に戻す' : '全部を準備済にする') : 'お渡し済';
-    b.classList.toggle('on', stState[f]); b.textContent = (stState[f] ? '✔ ' : '') + label;
-  }
-  const all = readyChips(), count = all.reduce((n,c)=>n+Number(c.dataset.ready),0), total=all.reduce((n,c)=>n+Number(c.dataset.total),0);
-  all.forEach(c=>c.querySelectorAll('.ready-step').forEach(b=>b.disabled=readyBusy || (Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total))));
-  const parts = ['準備済 ' + count + '／' + total + ' 点'];
-  if (stState.ready && stStamp.ready) parts.push('準備 ' + stStamp.ready);
-  if (stState.delivered && stStamp.delivered) parts.push('お渡し ' + stStamp.delivered);
-  document.getElementById('st-note').textContent = parts.join('　');
-}
-async function saveReady(url, data) {
-  if (readyBusy) return;
-  readyBusy = true;
-  const controls = [...document.querySelectorAll('.ready-step,.st-btn')];
-  controls.forEach(c => c.disabled = true);
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
-  try {
-    const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:ctl.signal});
-    if (!res.ok) throw new Error();
-    const j = await res.json();
-    if (!j.ok) throw new Error();
-    readyChips().forEach(c => {
-      const qty=Number(j.ready_quantities[c.dataset.id] || 0);
-      c.dataset.ready=qty; c.querySelector('.ready-progress').textContent=qty+'／'+c.dataset.total;
-    });
-    stState.ready=j.ready; stState.delivered=j.delivered;
-    stStamp.ready=j.ready_at; stStamp.delivered=j.delivered_at; showStatus();
-  } catch (e) { toast('保存結果を確認できませんでした。画面を開き直して確認してください'); }
-  finally {clearTimeout(timer); readyBusy=false; controls.forEach(c => c.disabled=false);showStatus();}
-}
-document.querySelectorAll('.ready-step').forEach(b=>b.addEventListener('click',()=>{
-  const c=b.closest('.ready-control');
-  saveReady('/customer-orders/{{ order.id }}/items/'+c.dataset.id+'/ready',{qty:Math.max(0,Math.min(Number(c.dataset.total),Number(c.dataset.ready)+Number(b.dataset.step)))});
-}));
-document.querySelectorAll('.st-btn').forEach(b => b.addEventListener('click', () => saveReady('/customer-orders/{{ order.id }}/status', {field:b.dataset.field,on:!stState[b.dataset.field]})));
-showStatus();
+document.getElementById('ord-btn').addEventListener('click',()=>{if(confirm('未発注の商品をまとめて発注済として記録しますか？業者へ注文は送信されません。'))changeStatus('/ordered',{ordered:true},'まとめて発注済として記録しました。');});
+document.querySelectorAll('.ready-step').forEach(b=>b.addEventListener('click',()=>{const c=b.closest('.ready-control');changeStatus('/items/'+c.dataset.id+'/ready',{qty:Number(c.dataset.ready)+Number(b.dataset.step)},'準備した個数を保存しました。');}));
+document.getElementById('st-ready').addEventListener('click',()=>{if(confirm('注文した個数がすべて店にそろっていますか？全商品の準備を完了にします。'))changeStatus('/status',{field:'ready',on:true},'全商品の準備を完了しました。');});
+document.getElementById('reset-ready').addEventListener('click',()=>{if(confirm('全商品の準備数を0に戻しますか？お渡し済の記録も解除します。'))changeStatus('/status',{field:'ready',on:false},'準備数を0に戻しました。');});
+document.getElementById('st-delivered').addEventListener('click',()=>{const on=!stState.delivered;if(confirm(on?'お客様に全商品をお渡ししましたか？全商品の準備も完了にします。':'お渡し済の記録を外しますか？'))changeStatus('/status',{field:'delivered',on},on?'お渡し済として記録しました。':'お渡し済を解除しました。');});
+document.getElementById('undo-btn').addEventListener('click',()=>{const h=historyRows[0];if(h?.can_undo&&confirm('「'+h.action+'」の直前の状態に戻しますか？'))changeStatus('/history/'+h.id+'/undo',{form_key:historyKey},'直前の操作を元に戻しました。');});
+showHistory();showStatus();
 document.querySelectorAll('.pdf-un').forEach(btn => btn.addEventListener('click', async () => {
   const label = btn.textContent; btn.disabled = true; btn.textContent = '作成中…';
   try {
