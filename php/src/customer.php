@@ -132,7 +132,7 @@ function h_customer_orders(): void
     ensure_customer_status_columns();
     $orders = rows('
         SELECT o.id, o.customer, o.phone, o.created_at, o.store, o.discount_pct, o.ready_at, o.delivered_at, COUNT(i.id) AS n,
-               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(i.ready), 0) AS n_ready, COALESCE(SUM(i.ready_qty), 0) AS ready_units, COALESCE(SUM(i.qty),0) AS total_units
+               COALESCE(SUM(i.ordered), 0) AS n_ordered, COALESCE(SUM(CASE WHEN i.ordered=0 AND i.ready_qty<i.qty THEN 1 ELSE 0 END),0) AS n_unordered, COALESCE(SUM(i.ready), 0) AS n_ready, COALESCE(SUM(i.ready_qty), 0) AS ready_units, COALESCE(SUM(i.qty),0) AS total_units
         FROM customer_orders o LEFT JOIN customer_order_items i ON i.order_id = o.id
         GROUP BY o.id ORDER BY (o.delivered_at IS NOT NULL), o.created_at DESC LIMIT 300');   // お渡し済は下にまとめる
     $lines = [];
@@ -357,7 +357,7 @@ function customer_change_ordered(int $id,?int $iid): void
     $result=transaction(function()use($id,$iid,$on){
         $before=customer_lock_state($id);
         if($iid!==null && !val('SELECT id FROM customer_order_items WHERE id=? AND order_id=?',[$iid,$id]))throw new HttpError(404);
-        if($iid===null)run('UPDATE customer_order_items SET ordered=? WHERE order_id=?',[$on,$id]);
+        if($iid===null)run('UPDATE customer_order_items SET ordered=? WHERE order_id=?'.($on?' AND ready_qty<qty':''),[$on,$id]);
         else run('UPDATE customer_order_items SET ordered=? WHERE id=? AND order_id=?',[$on,$iid,$id]);
         $name=$iid===null ? '全商品' : (string)val('SELECT name FROM customer_order_items WHERE id=?',[$iid]);
         customer_history_record($id,$name.($on ? 'を発注済に変更' : 'を未発注に戻す'),$before);
@@ -376,10 +376,11 @@ function h_customer_order_delete(int $id): void
 /** まだ発注していない商品の一覧（発注の作業用）。?order=ID でその注文だけ。?store=店 でその店だけ */
 function h_customer_orders_unordered_pdf(): void
 {
+    ensure_customer_status_columns();
     require_once __DIR__ . '/pdf.php';
     $oid = (int)($_GET['order'] ?? 0) ?: null;
     $store = in_array($_GET['store'] ?? null, STORES, true) ? $_GET['store'] : null;
-    $where = 'WHERE i.ordered = 0';
+    $where = 'WHERE i.ordered = 0 AND i.ready_qty < i.qty';
     $params = [];
     if ($oid) {
         $where .= ' AND o.id = ?';
@@ -390,7 +391,7 @@ function h_customer_orders_unordered_pdf(): void
         $params[] = $store;
     }
     $groups = [];
-    foreach (rows("SELECT i.price_id, i.name, i.spec, i.qty, o.customer, p.sort_order
+    foreach (rows("SELECT i.price_id, i.name, i.spec, (i.qty-i.ready_qty) AS qty, o.customer, p.sort_order
                    FROM customer_order_items i
                    JOIN customer_orders o ON o.id = i.order_id
                    LEFT JOIN price_items p ON p.id = i.price_id

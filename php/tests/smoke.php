@@ -348,6 +348,20 @@ ok((int)db_val("SELECT COUNT(*) FROM orders WHERE id={$oid2}") === 0, '取り消
 ok($st === 404, '2回目の取り消しは 404');
 
 echo "== お客様注文 ==\n";
+[$st,$stockOrder]=api('/customer-orders/save',['customer'=>'在庫連動テスト','store'=>'イノ','customs'=>[['name'=>'在庫で用意する商品','price'=>100,'qty'=>2]]]);
+$sid=(int)$stockOrder['id']; $siid=(int)db_val("SELECT id FROM customer_order_items WHERE order_id={$sid}");
+api("/customer-orders/{$sid}/items/{$siid}/ready",['qty'=>1]);
+pdf_ok("/customer-orders/unordered/pdf?order={$sid}",['在庫で用意する商品','× 1']);
+api("/customer-orders/{$sid}/items/{$siid}/ready",['qty'=>2]);
+pdf_ok("/customer-orders/unordered/pdf?order={$sid}",['未発注の商品はありません']);
+api("/customer-orders/{$sid}/ordered",['ordered'=>true]);
+ok((int)db_val("SELECT ordered FROM customer_order_items WHERE id={$siid}")===0,'全部準備済の商品は一括発注の記録対象にしない');
+$listReady=page_ok('/customer-orders','発注不要');
+ok(str_contains($listReady,'data-ordered="1"'),'準備済みの注文は未発注フィルターから外れる');
+api("/customer-orders/{$sid}/items/{$siid}/ready",['qty'=>1]);
+pdf_ok("/customer-orders/unordered/pdf?order={$sid}",['× 1']);
+api("/customer-orders/{$sid}/delete",[]);
+
 $cust = ['customer' => '田中 花子', 'phone' => '090-1111-2222', 'memo' => 'テスト', 'store' => 'リッチ', 'campaign' => true, 'discount_pct' => 16,
     'request_key' => bin2hex(random_bytes(16)),
     'items' => [['price_id' => 1, 'qty' => 3], ['price_id' => 2, 'qty' => 7], ['price_id' => 3, 'qty' => 2]],

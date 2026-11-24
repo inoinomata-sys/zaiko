@@ -33,11 +33,12 @@
 .slip .item-info td {border-bottom:0;padding-bottom:4px}
 .slip .item-actions td {padding-top:4px;padding-bottom:12px;border-bottom:1px solid #ddd}
 .slip .order-product tr {background:transparent}
-.item-tools .ord-chip {margin-top:0;white-space:nowrap;flex-shrink:0}
+.item-tools .ord-chip {margin-top:0;white-space:normal;max-width:calc(100% - 80px);flex-shrink:0}
 .ready-progress {font-weight:600;color:var(--fg)}
 .ready-step {width:44px;height:44px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--fg);font-size:20px;font-weight:600;font-family:inherit;cursor:pointer}
 .ready-progress {min-width:60px;text-align:center;font-size:12px}
 .ready-step:disabled,.st-btn:disabled {opacity:.5;cursor:default}
+.ord-chip.covered {background:#eceeea;border-color:#ced2c9;color:#4d554b}
 .ord-chip.on { background:#eaf5ef; border-color:#c1dccc; color:#286a51; }
 .st-btn { flex: 1; padding: 14px 8px; font-size: 17px; font-weight: 700; border: 2px solid var(--border); border-radius: 12px; background: #fff; color: var(--fg); font-family: inherit; cursor: pointer; }
 .st-btn.on { background: #eceeea; border-color: #ced2c9; color: #4d554b; }
@@ -83,7 +84,7 @@
 
 <div class="order-summary">
   <div id="ord-state"></div><div id="st-note" style="margin-top:5px"></div>
-  <p style="font-size:12px;color:var(--fg2);margin-top:6px">発注は業者への注文の記録、準備数は店で用意できた個数です。</p>
+  <p style="font-size:12px;color:var(--fg2);margin-top:6px">店で用意できた分は発注対象から外れます。足りない個数だけを発注してください。</p>
   <div id="action-feedback" role="status" style="margin-top:8px"></div>
   <button class="btn btn-ghost" type="button" id="undo-btn" hidden style="margin-top:8px">直前の操作を元に戻す</button>
 </div>
@@ -115,13 +116,14 @@ const chips=()=>[...document.querySelectorAll('.ord-chip')];
 const readyChips=()=>[...document.querySelectorAll('.ready-control')];
 const stState={ready:{{ ((order.ready_at) ? ('true') : ('false')) }},delivered:{{ ((order.delivered_at) ? ('true') : ('false')) }}};
 function showStatus(){
-  const ordered=chips().filter(c=>c.classList.contains('on')).length;
-  document.getElementById('ord-state').textContent='業者への発注：'+ordered+'／'+chips().length+'品 発注済';
+  const needed=chips().filter(c=>!c.classList.contains('on') && Number(c.closest('.order-product').querySelector('.ready-control').dataset.ready)<Number(c.closest('.order-product').querySelector('.ready-control').dataset.total));
+  const needUnits=needed.reduce((n,c)=>{const r=c.closest('.order-product').querySelector('.ready-control');return n+Number(r.dataset.total)-Number(r.dataset.ready)},0);
+  document.getElementById('ord-state').textContent=needed.length?'要発注：'+needed.length+'品・残り'+needUnits+'個':'追加の発注は不要です';
   const ready=readyChips().reduce((n,c)=>n+Number(c.dataset.ready),0),total=readyChips().reduce((n,c)=>n+Number(c.dataset.total),0);
   document.getElementById('st-note').textContent='店で準備：'+ready+'／'+total+'個'+(stState.delivered?' ・ お渡し済':'');
-  chips().forEach(c=>{c.disabled=busy;c.textContent=c.classList.contains('on')?'✔ 発注済（変更）':'発注済に記録';});
+  chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済（変更）':'残り'+(Number(r.dataset.total)-Number(r.dataset.ready))+'個を記録';c.classList.toggle('covered',covered);});
   readyChips().forEach(c=>c.querySelectorAll('.ready-step').forEach(b=>b.disabled=busy||(Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total))));
-  const ob=document.getElementById('ord-btn');ob.disabled=busy||ordered===chips().length;ob.textContent=ordered===chips().length?'全商品 発注済':'未発注の'+(chips().length-ordered)+'品を発注済に記録';
+  const ob=document.getElementById('ord-btn');ob.disabled=busy||needed.length===0;ob.textContent=needed.length?'要発注の'+needed.length+'品を発注済に記録':'追加の発注は不要です';
   const rb=document.getElementById('st-ready');rb.disabled=busy||stState.ready;rb.textContent=stState.ready?'全商品 準備完了':'全商品の準備を完了';
   const db=document.getElementById('st-delivered');db.disabled=busy;db.textContent=stState.delivered?'✔ お渡し済（変更）':'お渡し済にする';
   document.getElementById('reset-ready').disabled=busy;
@@ -151,7 +153,7 @@ chips().forEach(c=>c.addEventListener('click',()=>{
   if(!on && !confirm('この商品の発注済の記録を外しますか？準備した個数は変わりません。'))return;
   changeStatus('/items/'+c.dataset.id+'/ordered',{ordered:on},on?'発注済として記録しました。':'未発注に戻しました。');
 }));
-document.getElementById('ord-btn').addEventListener('click',()=>{if(confirm('未発注の商品をまとめて発注済として記録しますか？業者へ注文は送信されません。'))changeStatus('/ordered',{ordered:true},'まとめて発注済として記録しました。');});
+document.getElementById('ord-btn').addEventListener('click',()=>{if(confirm('準備済みの分を除き、足りない商品の発注を記録しますか？業者へ注文は送信されません。'))changeStatus('/ordered',{ordered:true},'まとめて発注済として記録しました。');});
 document.querySelectorAll('.ready-step').forEach(b=>b.addEventListener('click',()=>{const c=b.closest('.ready-control');changeStatus('/items/'+c.dataset.id+'/ready',{qty:Number(c.dataset.ready)+Number(b.dataset.step)},'準備した個数を保存しました。');}));
 document.getElementById('st-ready').addEventListener('click',()=>{if(confirm('注文した個数がすべて店にそろっていますか？全商品の準備を完了にします。'))changeStatus('/status',{field:'ready',on:true},'全商品の準備を完了しました。');});
 document.getElementById('reset-ready').addEventListener('click',()=>{if(confirm('全商品の準備数を0に戻しますか？お渡し済の記録も解除します。'))changeStatus('/status',{field:'ready',on:false},'準備数を0に戻しました。');});
