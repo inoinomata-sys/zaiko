@@ -22,7 +22,7 @@ function h_sns_memo(): void
     $bytes[6] = chr((ord($bytes[6]) & 15) | 64);
     $bytes[8] = chr((ord($bytes[8]) & 63) | 128);
     $id = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
-    render('sns_memo', ['sent' => isset($_GET['sent']), 'request_id' => $id, 'can_send' => sns_memo_key() !== null, 'shops' => SNS_MEMO_SHOPS, 'shop' => 'INO']);
+    render('sns_memo', ['sent' => isset($_GET['sent']), 'kind' => ($_GET['sent'] ?? '') === 'journal' ? 'journal' : 'sns', 'request_id' => $id, 'can_send' => sns_memo_key() !== null, 'shops' => SNS_MEMO_SHOPS, 'shop' => 'INO']);
 }
 
 function h_sns_memo_submit(): void
@@ -43,6 +43,10 @@ function h_sns_memo_submit(): void
     $shop = $_POST['shop'] ?? 'INO';
     if (!is_string($shop) || !isset(SNS_MEMO_SHOPS[$shop])) {
         throw new HttpError(400, '店舗を選び直してください。');
+    }
+    $kind = $_POST['kind'] ?? 'sns';
+    if (!in_array($kind, ['sns', 'journal'], true) || ($kind === 'journal' && $shop !== 'リッチ')) {
+        throw new HttpError(400, '作成する内容を選び直してください。');
     }
     $selected = array_filter((array)($_POST['menu'] ?? []), 'is_string');
     $menus = array_values(array_intersect(SNS_MEMO_SHOPS[$shop], $selected));
@@ -65,10 +69,14 @@ function h_sns_memo_submit(): void
     $payload = [
         'request_id' => $id,
         'shop' => $shop,
+        'kind' => $kind,
         'memo' => implode("\n", $memo_parts),
         'menu' => implode('、', $menus),
     ];
     $photo = $_FILES['photo'] ?? null;
+    if ($error === '' && $photo && ($photo['error'] ?? null) !== UPLOAD_ERR_NO_FILE && $kind === 'journal') {
+        $error = 'コラムの写真は、下書きができてからWordPressで追加してください。';
+    }
     if ($error === '' && $photo && ($photo['error'] ?? null) !== UPLOAD_ERR_NO_FILE) {
         if (($photo['error'] ?? null) !== UPLOAD_ERR_OK || !is_string($photo['tmp_name'] ?? null)
             || !is_uploaded_file($photo['tmp_name']) || $photo['size'] > 3 * 1024 * 1024) {
@@ -92,7 +100,7 @@ function h_sns_memo_submit(): void
         curl_close($connection);
         $result = is_string($body) ? json_decode($body, true) : null;
         if ($status === 200 && ($result['success'] ?? false) === true) {
-            header('Location: /sns-memo?sent=1', true, 303);
+            header('Location: /sns-memo?sent=' . ($kind === 'journal' ? 'journal' : '1'), true, 303);
             return;
         }
         $error = $status === 400 && is_string($result['data'] ?? null)
@@ -101,5 +109,5 @@ function h_sns_memo_submit(): void
     }
 
     header('Cache-Control: no-store');
-    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'shops' => SNS_MEMO_SHOPS, 'shop' => $shop, 'selected_menus' => $menus, 'request_id' => is_string($id) ? $id : ''], 422);
+    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'shops' => SNS_MEMO_SHOPS, 'shop' => $shop, 'kind' => $kind, 'selected_menus' => $menus, 'request_id' => is_string($id) ? $id : ''], 422);
 }

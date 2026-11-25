@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.5
+ * Version: 0.1.6
  * Requires PHP: 7.4
  */
 
@@ -75,7 +75,7 @@ final class Ino_Blog_Workflow {
                 <?php wp_nonce_field('ino_sns_settings'); ?>
                 <input type="hidden" name="action" value="ino_sns_settings">
                 <table class="form-table">
-                    <?php foreach (['sns_hook' => 'SNS用の受信URL', 'sns_key' => 'SNS用の受信キー', 'staff_key' => '総合管理の接続キー'] as $name => $label) : ?>
+                    <?php foreach (['sns_hook' => 'SNS用の受信URL', 'sns_key' => 'SNS用の受信キー', 'staff_key' => '総合管理の接続キー', 'rich_journal_key' => 'リッチのコラム接続キー'] as $name => $label) : ?>
                     <tr><th><label for="<?php echo esc_attr($name); ?>"><?php echo esc_html($label); ?></label></th><td><input class="regular-text" type="password" id="<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" autocomplete="new-password" placeholder="<?php echo empty($config[$name]) ? '未設定' : '保存済み'; ?>"></td></tr>
                     <?php endforeach; ?>
                 </table>
@@ -120,9 +120,11 @@ final class Ino_Blog_Workflow {
             'sns_hook' => self::input('sns_hook'),
             'sns_key' => self::input('sns_key'),
             'staff_key' => self::input('staff_key'),
+            'rich_journal_key' => self::input('rich_journal_key'),
         ], static function ($value) { return $value !== ''; });
         if ((isset($values['sns_hook']) && !self::valid_webhook($values['sns_hook']))
             || (isset($values['sns_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['sns_key']))
+            || (isset($values['rich_journal_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['rich_journal_key']))
             || (isset($values['staff_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['staff_key']))) {
             wp_die('SNS用の受信URLと接続キーをご確認ください。', '', ['response' => 400]);
         }
@@ -160,15 +162,22 @@ final class Ino_Blog_Workflow {
         if (!in_array($shop, ['INO', 'リッチ'], true)) {
             wp_send_json_error('店舗を選び直してください。', 400);
         }
-        self::submit_to_make('instagram', $shop);
+        $kind = isset($_POST['kind']) ? self::input('kind') : 'sns';
+        if (!in_array($kind, ['sns', 'journal'], true) || ($kind === 'journal' && $shop !== 'リッチ')) {
+            wp_send_json_error('作成する内容を選び直してください。', 400);
+        }
+        if ($kind === 'journal' && empty(self::config()['rich_journal_key'])) {
+            wp_send_json_error('コラムの接続設定が済んでいません。', 503);
+        }
+        self::submit_to_make($kind === 'journal' ? 'rich-journal' : 'instagram', $shop);
     }
 
     private static function submit_to_make($format = 'blog', $shop = 'INO') {
         $config = self::config();
-        $hook = $format === 'instagram'
+        $hook = $format !== 'blog'
             ? (defined('INO_INSTAGRAM_MAKE_HOOK') ? INO_INSTAGRAM_MAKE_HOOK : ($config['sns_hook'] ?? ''))
             : ($config['hook'] ?? '');
-        $key = $format === 'instagram'
+        $key = $format !== 'blog'
             ? (defined('INO_INSTAGRAM_MAKE_KEY') ? INO_INSTAGRAM_MAKE_KEY : ($config['sns_key'] ?? ''))
             : ($config['key'] ?? '');
         if (!self::valid_webhook($hook) || !is_string($key) || $key === '') {
@@ -193,12 +202,17 @@ final class Ino_Blog_Workflow {
         }
 
         if ($format === 'instagram') {
-            $memo = '店舗：' . $shop . "\n" . $memo;
+            $memo = '店舗：' . $shop . "\n種類：SNS投稿案\n" . $memo;
+        } elseif ($format === 'rich-journal') {
+            $memo = "店舗：リッチ\n種類：髪とカラーのお話\n" . $memo;
         }
 
         $photo = self::photo();
         if (is_wp_error($photo)) {
             wp_send_json_error($photo->get_error_message(), 400);
+        }
+        if ($format === 'rich-journal' && $photo !== null) {
+            wp_send_json_error('コラムの写真は、下書きができてからWordPressで追加してください。', 400);
         }
 
         $stage = self::PREFIX . $id;
@@ -294,6 +308,9 @@ final class Ino_Blog_Workflow {
     private static function save_draft($id, $title, $content) {
         $stage = self::PREFIX . $id;
         $photo_record = get_transient($stage);
+        if (($photo_record['format'] ?? '') === 'rich-journal') {
+            return self::save_rich_draft($id, $title, $content);
+        }
         $existing = get_posts([
             'post_type' => 'post',
             'post_status' => ['draft', 'pending', 'publish', 'future', 'private', 'trash'],
@@ -363,6 +380,57 @@ final class Ino_Blog_Workflow {
                 ],
             ],
         ]);
+    }
+
+    private static function rich_request($route, array $payload) {
+        $key = self::config()['rich_journal_key'] ?? '';
+        if (!is_string($key) || !preg_match('/\A[0-9a-f]{64}\z/D', $key)) {
+            return new WP_Error('rich_not_configured', 'リッチのコラム接続が未設定です。', ['status' => 503]);
+        }
+        $response = wp_safe_remote_post('https://rich-color.life/wp-json/rich-journal/v1/' . $route, [
+            'headers' => ['Content-Type' => 'application/json', 'X-Rich-Journal-Key' => $key],
+            'body' => wp_json_encode($payload), 'timeout' => 12, 'redirection' => 0,
+        ]);
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            return new WP_Error('rich_request_failed', 'リッチのコラムを処理できませんでした。', ['status' => 502]);
+        }
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return is_array($body) ? $body : new WP_Error('rich_response', 'リッチの応答を確認できません。', ['status' => 502]);
+    }
+
+    private static function save_rich_draft($id, $title, $content) {
+        $draft = self::rich_request('draft', ['request_id' => $id, 'title' => $title, 'content' => $content]);
+        if (is_wp_error($draft)) {
+            return $draft;
+        }
+        if (!is_int($draft['id'] ?? null) || ($draft['status'] ?? '') !== 'draft'
+            || !is_string($draft['title'] ?? null) || !is_string($draft['content'] ?? null)
+            || wp_parse_url($draft['preview_url'] ?? '', PHP_URL_HOST) !== 'rich-color.life'
+            || wp_parse_url($draft['preview_url'], PHP_URL_SCHEME) !== 'https') {
+            return new WP_Error('rich_draft_response', 'リッチの下書き情報を確認できません。', ['status' => 502]);
+        }
+        $approval = 'rich_journal_ok:' . $draft['id'] . ':' . $id;
+        $label = 'この下書きでOK';
+        $plain_title = html_entity_decode(wp_strip_all_tags($draft['title']), ENT_QUOTES, 'UTF-8');
+        $plain_body = html_entity_decode(wp_strip_all_tags($draft['content']), ENT_QUOTES, 'UTF-8');
+        $draft['approval_data'] = $approval;
+        $draft['messages'] = [
+            ['type' => 'text', 'text' => "【リッチ｜髪とカラーのお話・下書き】\n"
+                . wp_html_excerpt($plain_title, 150, '…') . "\n\n" . wp_html_excerpt($plain_body, 3500, '…')],
+            [
+                'type' => 'template',
+                'altText' => 'リッチのコラム下書きの確認',
+                'template' => [
+                    'type' => 'buttons',
+                    'text' => 'コラムの下書きを確認してください。',
+                    'actions' => [
+                        ['type' => 'uri', 'label' => 'コラムをプレビュー', 'uri' => $draft['preview_url']],
+                        ['type' => 'postback', 'label' => $label, 'data' => $approval, 'displayText' => $label],
+                    ],
+                ],
+            ],
+        ];
+        return rest_ensure_response($draft);
     }
 
     public static function show_sns_preview() {
@@ -464,8 +532,18 @@ final class Ino_Blog_Workflow {
         foreach ($input['events'] as $event) {
             $data = $event['postback']['data'] ?? '';
             if (($event['type'] ?? '') !== 'postback' || ($event['source']['type'] ?? '') !== 'user'
-                || ($event['source']['userId'] ?? '') !== $config['line_user'] || !is_string($data)
-                || !preg_match('/\Aino_ok:([1-9][0-9]{0,17}):([0-9a-f-]{36})\z/D', $data, $parts)) {
+                || ($event['source']['userId'] ?? '') !== $config['line_user'] || !is_string($data)) {
+                continue;
+            }
+            if (preg_match('/\Arich_journal_ok:([1-9][0-9]{0,17}):([0-9a-f-]{36})\z/D', $data, $parts)
+                && self::valid_uuid($parts[2])) {
+                $result = self::rich_request('approve', ['post_id' => (int) $parts[1], 'request_id' => $parts[2]]);
+                if (is_wp_error($result)) {
+                    return $result;
+                }
+                continue;
+            }
+            if (!preg_match('/\Aino_ok:([1-9][0-9]{0,17}):([0-9a-f-]{36})\z/D', $data, $parts)) {
                 continue;
             }
             $post = get_post((int) $parts[1]);
