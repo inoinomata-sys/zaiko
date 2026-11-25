@@ -383,7 +383,7 @@ final class Ino_Blog_Workflow {
             'approval_data' => $approval_data,
             'image_requested' => $image_requested,
             'image_request_id' => $image_requested ? $id : '',
-            'image_prompt' => $image_requested ? self::ino_image_prompt($post->post_title) : '',
+            'image_prompt' => $image_requested ? self::ino_image_prompt($plain_title . ' ' . $plain_body) : '',
             'messages' => [
                 ['type' => 'text', 'text' => ($instagram ? ('【' . $shop . "｜SNS投稿案】\n") : "【INO ブログ管理室｜ブログ下書き】\n")
                     . ($instagram ? "\n" : wp_html_excerpt($plain_title, 150, '…') . "\n\n")
@@ -507,12 +507,12 @@ final class Ino_Blog_Workflow {
         exit;
     }
 
-    private static function ino_image_prompt($title) {
-        $subject = preg_match('/うねり|くせ毛|広がり|縮毛矯正/u', $title)
-            ? 'A close-up of natural dark wavy Japanese hair from the back, face outside the frame.'
-            : 'A simple wooden comb and dark hair swatch in a softly lit salon.';
-        return 'Editorial illustration for an Osaka curly-hair salon. ' . $subject
-            . ' Natural daylight and warm neutral colors. No text, logos, identifiable faces, before-and-after images, or implied treatment result.';
+    private static function ino_image_prompt($topic) {
+        $subject = preg_match('/前髪|顔[周ま]わ?り/u', $topic)
+            ? 'Frame the forehead and temple of an adult model in three-quarter profile. Show soft, naturally curved bangs growing from the hairline, with the fringe in sharp focus. Crop out the eyes.'
+            : 'Show natural hair texture and movement on an adult model from behind, framed closely around the head.';
+        return 'Editorial reference photograph for a Japanese hair salon. ' . $subject
+            . ' Soft daylight, plain neutral background. All visible hair is attached to the head. No loose clippings, swatches, wigs, tools, text, logos or before-and-after layout.';
     }
 
     public static function save_draft_image(WP_REST_Request $request) {
