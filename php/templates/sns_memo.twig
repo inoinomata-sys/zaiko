@@ -11,7 +11,7 @@
 .sns-memo textarea { resize: vertical; }
 .sns-memo button { min-height: 48px; }
 .sns-menu { min-width: 0; border: 0; }
-.sns-menu-options[hidden] { display: none; }
+.sns-memo [hidden] { display: none; }
 .sns-menu-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .sns-menu-options label {
   grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 44px;
@@ -26,7 +26,7 @@
   <a href="/">‹ トップへ</a>
   <h1>SNS投稿メモ</h1>
   {% if sent %}
-    <p role="status">受け付けました。SNSの投稿案ができるとLINEに届きます。</p>
+    <p role="status">受け付けました。{{ kind == 'journal' ? 'コラムの下書き' : 'SNSの投稿案' }}ができるとLINEに届きます。</p>
     <a href="/sns-memo">次のメモを書く</a>
   {% else %}
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
@@ -41,6 +41,13 @@
               <span>{{ shop_name }}</span>
             </label>
           {% endfor %}
+        </div>
+      </fieldset>
+      <fieldset class="sns-menu" id="rich-content-kind"{% if shop != 'リッチ' %} hidden disabled{% endif %}>
+        <legend>作成する内容</legend>
+        <div class="sns-menu-options">
+          <label><input type="radio" name="kind" value="sns"{% if kind != 'journal' %} checked{% endif %}><span>SNS投稿案</span></label>
+          <label><input type="radio" name="kind" value="journal"{% if kind == 'journal' %} checked{% endif %}><span>髪とカラーのお話</span></label>
         </div>
       </fieldset>
       <label>お客様の髪のお悩み
@@ -65,15 +72,24 @@
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
-      <label>掲載できる写真（3MBまで）
-        <input type="file" name="photo" accept="image/jpeg,image/png,image/webp">
+      <label id="sns-photo"{% if kind == 'journal' %} hidden{% endif %}>掲載できる写真（3MBまで）
+        <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"{% if kind == 'journal' %} disabled{% endif %}>
       </label>
-      <button type="submit"{% if not can_send %} disabled{% endif %}>投稿案を作る</button>
+      <button type="submit"{% if not can_send %} disabled{% endif %}>{{ kind == 'journal' ? 'コラムの下書きを作る' : '投稿案を作る' }}</button>
     </form>
     <script>
       const form = document.getElementById('sns-memo-form');
+      const kindGroup = document.getElementById('rich-content-kind');
+      const photoGroup = document.getElementById('sns-photo');
+      const submitButton = form.querySelector('button[type="submit"]');
       const syncShop = () => {
         const selectedShop = form.elements.shop.value;
+        kindGroup.hidden = selectedShop !== 'リッチ';
+        kindGroup.disabled = kindGroup.hidden;
+        const journal = !kindGroup.hidden && form.elements.kind.value === 'journal';
+        photoGroup.hidden = journal;
+        form.elements.photo.disabled = journal;
+        submitButton.textContent = journal ? 'コラムの下書きを作る' : '投稿案を作る';
         form.elements.concern.placeholder = selectedShop === 'リッチ'
           ? '根元の白髪が気になる'
           : '雨の日に前髪がうねる';
@@ -83,6 +99,7 @@
         });
       };
       form.elements.shop.forEach(choice => choice.addEventListener('change', syncShop));
+      form.elements.kind.forEach(choice => choice.addEventListener('change', syncShop));
       window.addEventListener('pageshow', syncShop);
       syncShop();
       form.addEventListener('submit', () => {
