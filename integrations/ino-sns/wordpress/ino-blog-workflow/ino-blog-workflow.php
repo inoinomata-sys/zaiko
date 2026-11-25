@@ -169,7 +169,7 @@ final class Ino_Blog_Workflow {
         if ($kind === 'journal' && empty(self::config()['rich_journal_key'])) {
             wp_send_json_error('コラムの接続設定が済んでいません。', 503);
         }
-        $generate_image = $kind === 'journal' && self::input('generate_image') === '1';
+        $generate_image = ($kind === 'journal' || $shop === 'INO') && self::input('generate_image') === '1';
         self::submit_to_make($kind === 'journal' ? 'rich-journal' : 'instagram', $shop, $generate_image);
     }
 
@@ -225,7 +225,7 @@ final class Ino_Blog_Workflow {
         }
 
         try {
-            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop, 'generate_image' => $generate_image];
+            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop, 'generate_image' => $generate_image && $photo === null];
             if (get_transient($stage) !== $record && !set_transient($stage, $record, DAY_IN_SECONDS)) {
                 $outcome = ['error' => '写真と入力内容を準備できませんでした。', 'status' => 500];
             } else {
@@ -278,6 +278,11 @@ final class Ino_Blog_Workflow {
             'methods' => 'POST',
             'permission_callback' => static function () { return current_user_can('edit_posts'); },
             'callback' => [self::class, 'create_draft'],
+        ]);
+        register_rest_route('ino-blog/v1', '/draft-image', [
+            'methods' => 'POST',
+            'permission_callback' => static function () { return current_user_can('upload_files'); },
+            'callback' => [self::class, 'save_draft_image'],
         ]);
         register_rest_route('ino-blog/v1', '/line', [
             'methods' => 'POST',
@@ -350,6 +355,11 @@ final class Ino_Blog_Workflow {
                 return $attachment;
             }
         }
+        $image_requested = $instagram && $shop === 'INO' && !has_post_thumbnail($post->ID)
+            && (($photo_record['generate_image'] ?? false) === true || get_post_meta($post->ID, '_ino_image_requested', true) === '1');
+        if ($image_requested) {
+            update_post_meta($post->ID, '_ino_image_requested', '1');
+        }
         delete_transient($stage);
         $preview = get_preview_post_link($post);
         $approval_data = 'ino_ok:' . $post->ID . ':' . $id;
@@ -363,6 +373,9 @@ final class Ino_Blog_Workflow {
             'content' => $post->post_content,
             'preview_url' => $preview,
             'approval_data' => $approval_data,
+            'image_requested' => $image_requested,
+            'image_request_id' => $image_requested ? $id : '',
+            'image_prompt' => $image_requested ? self::ino_image_prompt($post->post_title) : '',
             'messages' => [
                 ['type' => 'text', 'text' => ($instagram ? ('【' . $shop . "｜SNS投稿案】\n") : "【INO ブログ管理室｜ブログ下書き】\n")
                     . ($instagram ? "\n" : wp_html_excerpt($plain_title, 150, '…') . "\n\n")
@@ -486,7 +499,57 @@ final class Ino_Blog_Workflow {
         exit;
     }
 
-    private static function attach_photo($post_id, $id, $photo) {
+    private static function ino_image_prompt($title) {
+        $subject = preg_match('/うねり|くせ毛|広がり|縮毛矯正/u', $title)
+            ? 'A close-up of natural dark wavy Japanese hair from the back, face outside the frame.'
+            : 'A simple wooden comb and dark hair swatch in a softly lit salon.';
+        return 'Editorial illustration for an Osaka curly-hair salon. ' . $subject
+            . ' Natural daylight and warm neutral colors. No text, logos, identifiable faces, before-and-after images, or implied treatment result.';
+    }
+
+    public static function save_draft_image(WP_REST_Request $request) {
+        if (strlen($request->get_body()) > 4500000) {
+            return new WP_Error('ino_image_size', '画像が大きすぎます。', ['status' => 400]);
+        }
+        $input = $request->get_json_params();
+        $post_id = $input['post_id'] ?? null;
+        $id = $input['image_request_id'] ?? null;
+        $data = $input['image_base64'] ?? null;
+        if (!is_int($post_id) || $post_id < 1 || !self::valid_uuid($id) || !is_string($data) || strlen($data) > 4 * MB_IN_BYTES) {
+            return new WP_Error('ino_image_input', '画像の入力を確認してください。', ['status' => 400]);
+        }
+        $post = get_post($post_id);
+        if (!$post || $post->post_type !== 'post' || $post->post_status !== 'draft'
+            || get_post_meta($post_id, self::META, true) !== $id
+            || get_post_meta($post_id, '_ino_image_requested', true) !== '1') {
+            return new WP_Error('ino_image_draft', '画像を希望した下書きが見つかりません。', ['status' => 404]);
+        }
+        $bytes = base64_decode($data, true);
+        $size = is_string($bytes) && strlen($bytes) <= 3 * MB_IN_BYTES ? @getimagesizefromstring($bytes) : false;
+        $types = ['image/png' => 'png', 'image/webp' => 'webp', 'image/jpeg' => 'jpg'];
+        $mime = $size['mime'] ?? '';
+        if (!isset($types[$mime]) || min($size[0], $size[1]) < 256 || max($size[0], $size[1]) > 2048) {
+            return new WP_Error('ino_image_type', '画像の形式を確認してください。', ['status' => 400]);
+        }
+        $lock = self::PREFIX . $id . '_image';
+        if (!add_option($lock, time(), '', false)) {
+            return new WP_Error('ino_image_busy', '画像を保存中です。', ['status' => 409]);
+        }
+        try {
+            if (get_post_status($post_id) !== 'draft') {
+                return new WP_Error('ino_image_not_draft', '対象の記事は下書きではありません。', ['status' => 409]);
+            }
+            if (has_post_thumbnail($post_id)) {
+                return rest_ensure_response(['ok' => true]);
+            }
+            $attachment = self::attach_photo($post_id, $id, ['data' => $data, 'extension' => $types[$mime], 'mime' => $mime], true);
+            return is_wp_error($attachment) ? $attachment : rest_ensure_response(['ok' => true, 'attachment_id' => $attachment]);
+        } finally {
+            delete_option($lock);
+        }
+    }
+
+    private static function attach_photo($post_id, $id, $photo, $generated = false) {
         if (!current_user_can('upload_files')) {
             return new WP_Error('photo_permission', '連携用ユーザーに写真を登録する権限がありません。', ['status' => 403]);
         }
@@ -497,7 +560,7 @@ final class Ino_Blog_Workflow {
         }
         $attachment_id = wp_insert_attachment([
             'post_mime_type' => $photo['mime'],
-            'post_title' => 'INO ブログ掲載写真',
+            'post_title' => $generated ? 'INOの見出し画像（AI生成）' : 'INO ブログ掲載写真',
             'post_status' => 'inherit',
         ], $upload['file'], $post_id, true);
         if (is_wp_error($attachment_id)) {
@@ -509,6 +572,9 @@ final class Ino_Blog_Workflow {
         if (!set_post_thumbnail($post_id, $attachment_id)) {
             wp_delete_attachment($attachment_id, true);
             return new WP_Error('photo_thumbnail', '下書きに写真を設定できませんでした。', ['status' => 500]);
+        }
+        if ($generated) {
+            update_post_meta($attachment_id, '_wp_attachment_image_alt', '投稿のテーマを表したイメージ画像');
         }
         return $attachment_id;
     }

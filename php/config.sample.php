@@ -7,6 +7,7 @@ return [
     'ino_blog_staff_key' => '',
     // Makeで画像の生成・添付を確認してから有効にする。
     'ino_journal_images_available' => false,
+    'ino_sns_images_available' => false,
 
     // ロリポップ管理画面「サーバーの管理・設定 > データベース」に出る値
     'db_host' => 'mysqlXXXX.lolipop.jp',

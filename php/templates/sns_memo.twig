@@ -72,7 +72,9 @@
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
-      <fieldset class="sns-menu" id="rich-journal-image"{% if kind != 'journal' %} hidden{% endif %}{% if kind != 'journal' or not images_available %} disabled{% endif %}>
+      {% set image_supported = kind == 'journal' or shop == 'INO' %}
+      {% set image_ready = kind == 'journal' ? images_available.journal : images_available.ino %}
+      <fieldset class="sns-menu" id="draft-image"{% if not image_supported %} hidden{% endif %}{% if not image_supported or not image_ready %} disabled{% endif %}>
         <legend>見出し画像</legend>
         <div class="sns-menu-options">
           <label>
@@ -80,7 +82,7 @@
             <span>AIで自動生成する</span>
           </label>
         </div>
-        {% if not images_available %}<p>画像の自動生成は準備中です。</p>{% endif %}
+        <p id="image-unavailable"{% if image_ready %} hidden{% endif %}>画像の自動生成は準備中です。</p>
       </fieldset>
       <label id="sns-photo"{% if kind == 'journal' %} hidden{% endif %}>掲載できる写真（3MBまで）
         <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"{% if kind == 'journal' %} disabled{% endif %}>
@@ -90,8 +92,12 @@
     <script>
       const form = document.getElementById('sns-memo-form');
       const kindGroup = document.getElementById('rich-content-kind');
-      const imageGroup = document.getElementById('rich-journal-image');
-      const imagesAvailable = {{ images_available ? 'true' : 'false' }};
+      const imageGroup = document.getElementById('draft-image');
+      const imageUnavailable = document.getElementById('image-unavailable');
+      const imagesAvailable = {
+        journal: {{ images_available.journal ? 'true' : 'false' }},
+        ino: {{ images_available.ino ? 'true' : 'false' }}
+      };
       const photoGroup = document.getElementById('sns-photo');
       const submitButton = form.querySelector('button[type="submit"]');
       const syncShop = () => {
@@ -99,8 +105,10 @@
         kindGroup.hidden = selectedShop !== 'リッチ';
         kindGroup.disabled = kindGroup.hidden;
         const journal = !kindGroup.hidden && form.elements.kind.value === 'journal';
-        imageGroup.hidden = !journal;
-        imageGroup.disabled = !journal || !imagesAvailable;
+        const imageReady = journal ? imagesAvailable.journal : imagesAvailable.ino;
+        imageGroup.hidden = !journal && selectedShop !== 'INO';
+        imageGroup.disabled = imageGroup.hidden || !imageReady || (!journal && form.elements.photo.files.length > 0);
+        imageUnavailable.hidden = imageReady;
         photoGroup.hidden = journal;
         form.elements.photo.disabled = journal;
         submitButton.textContent = journal ? 'コラムの下書きを作る' : '投稿案を作る';
@@ -114,6 +122,7 @@
       };
       form.elements.shop.forEach(choice => choice.addEventListener('change', syncShop));
       form.elements.kind.forEach(choice => choice.addEventListener('change', syncShop));
+      form.elements.photo.addEventListener('change', syncShop);
       window.addEventListener('pageshow', syncShop);
       syncShop();
       form.addEventListener('submit', () => {
