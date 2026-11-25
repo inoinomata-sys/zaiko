@@ -44,7 +44,7 @@
         </div>
       </fieldset>
       <label>お客様の髪のお悩み
-        <input type="text" name="concern" maxlength="100" placeholder="雨の日に前髪がうねる" value="{{ fields.concern|default('') }}">
+        <input type="text" name="concern" maxlength="100" placeholder="{{ shop == 'リッチ' ? '根元の白髪が気になる' : '雨の日に前髪がうねる' }}" value="{{ fields.concern|default('') }}">
       </label>
       <fieldset class="sns-menu">
         <legend>施術メニュー（複数選択可）</legend>
@@ -74,6 +74,9 @@
       const form = document.getElementById('sns-memo-form');
       const syncShop = () => {
         const selectedShop = form.elements.shop.value;
+        form.elements.concern.placeholder = selectedShop === 'リッチ'
+          ? '根元の白髪が気になる'
+          : '雨の日に前髪がうねる';
         form.querySelectorAll('[data-shop-menus]').forEach(group => {
           group.hidden = group.dataset.shopMenus !== selectedShop;
           group.querySelectorAll('input').forEach(input => { input.disabled = group.hidden; });
