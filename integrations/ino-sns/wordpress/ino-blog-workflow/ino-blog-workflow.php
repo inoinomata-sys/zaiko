@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.2
+ * Version: 0.1.3
  * Requires PHP: 7.4
  */
 
@@ -20,6 +20,7 @@ final class Ino_Blog_Workflow {
         add_action('admin_post_nopriv_ino_blog_staff_submit', [self::class, 'staff_submit']);
         add_action('admin_post_ino_blog_staff_submit', [self::class, 'staff_submit']);
         add_action('admin_post_ino_blog_settings', [self::class, 'save_settings']);
+        add_action('admin_post_ino_sns_settings', [self::class, 'save_sns_settings']);
         add_action('rest_api_init', [self::class, 'routes']);
     }
 
@@ -68,6 +69,17 @@ final class Ino_Blog_Workflow {
                 </table>
                 <?php submit_button(); ?>
             </form>
+            <h2>SNS投稿メモの接続</h2>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('ino_sns_settings'); ?>
+                <input type="hidden" name="action" value="ino_sns_settings">
+                <table class="form-table">
+                    <?php foreach (['sns_hook' => 'SNS用の受信URL', 'sns_key' => 'SNS用の受信キー', 'staff_key' => '総合管理の接続キー'] as $name => $label) : ?>
+                    <tr><th><label for="<?php echo esc_attr($name); ?>"><?php echo esc_html($label); ?></label></th><td><input class="regular-text" type="password" id="<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" autocomplete="new-password" placeholder="<?php echo empty($config[$name]) ? '未設定' : '保存済み'; ?>"></td></tr>
+                    <?php endforeach; ?>
+                </table>
+                <?php submit_button('SNS設定を保存'); ?>
+            </form>
             <p>下書き保存のURL <code><?php echo esc_html(rest_url('ino-blog/v1/draft')); ?></code></p>
             <p>LINEのWebhook URL <code><?php echo esc_html(rest_url('ino-blog/v1/line')); ?></code></p>
         </div>
@@ -98,6 +110,26 @@ final class Ino_Blog_Workflow {
         exit;
     }
 
+    public static function save_sns_settings() {
+        if (!current_user_can('manage_options')) {
+            wp_die('設定を変更する権限がありません。', '', ['response' => 403]);
+        }
+        check_admin_referer('ino_sns_settings');
+        $values = array_filter([
+            'sns_hook' => self::input('sns_hook'),
+            'sns_key' => self::input('sns_key'),
+            'staff_key' => self::input('staff_key'),
+        ], static function ($value) { return $value !== ''; });
+        if ((isset($values['sns_hook']) && !self::valid_webhook($values['sns_hook']))
+            || (isset($values['sns_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['sns_key']))
+            || (isset($values['staff_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['staff_key']))) {
+            wp_die('SNS用の受信URLと接続キーをご確認ください。', '', ['response' => 400]);
+        }
+        update_option(self::OPTION, array_replace(self::config(), $values), false);
+        wp_safe_redirect(admin_url('options-general.php?page=ino-blog-workflow&saved=1'));
+        exit;
+    }
+
     public static function form() {
         if (!current_user_can('manage_options')) {
             wp_die('フォームを使う権限がありません。', '', ['response' => 403]);
@@ -118,7 +150,7 @@ final class Ino_Blog_Workflow {
     }
 
     public static function staff_submit() {
-        $key = defined('INO_BLOG_STAFF_KEY') ? INO_BLOG_STAFF_KEY : '';
+        $key = defined('INO_BLOG_STAFF_KEY') ? INO_BLOG_STAFF_KEY : (self::config()['staff_key'] ?? '');
         $provided = $_SERVER['HTTP_X_INO_BLOG_STAFF_KEY'] ?? '';
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !is_string($key) || !preg_match('/\A[0-9a-f]{64}\z/D', $key) || !hash_equals($key, $provided)) {
             wp_send_json_error('スタッフ用フォームの接続を確認してください。', 403);
@@ -129,10 +161,10 @@ final class Ino_Blog_Workflow {
     private static function submit_to_make($format = 'blog') {
         $config = self::config();
         $hook = $format === 'instagram'
-            ? (defined('INO_INSTAGRAM_MAKE_HOOK') ? INO_INSTAGRAM_MAKE_HOOK : '')
+            ? (defined('INO_INSTAGRAM_MAKE_HOOK') ? INO_INSTAGRAM_MAKE_HOOK : ($config['sns_hook'] ?? ''))
             : ($config['hook'] ?? '');
         $key = $format === 'instagram'
-            ? (defined('INO_INSTAGRAM_MAKE_KEY') ? INO_INSTAGRAM_MAKE_KEY : '')
+            ? (defined('INO_INSTAGRAM_MAKE_KEY') ? INO_INSTAGRAM_MAKE_KEY : ($config['sns_key'] ?? ''))
             : ($config['key'] ?? '');
         if (!self::valid_webhook($hook) || !is_string($key) || $key === '') {
             wp_send_json_error('Makeの接続を設定してください。', 503);
