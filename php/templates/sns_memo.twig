@@ -3,9 +3,11 @@
 {% block head %}
 <style>
 .sns-memo { max-width: 480px; margin: 24px auto; padding: 0 12px; }
-.sns-memo form, .sns-memo label { display: grid; gap: 8px; }
+.sns-memo form, .sns-memo label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .sns-memo form { gap: 18px; }
-.sns-memo input, .sns-memo textarea, .sns-memo button { font-size: 16px; padding: 10px; }
+.sns-memo input, .sns-memo textarea, .sns-memo textarea { resize: vertical; }
+.sns-memo button { width: 100%; min-width: 0; font-size: 16px; padding: 10px; }
+.sns-memo textarea { resize: vertical; }
 .sns-memo button { min-height: 48px; }
 </style>
 {% endblock %}
