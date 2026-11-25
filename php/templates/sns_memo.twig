@@ -1,0 +1,49 @@
+{% extends 'base.twig' %}
+{% block title %}SNS投稿メモ{% endblock %}
+{% block head %}
+<style>
+.sns-memo { max-width: 480px; margin: 24px auto; padding: 0 12px; }
+.sns-memo form, .sns-memo label { display: grid; gap: 8px; }
+.sns-memo form { gap: 18px; }
+.sns-memo input, .sns-memo textarea, .sns-memo button { font-size: 16px; padding: 10px; }
+.sns-memo button { min-height: 48px; }
+</style>
+{% endblock %}
+{% block content %}
+<section class="sns-memo">
+  <a href="/">‹ 総合管理</a>
+  <h1>SNS投稿メモ</h1>
+  {% if sent %}
+    <p role="status">受け付けました。Instagramの投稿案ができると猪股さんのLINEに届きます。</p>
+    <a href="/sns-memo">次のメモを書く</a>
+  {% else %}
+    {% if not can_send %}<p role="status">LINEへの送信は準備中です。</p>{% endif %}
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    <form method="post" enctype="multipart/form-data" id="sns-memo-form">
+      <input type="hidden" name="request_id" value="{{ request_id|default('') }}">
+      <label>髪のお悩み（任意）
+        <input type="text" name="concern" maxlength="100" placeholder="雨の日に前髪がうねる" value="{{ fields.concern|default('') }}">
+      </label>
+      <label>施術メニュー（任意）
+        <input type="text" name="menu" maxlength="100" placeholder="前髪の縮毛矯正" value="{{ fields.menu|default('') }}">
+      </label>
+      <label>ひとことメモ
+        <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
+      </label>
+      <label>掲載できる写真（任意・3MBまで）
+        <input type="file" name="photo" accept="image/jpeg,image/png,image/webp">
+      </label>
+      <button type="submit"{% if not can_send %} disabled{% endif %}>投稿案を作る</button>
+    </form>
+    <script>
+      const form = document.getElementById('sns-memo-form');
+      form.addEventListener('submit', () => {
+        form.querySelector('button').disabled = true;
+      });
+      {% if can_send %}
+      window.addEventListener('pageshow', () => { form.querySelector('button').disabled = false; });
+      {% endif %}
+    </script>
+  {% endif %}
+</section>
+{% endblock %}

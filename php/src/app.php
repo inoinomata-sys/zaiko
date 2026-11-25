@@ -16,6 +16,7 @@ require __DIR__ . '/migrations.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/line.php';
 require __DIR__ . '/staff_line.php';
+require __DIR__ . '/sns_memo.php';
 require __DIR__ . '/mail.php';
 
 // ── 画面（Twig）の準備 ─────────────────────────────────────────────────────────
@@ -75,6 +76,8 @@ function routes(): array
 {
     return [
         ['GET', '/', 'h_menu'],
+        ['GET', '/sns-memo', 'h_sns_memo'],
+        ['POST', '/sns-memo', 'h_sns_memo_submit'],
         ['GET', '/stock', 'h_inventory'],
         ['POST', '/api/stock', 'h_api_stock'],
         ['POST', '/api/stock/check_category', 'h_api_check_category'],

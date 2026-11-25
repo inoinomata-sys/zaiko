@@ -2,6 +2,10 @@
 // これを「config.php」という名前でコピーして、ロリポップのサーバーに置く（GitHub には載せない）。
 // 場所: ロリポップの FTP で、アプリのフォルダの直下（public の1つ上）。自動アップロードでは上書きされない。
 return [
+    // スタッフ用SNSフォームを有効にする場合は、WordPress 側の
+    // INO_BLOG_STAFF_KEY と同じ64桁のランダムな16進数の鍵を設定する。
+    'ino_blog_staff_key' => '',
+
     // ロリポップ管理画面「サーバーの管理・設定 > データベース」に出る値
     'db_host' => 'mysqlXXXX.lolipop.jp',
     'db_name' => 'LAA0000000-zaiko',
