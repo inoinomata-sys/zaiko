@@ -199,12 +199,10 @@ function sl_messages(string $text): array
     return $parts;
 }
 
-/** 水曜・土曜の排水だけを、当日15時に既存の店舗LINEへ知らせる。 */
+/** 排水の個別リマインドは停止。過去の配信履歴の参照用に関数は残す。 */
 function sl_drain_snapshot(string $date): array
 {
-    $day = new DateTimeImmutable($date, new DateTimeZone('Asia/Tokyo'));
-    if (!in_array((int)$day->format('N'), [3, 6], true)) return [];
-    return [$date => ['drain' => ['label' => 'ドリンク機械の排水', 'value' => '水が溜まる前に、排水をお願いします。']]];
+    return [];
 }
 
 /** 予定一覧と実際の通知で同じ時刻判定を使う。 */
@@ -212,7 +210,6 @@ function sl_rule_reminder_time(array $rule): string
 {
     if (empty($rule['is_active']) || !empty($rule['is_closure'])) return '';
     $title = nfkc($rule['title']);
-    if ($rule['kind'] === 'weekly' && in_array((int)($rule['weekday'] ?? -1), [3,6], true) && str_contains($title, 'ドリンク') && str_contains($title, '排水')) return '15:00';
     if (($rule['store'] ?? '') === 'イノ' && in_array($rule['kind'], ['weekly','nth'], true) && (int)($rule['weekday'] ?? -1) === 4 && in_array($title, ['ゴミ出し(リマインド)', '瓶のゴミまとめる'], true)) return '16:50';
     return '';
 }
@@ -366,6 +363,10 @@ function sl_send(array $job, array $s, DateTimeImmutable $now, callable $transpo
 {
     if (sl_holiday_suspended($now)) return;
     if ($job['stream'] !== 'store' || $s['stream'] !== 'store') { return; }
+    if ($job['kind'] === 'reminder') {
+        run("UPDATE staff_line_jobs SET state=CASE WHEN attempts=0 THEN 'cancelled' ELSE 'uncertain' END WHERE id=? AND state IN ('pending','ready','retry','failed','oversized')",[$job['id']]);
+        return;
+    }
     if ($job['kind'] === 'change') {
         if (!$s['notify_changes'] || !str_starts_with($job['slot'], 'morning-change:')) return;
     }
@@ -412,6 +413,8 @@ function sl_tick(?callable $transport = null, ?DateTimeImmutable $clock = null):
             return;
         }
         run("UPDATE staff_line_jobs SET state = CASE WHEN attempts = 0 THEN 'expired' ELSE 'uncertain' END WHERE state IN ('pending','ready','retry','oversized') AND expires_at < ?", [$now->format('Y-m-d H:i:s')]);
+        // 停止した排水リマインドは、予約済み・再送待ちも配信しない。
+        run("UPDATE staff_line_jobs SET state=CASE WHEN attempts=0 THEN 'cancelled' ELSE 'uncertain' END WHERE kind='reminder' AND state IN ('pending','ready','retry','failed','oversized')");
         // 旧方式の即時変更通知を持ち越さない。試行済みは本文を変えず要確認へ。
         run("UPDATE staff_line_jobs SET state = CASE WHEN attempts=0 THEN 'superseded' ELSE 'uncertain' END WHERE kind='change' AND slot NOT LIKE 'morning-change:%' AND state IN ('pending','ready','retry','oversized')");
         // 旧版に出勤共有の設定・配信待ちがあっても、実行できないようにする。
