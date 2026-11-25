@@ -36,7 +36,9 @@
 .item-tools .ord-chip {margin-top:0;white-space:normal;max-width:calc(100% - 80px);flex-shrink:0}
 .ready-progress {font-weight:600;color:var(--fg)}
 .ready-step {width:44px;height:44px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--fg);font-size:20px;font-weight:600;font-family:inherit;cursor:pointer}
-.ready-progress {min-width:60px;text-align:center;font-size:12px}
+.ready-progress {min-width:60px;text-align:center;font-size:18px}
+.item-order-qty {font-size:13px;font-weight:600;color:var(--fg)}
+.ready-needed {font-size:13px;color:var(--fg2);text-align:right}
 .ready-step:disabled,.st-btn:disabled {opacity:.5;cursor:default}
 .ord-chip.covered {background:#eceeea;border-color:#ced2c9;color:#4d554b}
 .ord-chip.on { background:#eaf5ef; border-color:#c1dccc; color:#286a51; }
@@ -55,21 +57,22 @@
   <h2>{{ order.customer|sama }}　<span style="font-size:13px; font-weight:700; color:var(--acc); border:1px solid var(--acc); border-radius:6px; padding:0 7px; vertical-align:3px">{{ order.store }}</span></h2>
   <div class="meta">{% if order.phone %}TEL {{ order.phone }}{% endif %}</div>
   <table>
-    <thead><tr><th>商品名</th><th class="q">数量</th><th class="a">金額</th></tr></thead>
+    <thead><tr><th>商品名</th><th class="a">金額</th></tr></thead>
     {% for it in items %}
     <tbody class="order-product">
       <tr class="item-info">
         <td>{{ it.name }}<div class="sub">{% if it.spec %}{{ it.spec }}　{% endif %}{{ it.unit_price|yen }}{% if it.label %}　{{ it.label }}{% endif %}</div></td>
-        <td class="q">{{ it.qty }}</td>
         <td class="a">{{ it.amount|yen }}</td>
       </tr>
-      <tr class="item-actions"><td colspan="3"><div class="item-tools">
+      <tr class="item-actions"><td colspan="2"><div class="item-tools">
+        <div class="item-order-qty">ご注文：{{ it.qty }}個</div>
         <div class="item-order-line"><span class="item-label">業者への発注</span><button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ ((it.ordered) ? ('✔ 発注済') : ('発注済に記録')) }}</button></div>
-        <div class="item-prepare-line"><span class="item-label">店で用意した数</span><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
+        <div class="item-prepare-line"><span class="item-label">用意できた数</span><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
           <button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button>
-          <span class="ready-center"><span class="ready-caption">準備</span><span class="ready-progress">{{ it.ready_qty }}／{{ it.qty }}</span></span>
+          <span class="ready-center"><span class="ready-progress">{{ it.ready_qty }}個</span></span>
           <button type="button" class="ready-step" data-step="1" aria-label="{{ it.name }}の準備数を1増やす">＋</button>
         </div></div>
+        <div class="ready-needed" role="status">{% if it.ready_qty >= it.qty %}すべて用意できました{% else %}あと{{ it.qty - it.ready_qty }}個必要{% endif %}</div>
       </div></td></tr>
     </tbody>
     {% endfor %}
@@ -122,7 +125,11 @@ function showStatus(){
   const ready=readyChips().reduce((n,c)=>n+Number(c.dataset.ready),0),total=readyChips().reduce((n,c)=>n+Number(c.dataset.total),0);
   document.getElementById('st-note').textContent='店で準備：'+ready+'／'+total+'個'+(stState.delivered?' ・ お渡し済':'');
   chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済（変更）':'残り'+(Number(r.dataset.total)-Number(r.dataset.ready))+'個を記録';c.classList.toggle('covered',covered);});
-  readyChips().forEach(c=>c.querySelectorAll('.ready-step').forEach(b=>b.disabled=busy||(Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total))));
+  readyChips().forEach(c=>{
+    const remaining=Math.max(0,Number(c.dataset.total)-Number(c.dataset.ready));
+    c.closest('.order-product').querySelector('.ready-needed').textContent=remaining?'あと'+remaining+'個必要':'すべて用意できました';
+    c.querySelectorAll('.ready-step').forEach(b=>b.disabled=busy||(Number(b.dataset.step)<0 ? Number(c.dataset.ready)<=0 : Number(c.dataset.ready)>=Number(c.dataset.total)));
+  });
   const ob=document.getElementById('ord-btn');ob.disabled=busy||needed.length===0;ob.textContent=needed.length?'要発注の'+needed.length+'品を発注済に記録':'追加の発注は不要です';
   const rb=document.getElementById('st-ready');rb.disabled=busy||stState.ready;rb.textContent=stState.ready?'全商品 準備完了':'全商品の準備を完了';
   const db=document.getElementById('st-delivered');db.disabled=busy;db.textContent=stState.delivered?'✔ お渡し済（変更）':'お渡し済にする';
@@ -142,7 +149,7 @@ async function changeStatus(path,data,message){
     if(!res.ok)throw new Error(res.status===409?'他の操作で内容が変わっています。画面を開き直してください。':'保存結果を確認できません。画面を開き直してください。');
     const j=await res.json();if(!j.ok)throw new Error('保存できませんでした');
     const ids=new Set(j.ordered_items.map(String));chips().forEach(c=>c.classList.toggle('on',ids.has(c.dataset.id)));
-    readyChips().forEach(c=>{c.dataset.ready=Number(j.ready_quantities[c.dataset.id]||0);c.querySelector('.ready-progress').textContent=c.dataset.ready+'／'+c.dataset.total;});
+    readyChips().forEach(c=>{c.dataset.ready=Number(j.ready_quantities[c.dataset.id]||0);c.querySelector('.ready-progress').textContent=c.dataset.ready+'個';});
     stState.ready=j.ready;stState.delivered=j.delivered;stateKey=j.state_key;historyRows=j.history;
     document.getElementById('action-feedback').textContent=message;showHistory();
   }catch(e){document.getElementById('action-feedback').textContent=e.message;toast(e.message,5000);}
