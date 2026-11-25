@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.8
+ * Version: 0.1.9
  * Requires PHP: 7.4
  */
 
@@ -188,6 +188,11 @@ final class Ino_Blog_Workflow {
         }
 
         $memo = self::input('memo', true);
+        $image_prompt = $format === 'instagram' && $shop === 'INO' && $generate_image
+            ? self::ino_image_prompt($memo) : '';
+        if ($format === 'instagram' && $shop === 'INO' && $image_prompt === '') {
+            $generate_image = false;
+        }
         $id = self::input('request_id');
         if ($memo === '' || strlen($memo) > 6000 || !self::valid_uuid($id)) {
             wp_send_json_error('施術メモと入力内容を確認してください。', 400);
@@ -234,6 +239,7 @@ final class Ino_Blog_Workflow {
 
         try {
             $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop, 'generate_image' => $generate_image && $photo === null];
+            $record['image_prompt'] = $image_prompt;
             if (get_transient($stage) !== $record && !set_transient($stage, $record, DAY_IN_SECONDS)) {
                 $outcome = ['error' => '写真と入力内容を準備できませんでした。', 'status' => 500];
             } else {
@@ -363,9 +369,11 @@ final class Ino_Blog_Workflow {
                 return $attachment;
             }
         }
-        $image_requested = $instagram && $shop === 'INO' && !has_post_thumbnail($post->ID)
+        $image_prompt = $photo_record['image_prompt'] ?? get_post_meta($post->ID, '_ino_image_prompt', true);
+        $image_requested = $image_prompt !== '' && $instagram && $shop === 'INO' && !has_post_thumbnail($post->ID)
             && (($photo_record['generate_image'] ?? false) === true || get_post_meta($post->ID, '_ino_image_requested', true) === '1');
         if ($image_requested) {
+            update_post_meta($post->ID, '_ino_image_prompt', $image_prompt);
             update_post_meta($post->ID, '_ino_image_requested', '1');
         }
         delete_transient($stage);
@@ -383,7 +391,7 @@ final class Ino_Blog_Workflow {
             'approval_data' => $approval_data,
             'image_requested' => $image_requested,
             'image_request_id' => $image_requested ? $id : '',
-            'image_prompt' => $image_requested ? self::ino_image_prompt($post->post_title) : '',
+            'image_prompt' => $image_requested ? $image_prompt : '',
             'messages' => [
                 ['type' => 'text', 'text' => ($instagram ? ('【' . $shop . "｜SNS投稿案】\n") : "【INO ブログ管理室｜ブログ下書き】\n")
                     . ($instagram ? "\n" : wp_html_excerpt($plain_title, 150, '…') . "\n\n")
@@ -507,12 +515,21 @@ final class Ino_Blog_Workflow {
         exit;
     }
 
-    private static function ino_image_prompt($title) {
-        $subject = preg_match('/うねり|くせ毛|広がり|縮毛矯正/u', $title)
-            ? 'A close-up of natural dark wavy Japanese hair from the back, face outside the frame.'
-            : 'A simple wooden comb and dark hair swatch in a softly lit salon.';
-        return 'Editorial illustration for an Osaka curly-hair salon. ' . $subject
-            . ' Natural daylight and warm neutral colors. No text, logos, identifiable faces, before-and-after images, or implied treatment result.';
+    private static function ino_image_prompt($memo) {
+        // Only illustrate an explicitly described technique, never infer a finished style.
+        $actions = [
+            '前髪を少しずつ切' => 'Show a stylist trimming a small section of fringe on a training mannequin.',
+            '前髪を少しずつカット' => 'Show a stylist trimming a small section of fringe on a training mannequin.',
+            '根元から乾か' => 'Show a side view of a blow dryer aimed at the roots of hair on a training mannequin.',
+            '根元から風を当て' => 'Show a side view of a blow dryer aimed at the roots of hair on a training mannequin.',
+        ];
+        foreach ($actions as $action => $subject) {
+            if (strpos($memo, $action) !== false && !preg_match('/ない|ません|せず|しない|避け/u', $memo)) {
+                return 'Simple editorial technique illustration. ' . $subject
+                    . ' Focus on this action. Neutral background. No client portrait, result photo, clippings, lettering or logos.';
+            }
+        }
+        return '';
     }
 
     public static function save_draft_image(WP_REST_Request $request) {
