@@ -17,20 +17,19 @@
     <p role="status">受け付けました。Instagramの投稿案ができると猪股さんのLINEに届きます。</p>
     <a href="/sns-memo">次のメモを書く</a>
   {% else %}
-    {% if not can_send %}<p role="status">LINEへの送信は準備中です。</p>{% endif %}
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
     <form method="post" enctype="multipart/form-data" id="sns-memo-form">
       <input type="hidden" name="request_id" value="{{ request_id|default('') }}">
-      <label>髪のお悩み（任意）
+      <label>髪のお悩み
         <input type="text" name="concern" maxlength="100" placeholder="雨の日に前髪がうねる" value="{{ fields.concern|default('') }}">
       </label>
-      <label>施術メニュー（任意）
+      <label>施術メニュー
         <input type="text" name="menu" maxlength="100" placeholder="前髪の縮毛矯正" value="{{ fields.menu|default('') }}">
       </label>
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
-      <label>掲載できる写真（任意・3MBまで）
+      <label>掲載できる写真（3MBまで）
         <input type="file" name="photo" accept="image/jpeg,image/png,image/webp">
       </label>
       <button type="submit"{% if not can_send %} disabled{% endif %}>投稿案を作る</button>
