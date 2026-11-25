@@ -18,8 +18,8 @@ function sns_memo_key(): ?string
 function sns_memo_image_availability(): array
 {
     return [
-        'journal' => !empty($GLOBALS['CONFIG']['ino_journal_images_available']),
-        'ino' => !empty($GLOBALS['CONFIG']['ino_sns_images_available']),
+        'journal' => (bool)($GLOBALS['CONFIG']['ino_journal_images_available'] ?? true),
+        'ino' => (bool)($GLOBALS['CONFIG']['ino_sns_images_available'] ?? true),
     ];
 }
 
