@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.6
+ * Version: 0.1.7
  * Requires PHP: 7.4
  */
 
@@ -169,10 +169,11 @@ final class Ino_Blog_Workflow {
         if ($kind === 'journal' && empty(self::config()['rich_journal_key'])) {
             wp_send_json_error('コラムの接続設定が済んでいません。', 503);
         }
-        self::submit_to_make($kind === 'journal' ? 'rich-journal' : 'instagram', $shop);
+        $generate_image = $kind === 'journal' && self::input('generate_image') === '1';
+        self::submit_to_make($kind === 'journal' ? 'rich-journal' : 'instagram', $shop, $generate_image);
     }
 
-    private static function submit_to_make($format = 'blog', $shop = 'INO') {
+    private static function submit_to_make($format = 'blog', $shop = 'INO', $generate_image = false) {
         $config = self::config();
         $hook = $format !== 'blog'
             ? (defined('INO_INSTAGRAM_MAKE_HOOK') ? INO_INSTAGRAM_MAKE_HOOK : ($config['sns_hook'] ?? ''))
@@ -224,7 +225,7 @@ final class Ino_Blog_Workflow {
         }
 
         try {
-            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop];
+            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop, 'generate_image' => $generate_image];
             if (get_transient($stage) !== $record && !set_transient($stage, $record, DAY_IN_SECONDS)) {
                 $outcome = ['error' => '写真と入力内容を準備できませんでした。', 'status' => 500];
             } else {
@@ -309,7 +310,7 @@ final class Ino_Blog_Workflow {
         $stage = self::PREFIX . $id;
         $photo_record = get_transient($stage);
         if (($photo_record['format'] ?? '') === 'rich-journal') {
-            return self::save_rich_draft($id, $title, $content);
+            return self::save_rich_draft($id, $title, $content, ($photo_record['generate_image'] ?? false) === true);
         }
         $existing = get_posts([
             'post_type' => 'post',
@@ -398,8 +399,8 @@ final class Ino_Blog_Workflow {
         return is_array($body) ? $body : new WP_Error('rich_response', 'リッチの応答を確認できません。', ['status' => 502]);
     }
 
-    private static function save_rich_draft($id, $title, $content) {
-        $draft = self::rich_request('draft', ['request_id' => $id, 'title' => $title, 'content' => $content]);
+    private static function save_rich_draft($id, $title, $content, $generate_image) {
+        $draft = self::rich_request('draft', ['request_id' => $id, 'title' => $title, 'content' => $content, 'generate_image' => $generate_image]);
         if (is_wp_error($draft)) {
             return $draft;
         }

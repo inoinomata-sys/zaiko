@@ -72,6 +72,16 @@
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
+      <fieldset class="sns-menu" id="rich-journal-image"{% if kind != 'journal' %} hidden{% endif %}{% if kind != 'journal' or not images_available %} disabled{% endif %}>
+        <legend>見出し画像</legend>
+        <div class="sns-menu-options">
+          <label>
+            <input type="checkbox" name="generate_image" value="1"{% if generate_image|default(false) %} checked{% endif %}>
+            <span>AIで自動生成する</span>
+          </label>
+        </div>
+        {% if not images_available %}<p>画像の自動生成は準備中です。</p>{% endif %}
+      </fieldset>
       <label id="sns-photo"{% if kind == 'journal' %} hidden{% endif %}>掲載できる写真（3MBまで）
         <input type="file" name="photo" accept="image/jpeg,image/png,image/webp"{% if kind == 'journal' %} disabled{% endif %}>
       </label>
@@ -80,6 +90,8 @@
     <script>
       const form = document.getElementById('sns-memo-form');
       const kindGroup = document.getElementById('rich-content-kind');
+      const imageGroup = document.getElementById('rich-journal-image');
+      const imagesAvailable = {{ images_available ? 'true' : 'false' }};
       const photoGroup = document.getElementById('sns-photo');
       const submitButton = form.querySelector('button[type="submit"]');
       const syncShop = () => {
@@ -87,6 +99,8 @@
         kindGroup.hidden = selectedShop !== 'リッチ';
         kindGroup.disabled = kindGroup.hidden;
         const journal = !kindGroup.hidden && form.elements.kind.value === 'journal';
+        imageGroup.hidden = !journal;
+        imageGroup.disabled = !journal || !imagesAvailable;
         photoGroup.hidden = journal;
         form.elements.photo.disabled = journal;
         submitButton.textContent = journal ? 'コラムの下書きを作る' : '投稿案を作る';

@@ -5,6 +5,8 @@ return [
     // スタッフ用SNSフォームを有効にする場合は、WordPress 側の
     // INO_BLOG_STAFF_KEY と同じ64桁のランダムな16進数の鍵を設定する。
     'ino_blog_staff_key' => '',
+    // Makeで画像の生成・添付を確認してから有効にする。
+    'ino_journal_images_available' => false,
 
     // ロリポップ管理画面「サーバーの管理・設定 > データベース」に出る値
     'db_host' => 'mysqlXXXX.lolipop.jp',

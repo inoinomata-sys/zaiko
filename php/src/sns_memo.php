@@ -15,6 +15,11 @@ function sns_memo_key(): ?string
     return $key;
 }
 
+function sns_memo_images_available(): bool
+{
+    return !empty($GLOBALS['CONFIG']['ino_journal_images_available']);
+}
+
 function h_sns_memo(): void
 {
     header('Cache-Control: no-store');
@@ -22,7 +27,7 @@ function h_sns_memo(): void
     $bytes[6] = chr((ord($bytes[6]) & 15) | 64);
     $bytes[8] = chr((ord($bytes[8]) & 63) | 128);
     $id = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
-    render('sns_memo', ['sent' => isset($_GET['sent']), 'kind' => ($_GET['sent'] ?? '') === 'journal' ? 'journal' : 'sns', 'request_id' => $id, 'can_send' => sns_memo_key() !== null, 'shops' => SNS_MEMO_SHOPS, 'shop' => 'INO']);
+    render('sns_memo', ['sent' => isset($_GET['sent']), 'kind' => ($_GET['sent'] ?? '') === 'journal' ? 'journal' : 'sns', 'request_id' => $id, 'can_send' => sns_memo_key() !== null, 'images_available' => sns_memo_images_available(), 'shops' => SNS_MEMO_SHOPS, 'shop' => 'INO']);
 }
 
 function h_sns_memo_submit(): void
@@ -48,6 +53,8 @@ function h_sns_memo_submit(): void
     if (!in_array($kind, ['sns', 'journal'], true) || ($kind === 'journal' && $shop !== 'リッチ')) {
         throw new HttpError(400, '作成する内容を選び直してください。');
     }
+    $generate_image = $kind === 'journal' && ($_POST['generate_image'] ?? '') === '1';
+    $images_available = sns_memo_images_available();
     $selected = array_filter((array)($_POST['menu'] ?? []), 'is_string');
     $menus = array_values(array_intersect(SNS_MEMO_SHOPS[$shop], $selected));
     $id = $_POST['request_id'] ?? '';
@@ -56,6 +63,10 @@ function h_sns_memo_submit(): void
         || $fields['memo'] === '' || strlen($fields['memo']) > 3000
         || strlen($fields['concern']) > 300 || strlen($fields['menu_other']) > 300) {
         $error = 'ひとことメモと入力内容を確認してください。';
+    }
+
+    if ($generate_image && !$images_available) {
+        $error = '現在、画像の自動生成は利用できません。本文だけで下書きを作れます。';
     }
 
     $memo_parts = [$fields['memo']];
@@ -70,6 +81,7 @@ function h_sns_memo_submit(): void
         'request_id' => $id,
         'shop' => $shop,
         'kind' => $kind,
+        'generate_image' => $generate_image ? '1' : '0',
         'memo' => implode("\n", $memo_parts),
         'menu' => implode('、', $menus),
     ];
@@ -109,5 +121,5 @@ function h_sns_memo_submit(): void
     }
 
     header('Cache-Control: no-store');
-    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'shops' => SNS_MEMO_SHOPS, 'shop' => $shop, 'kind' => $kind, 'selected_menus' => $menus, 'request_id' => is_string($id) ? $id : ''], 422);
+    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'images_available' => $images_available, 'generate_image' => $generate_image, 'shops' => SNS_MEMO_SHOPS, 'shop' => $shop, 'kind' => $kind, 'selected_menus' => $menus, 'request_id' => is_string($id) ? $id : ''], 422);
 }
