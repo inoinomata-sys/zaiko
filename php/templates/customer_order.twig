@@ -124,7 +124,7 @@ function showStatus(){
   document.getElementById('ord-state').textContent=needed.length?'要発注：'+needed.length+'品・残り'+needUnits+'個':'追加の発注は不要です';
   const ready=readyChips().reduce((n,c)=>n+Number(c.dataset.ready),0),total=readyChips().reduce((n,c)=>n+Number(c.dataset.total),0);
   document.getElementById('st-note').textContent='店で準備：'+ready+'／'+total+'個'+(stState.delivered?' ・ お渡し済':'');
-  chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済（変更）':'残り'+(Number(r.dataset.total)-Number(r.dataset.ready))+'個を記録';c.classList.toggle('covered',covered);});
+  chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済（変更）':'発注した';c.classList.toggle('covered',covered);});
   readyChips().forEach(c=>{
     const remaining=Math.max(0,Number(c.dataset.total)-Number(c.dataset.ready));
     c.closest('.order-product').querySelector('.ready-needed').textContent=remaining?'あと'+remaining+'個必要':'すべて用意できました';
