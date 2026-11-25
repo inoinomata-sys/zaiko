@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const SNS_MEMO_MENUS = ['縮毛矯正', '前髪の縮毛矯正', 'カット', 'カラー', '相談のみ', 'その他'];
+const SNS_MEMO_MENUS = ['縮毛矯正', '顔周りの縮毛矯正', 'カット', 'カラー', 'パーマ'];
 
 function sns_memo_key(): ?string
 {
@@ -33,7 +33,7 @@ function h_sns_memo_submit(): void
     }
 
     $fields = [];
-    foreach (['concern', 'memo'] as $name) {
+    foreach (['concern', 'menu_other', 'memo'] as $name) {
         $value = $_POST[$name] ?? '';
         $fields[$name] = is_string($value) ? trim($value) : '';
     }
@@ -43,13 +43,21 @@ function h_sns_memo_submit(): void
     $error = '';
     if (!is_string($id) || !preg_match('/\A[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}\z/D', $id)
         || $fields['memo'] === '' || strlen($fields['memo']) > 3000
-        || strlen($fields['concern']) > 300) {
+        || strlen($fields['concern']) > 300 || strlen($fields['menu_other']) > 300) {
         $error = 'ひとことメモと入力内容を確認してください。';
+    }
+
+    $memo_parts = [$fields['memo']];
+    if ($fields['concern'] !== '') {
+        $memo_parts[] = '髪のお悩み：' . $fields['concern'];
+    }
+    if ($fields['menu_other'] !== '') {
+        $memo_parts[] = '施術メニュー（自由記入）：' . $fields['menu_other'];
     }
 
     $payload = [
         'request_id' => $id,
-        'memo' => $fields['memo'] . ($fields['concern'] === '' ? '' : "\n髪のお悩み：" . $fields['concern']),
+        'memo' => implode("\n", $memo_parts),
         'menu' => implode('、', $menus),
     ];
     $photo = $_FILES['photo'] ?? null;

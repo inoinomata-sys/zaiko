@@ -44,6 +44,9 @@
           {% endfor %}
         </div>
       </fieldset>
+      <label>一覧にない施術メニュー
+        <input type="text" name="menu_other" maxlength="100" value="{{ fields.menu_other|default('') }}">
+      </label>
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
