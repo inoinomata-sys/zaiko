@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.7
+ * Version: 0.1.8
  * Requires PHP: 7.4
  */
 
@@ -75,7 +75,7 @@ final class Ino_Blog_Workflow {
                 <?php wp_nonce_field('ino_sns_settings'); ?>
                 <input type="hidden" name="action" value="ino_sns_settings">
                 <table class="form-table">
-                    <?php foreach (['sns_hook' => 'SNS用の受信URL', 'sns_key' => 'SNS用の受信キー', 'staff_key' => '総合管理の接続キー', 'rich_journal_key' => 'リッチのコラム接続キー'] as $name => $label) : ?>
+                    <?php foreach (['sns_hook' => 'SNS用の受信URL', 'sns_image_hook' => 'AI画像付き投稿用の受信URL', 'sns_key' => 'SNS用の受信キー', 'staff_key' => '総合管理の接続キー', 'rich_journal_key' => 'リッチのコラム接続キー'] as $name => $label) : ?>
                     <tr><th><label for="<?php echo esc_attr($name); ?>"><?php echo esc_html($label); ?></label></th><td><input class="regular-text" type="password" id="<?php echo esc_attr($name); ?>" name="<?php echo esc_attr($name); ?>" autocomplete="new-password" placeholder="<?php echo empty($config[$name]) ? '未設定' : '保存済み'; ?>"></td></tr>
                     <?php endforeach; ?>
                 </table>
@@ -118,11 +118,13 @@ final class Ino_Blog_Workflow {
         check_admin_referer('ino_sns_settings');
         $values = array_filter([
             'sns_hook' => self::input('sns_hook'),
+            'sns_image_hook' => self::input('sns_image_hook'),
             'sns_key' => self::input('sns_key'),
             'staff_key' => self::input('staff_key'),
             'rich_journal_key' => self::input('rich_journal_key'),
         ], static function ($value) { return $value !== ''; });
         if ((isset($values['sns_hook']) && !self::valid_webhook($values['sns_hook']))
+            || (isset($values['sns_image_hook']) && !self::valid_webhook($values['sns_image_hook']))
             || (isset($values['sns_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['sns_key']))
             || (isset($values['rich_journal_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['rich_journal_key']))
             || (isset($values['staff_key']) && !preg_match('/\A[0-9a-f]{64}\z/D', $values['staff_key']))) {
@@ -216,6 +218,12 @@ final class Ino_Blog_Workflow {
             wp_send_json_error('コラムの写真は、下書きができてからWordPressで追加してください。', 400);
         }
 
+        if ($generate_image && $photo === null) {
+            $hook = $config['sns_image_hook'] ?? '';
+            if (!self::valid_webhook($hook)) {
+                wp_send_json_error('画像生成の受付先を設定してください。', 503);
+            }
+        }
         $stage = self::PREFIX . $id;
         if (get_transient($stage . '_sent')) {
             wp_send_json_success('受付済みです。LINEへの通知をお待ちください。');
