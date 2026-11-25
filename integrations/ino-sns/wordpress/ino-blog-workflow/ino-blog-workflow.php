@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.4
+ * Version: 0.1.5
  * Requires PHP: 7.4
  */
 
@@ -156,10 +156,14 @@ final class Ino_Blog_Workflow {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !is_string($key) || !preg_match('/\A[0-9a-f]{64}\z/D', $key) || !hash_equals($key, $provided)) {
             wp_send_json_error('スタッフ用フォームの接続を確認してください。', 403);
         }
-        self::submit_to_make('instagram');
+        $shop = isset($_POST['shop']) ? self::input('shop') : 'INO';
+        if (!in_array($shop, ['INO', 'リッチ'], true)) {
+            wp_send_json_error('店舗を選び直してください。', 400);
+        }
+        self::submit_to_make('instagram', $shop);
     }
 
-    private static function submit_to_make($format = 'blog') {
+    private static function submit_to_make($format = 'blog', $shop = 'INO') {
         $config = self::config();
         $hook = $format === 'instagram'
             ? (defined('INO_INSTAGRAM_MAKE_HOOK') ? INO_INSTAGRAM_MAKE_HOOK : ($config['sns_hook'] ?? ''))
@@ -188,6 +192,10 @@ final class Ino_Blog_Workflow {
             $memo .= "\n髪のお悩み：" . wp_html_excerpt(implode('、', $concerns), 200, '');
         }
 
+        if ($format === 'instagram') {
+            $memo = '店舗：' . $shop . "\n" . $memo;
+        }
+
         $photo = self::photo();
         if (is_wp_error($photo)) {
             wp_send_json_error($photo->get_error_message(), 400);
@@ -202,13 +210,13 @@ final class Ino_Blog_Workflow {
         }
 
         try {
-            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format];
+            $record = ['photo' => $photo, 'owner' => get_current_user_id(), 'format' => $format, 'shop' => $shop];
             if (get_transient($stage) !== $record && !set_transient($stage, $record, DAY_IN_SECONDS)) {
                 $outcome = ['error' => '写真と入力内容を準備できませんでした。', 'status' => 500];
             } else {
                 $response = wp_safe_remote_post($hook, [
                     'headers' => ['Content-Type' => 'application/json', 'x-make-apikey' => $key],
-                    'body' => wp_json_encode(['shop' => 'INO', 'memo' => $memo, 'request_id' => $id]),
+                    'body' => wp_json_encode(['shop' => $shop, 'memo' => $memo, 'request_id' => $id]),
                     'timeout' => 12,
                     'redirection' => 0,
                 ]);
@@ -303,13 +311,15 @@ final class Ino_Blog_Workflow {
         $instagram = $post
             ? get_post_meta($post->ID, '_ino_blog_format', true) === 'instagram'
             : ($photo_record['format'] ?? '') === 'instagram';
+        $recorded_shop = $post ? get_post_meta($post->ID, '_ino_blog_shop', true) : ($photo_record['shop'] ?? 'INO');
+        $shop = $recorded_shop === 'リッチ' ? 'リッチ' : 'INO';
         if (!$post) {
             $post_id = wp_insert_post(wp_slash([
                 'post_title' => sanitize_text_field($title),
                 'post_content' => wp_kses_post($content),
                 'post_status' => 'draft',
                 'post_type' => 'post',
-                'meta_input' => [self::META => $id, '_ino_blog_format' => $instagram ? 'instagram' : 'blog'],
+                'meta_input' => [self::META => $id, '_ino_blog_format' => $instagram ? 'instagram' : 'blog', '_ino_blog_shop' => $shop],
             ]), true);
             if (is_wp_error($post_id)) {
                 return $post_id;
@@ -336,12 +346,12 @@ final class Ino_Blog_Workflow {
             'preview_url' => $preview,
             'approval_data' => $approval_data,
             'messages' => [
-                ['type' => 'text', 'text' => ($instagram ? "【INO｜SNS投稿案】\n" : "【INO ブログ管理室｜ブログ下書き】\n")
+                ['type' => 'text', 'text' => ($instagram ? ('【' . $shop . "｜SNS投稿案】\n") : "【INO ブログ管理室｜ブログ下書き】\n")
                     . ($instagram ? "\n" : wp_html_excerpt($plain_title, 150, '…') . "\n\n")
                     . wp_html_excerpt($plain_body, 2000, '…')],
                 [
                     'type' => 'template',
-                    'altText' => $instagram ? 'INO SNS投稿案の確認' : 'INO ブログ下書きの確認',
+                    'altText' => $instagram ? $shop . ' SNS投稿案の確認' : 'INO ブログ下書きの確認',
                     'template' => [
                         'type' => 'buttons',
                         'text' => $instagram ? '投稿案を確認してください。' : '下書きを確認してください。',
@@ -368,6 +378,7 @@ final class Ino_Blog_Workflow {
             auth_redirect();
             wp_die('この下書きを見る権限がありません。', '', ['response' => 403]);
         }
+        $shop = get_post_meta($post->ID, '_ino_blog_shop', true) === 'リッチ' ? 'リッチ' : 'INO';
         nocache_headers();
         header('X-Robots-Tag: noindex, nofollow');
         header('Content-Type: text/html; charset=UTF-8');
@@ -378,7 +389,7 @@ final class Ino_Blog_Workflow {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <meta name="robots" content="noindex,nofollow">
-            <title>SNS投稿案・下書き | INO</title>
+            <title>SNS投稿案・下書き | <?php echo esc_html($shop); ?></title>
             <style>
                 * { box-sizing: border-box; }
                 body { margin: 0; background: #faf8f3; color: #262219; font: 1rem/1.8 system-ui, sans-serif; }
@@ -393,6 +404,7 @@ final class Ino_Blog_Workflow {
         <body>
         <main>
             <h1>SNS投稿案・下書き</h1>
+            <p><?php echo esc_html($shop); ?></p>
             <article>
                 <h2><?php echo esc_html($post->post_title); ?></h2>
                 <?php echo get_the_post_thumbnail($post, 'large'); ?>
