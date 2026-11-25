@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.3
+ * Version: 0.1.4
  * Requires PHP: 7.4
  */
 
@@ -22,6 +22,7 @@ final class Ino_Blog_Workflow {
         add_action('admin_post_ino_blog_settings', [self::class, 'save_settings']);
         add_action('admin_post_ino_sns_settings', [self::class, 'save_sns_settings']);
         add_action('rest_api_init', [self::class, 'routes']);
+        add_action('template_redirect', [self::class, 'show_sns_preview'], 0);
     }
 
     private static function config() {
@@ -335,12 +336,12 @@ final class Ino_Blog_Workflow {
             'preview_url' => $preview,
             'approval_data' => $approval_data,
             'messages' => [
-                ['type' => 'text', 'text' => ($instagram ? "【INO｜Instagram投稿案】\n" : "【INO ブログ管理室｜ブログ下書き】\n")
+                ['type' => 'text', 'text' => ($instagram ? "【INO｜SNS投稿案】\n" : "【INO ブログ管理室｜ブログ下書き】\n")
                     . ($instagram ? "\n" : wp_html_excerpt($plain_title, 150, '…') . "\n\n")
                     . wp_html_excerpt($plain_body, 2000, '…')],
                 [
                     'type' => 'template',
-                    'altText' => $instagram ? 'INO Instagram投稿案の確認' : 'INO ブログ下書きの確認',
+                    'altText' => $instagram ? 'INO SNS投稿案の確認' : 'INO ブログ下書きの確認',
                     'template' => [
                         'type' => 'buttons',
                         'text' => $instagram ? '投稿案を確認してください。' : '下書きを確認してください。',
@@ -352,6 +353,56 @@ final class Ino_Blog_Workflow {
                 ],
             ],
         ]);
+    }
+
+    public static function show_sns_preview() {
+        if (!is_preview()) {
+            return;
+        }
+        $post = get_queried_object();
+        if (!$post instanceof WP_Post || $post->post_status !== 'draft'
+            || get_post_meta($post->ID, '_ino_blog_format', true) !== 'instagram') {
+            return;
+        }
+        if (!current_user_can('edit_post', $post->ID)) {
+            auth_redirect();
+            wp_die('この下書きを見る権限がありません。', '', ['response' => 403]);
+        }
+        nocache_headers();
+        header('X-Robots-Tag: noindex, nofollow');
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+        <!doctype html>
+        <html lang="ja">
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="robots" content="noindex,nofollow">
+            <title>SNS投稿案・下書き | INO</title>
+            <style>
+                * { box-sizing: border-box; }
+                body { margin: 0; background: #faf8f3; color: #262219; font: 1rem/1.8 system-ui, sans-serif; }
+                main { width: min(100%, 42rem); margin: auto; padding: 24px 16px; overflow-wrap: anywhere; }
+                h1 { margin: 0 0 16px; font-size: 1.5rem; }
+                article { padding: 16px; background: #fff; border: 1px solid #ded6c2; border-radius: 12px; }
+                h2 { margin: 0; font-size: 1.15rem; }
+                img { display: block; max-width: 100%; height: auto; margin: 16px 0; border-radius: 8px; }
+                p:last-child { margin-bottom: 0; }
+            </style>
+        </head>
+        <body>
+        <main>
+            <h1>SNS投稿案・下書き</h1>
+            <article>
+                <h2><?php echo esc_html($post->post_title); ?></h2>
+                <?php echo get_the_post_thumbnail($post, 'large'); ?>
+                <?php echo wp_kses_post(wpautop($post->post_content)); ?>
+            </article>
+        </main>
+        </body>
+        </html>
+        <?php
+        exit;
     }
 
     private static function attach_photo($post_id, $id, $photo) {
