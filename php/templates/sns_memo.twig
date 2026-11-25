@@ -29,11 +29,12 @@
     <p role="status">受け付けました。{{ kind == 'journal' ? 'コラムの下書き' : 'SNSの投稿案' }}ができるとLINEに届きます。</p>
     <a href="/sns-memo">次のメモを書く</a>
   {% else %}
+    <p>店舗を選び、施術で工夫したことをひとこと書いてください。できた下書きはLINEで確認できます。</p>
     {% if error %}<p role="alert">{{ error }}</p>{% endif %}
     <form method="post" enctype="multipart/form-data" id="sns-memo-form">
       <input type="hidden" name="request_id" value="{{ request_id|default('') }}">
       <fieldset class="sns-menu">
-        <legend>店舗</legend>
+        <legend>どちらの店舗ですか？</legend>
         <div class="sns-menu-options">
           {% for shop_name in shops|keys %}
             <label>
@@ -44,10 +45,10 @@
         </div>
       </fieldset>
       <fieldset class="sns-menu" id="rich-content-kind"{% if shop != 'リッチ' %} hidden disabled{% endif %}>
-        <legend>作成する内容</legend>
+        <legend>何の下書きを作りますか？</legend>
         <div class="sns-menu-options">
           <label><input type="radio" name="kind" value="sns"{% if kind != 'journal' %} checked{% endif %}><span>SNS投稿案</span></label>
-          <label><input type="radio" name="kind" value="journal"{% if kind == 'journal' %} checked{% endif %}><span>髪とカラーのお話</span></label>
+          <label><input type="radio" name="kind" value="journal"{% if kind == 'journal' %} checked{% endif %}><span>コラム「髪とカラーのお話」</span></label>
         </div>
       </fieldset>
       <label>お客様の髪のお悩み
@@ -70,7 +71,7 @@
         <input type="text" name="menu_other" maxlength="100" value="{{ fields.menu_other|default('') }}">
       </label>
       <label>ひとことメモ
-        <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
+        <textarea name="memo" rows="4" required maxlength="1000" placeholder="{{ shop == 'リッチ' ? '例：毛先の色に合わせて、伸びた根元だけを染めた' : '例：前髪のくせを見ながら、乾いた状態で長さを調整した' }}">{{ fields.memo|default('') }}</textarea>
       </label>
       {% set image_supported = kind == 'journal' or shop == 'INO' %}
       {% set image_ready = kind == 'journal' ? images_available.journal : images_available.ino %}
@@ -112,6 +113,9 @@
         photoGroup.hidden = journal;
         form.elements.photo.disabled = journal;
         submitButton.textContent = journal ? 'コラムの下書きを作る' : '投稿案を作る';
+        form.elements.memo.placeholder = selectedShop === 'リッチ'
+          ? '例：毛先の色に合わせて、伸びた根元だけを染めた'
+          : '例：前髪のくせを見ながら、乾いた状態で長さを調整した';
         form.elements.concern.placeholder = selectedShop === 'リッチ'
           ? '根元の白髪が気になる'
           : '雨の日に前髪がうねる';
