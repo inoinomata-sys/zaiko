@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+const SNS_MEMO_MENUS = ['縮毛矯正', '前髪の縮毛矯正', 'カット', 'カラー', '相談のみ', 'その他'];
+
 function sns_memo_key(): ?string
 {
     $key = (string)($GLOBALS['CONFIG']['ino_blog_staff_key'] ?? '');
@@ -17,7 +19,7 @@ function h_sns_memo(): void
     $bytes[6] = chr((ord($bytes[6]) & 15) | 64);
     $bytes[8] = chr((ord($bytes[8]) & 63) | 128);
     $id = vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
-    render('sns_memo', ['sent' => isset($_GET['sent']), 'request_id' => $id, 'can_send' => sns_memo_key() !== null]);
+    render('sns_memo', ['sent' => isset($_GET['sent']), 'request_id' => $id, 'can_send' => sns_memo_key() !== null, 'menu_options' => SNS_MEMO_MENUS]);
 }
 
 function h_sns_memo_submit(): void
@@ -31,22 +33,24 @@ function h_sns_memo_submit(): void
     }
 
     $fields = [];
-    foreach (['concern', 'menu', 'memo'] as $name) {
+    foreach (['concern', 'memo'] as $name) {
         $value = $_POST[$name] ?? '';
         $fields[$name] = is_string($value) ? trim($value) : '';
     }
+    $selected = array_filter((array)($_POST['menu'] ?? []), 'is_string');
+    $menus = array_values(array_intersect(SNS_MEMO_MENUS, $selected));
     $id = $_POST['request_id'] ?? '';
     $error = '';
     if (!is_string($id) || !preg_match('/\A[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}\z/D', $id)
         || $fields['memo'] === '' || strlen($fields['memo']) > 3000
-        || strlen($fields['menu']) > 300 || strlen($fields['concern']) > 300) {
+        || strlen($fields['concern']) > 300) {
         $error = 'ひとことメモと入力内容を確認してください。';
     }
 
     $payload = [
         'request_id' => $id,
         'memo' => $fields['memo'] . ($fields['concern'] === '' ? '' : "\n髪のお悩み：" . $fields['concern']),
-        'menu' => $fields['menu'],
+        'menu' => implode('、', $menus),
     ];
     $photo = $_FILES['photo'] ?? null;
     if ($error === '' && $photo && ($photo['error'] ?? null) !== UPLOAD_ERR_NO_FILE) {
@@ -81,5 +85,5 @@ function h_sns_memo_submit(): void
     }
 
     header('Cache-Control: no-store');
-    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'request_id' => is_string($id) ? $id : ''], 422);
+    render('sns_memo', ['fields' => $fields, 'error' => $error, 'can_send' => true, 'menu_options' => SNS_MEMO_MENUS, 'selected_menus' => $menus, 'request_id' => is_string($id) ? $id : ''], 422);
 }

@@ -5,10 +5,18 @@
 .sns-memo { max-width: 480px; margin: 24px auto; padding: 0 12px; }
 .sns-memo form, .sns-memo label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .sns-memo form { gap: 18px; }
-.sns-memo input, .sns-memo textarea, .sns-memo textarea { resize: vertical; }
-.sns-memo button { width: 100%; min-width: 0; font-size: 16px; padding: 10px; }
+.sns-memo input[type=text], .sns-memo input[type=file], .sns-memo textarea, .sns-memo button {
+  width: 100%; min-width: 0; max-width: 100%; font-size: 16px; padding: 10px;
+}
 .sns-memo textarea { resize: vertical; }
 .sns-memo button { min-height: 48px; }
+.sns-menu { min-width: 0; border: 0; }
+.sns-menu-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.sns-menu-options label {
+  grid-template-columns: auto minmax(0, 1fr); align-items: center; min-height: 44px;
+  padding: 8px; border: 1px solid var(--border); border-radius: 10px;
+}
+.sns-menu-options input { accent-color: var(--acc); width: 17px; height: 17px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -25,9 +33,17 @@
       <label>髪のお悩み
         <input type="text" name="concern" maxlength="100" placeholder="雨の日に前髪がうねる" value="{{ fields.concern|default('') }}">
       </label>
-      <label>施術メニュー
-        <input type="text" name="menu" maxlength="100" placeholder="前髪の縮毛矯正" value="{{ fields.menu|default('') }}">
-      </label>
+      <fieldset class="sns-menu">
+        <legend>施術メニュー（複数選択可）</legend>
+        <div class="sns-menu-options">
+          {% for menu in menu_options %}
+            <label>
+              <input type="checkbox" name="menu[]" value="{{ menu }}"{% if menu in selected_menus|default([]) %} checked{% endif %}>
+              <span>{{ menu }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
       <label>ひとことメモ
         <textarea name="memo" rows="4" required maxlength="1000" placeholder="相談したことや、施術で工夫したこと">{{ fields.memo|default('') }}</textarea>
       </label>
