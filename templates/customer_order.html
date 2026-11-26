@@ -18,6 +18,7 @@
 .ready-control {display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;margin:0;font-size:12px;color:var(--fg2)}
 .item-tools {display:flex;flex-direction:column;gap:10px}
 .item-order-line,.item-prepare-line {display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+.order-status {display:block;font-size:12px;font-weight:600;color:var(--fg);margin-top:2px}
 .item-label {font-size:12px;color:var(--fg2)}
 .item-tools .ord-chip {min-height:44px;padding:7px 12px}
 .order-summary {max-width:640px;margin:0 auto 12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:13px}
@@ -66,7 +67,7 @@
       </tr>
       <tr class="item-actions"><td colspan="2"><div class="item-tools">
         <div class="item-order-qty">ご注文：{{ it.qty }}個</div>
-        <div class="item-order-line"><span class="item-label">業者への発注</span><button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ '✔ 発注済' if it.ordered else '発注した' }}</button></div>
+        <div class="item-order-line"><span class="item-label">業者への発注<span class="order-status">{{ '発注済み' if it.ordered else '未発注' }}</span></span><button type="button" class="ord-chip{% if it.ordered %} on{% endif %}" data-id="{{ it.id }}">{{ '✔ 発注済' if it.ordered else '発注済みにする' }}</button></div>
         <div class="item-prepare-line"><span class="item-label">用意できた数</span><div class="ready-control" data-id="{{ it.id }}" data-total="{{ it.qty }}" data-ready="{{ it.ready_qty }}">
           <button type="button" class="ready-step" data-step="-1" aria-label="{{ it.name }}の準備数を1減らす">−</button>
           <span class="ready-center"><span class="ready-progress">{{ it.ready_qty }}個</span></span>
@@ -124,7 +125,7 @@ function showStatus(){
   document.getElementById('ord-state').textContent=needed.length?'要発注：'+needed.length+'品・残り'+needUnits+'個':'追加の発注は不要です';
   const ready=readyChips().reduce((n,c)=>n+Number(c.dataset.ready),0),total=readyChips().reduce((n,c)=>n+Number(c.dataset.total),0);
   document.getElementById('st-note').textContent='店で準備：'+ready+'／'+total+'個'+(stState.delivered?' ・ お渡し済':'');
-  chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済（変更）':'発注した';c.classList.toggle('covered',covered);});
+  chips().forEach(c=>{const r=c.closest('.order-product').querySelector('.ready-control'),covered=Number(r.dataset.ready)>=Number(r.dataset.total);c.closest('.item-order-line').querySelector('.order-status').textContent=covered?'発注不要':c.classList.contains('on')?'発注済み':'未発注';c.disabled=busy||covered;c.textContent=covered?'準備済・発注不要':c.classList.contains('on')?'✔ 発注済み（変更）':'発注済みにする';c.classList.toggle('covered',covered);});
   readyChips().forEach(c=>{
     const remaining=Math.max(0,Number(c.dataset.total)-Number(c.dataset.ready));
     c.closest('.order-product').querySelector('.ready-needed').textContent=remaining?'あと'+remaining+'個必要':'すべて用意できました';
