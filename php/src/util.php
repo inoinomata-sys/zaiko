@@ -151,10 +151,11 @@ const NO_DISCOUNT_NAMES = ['コアミー1ヶ月S', 'コアミー1ヶ月M', 'コ�
 const ORGANIC_NOTE_PREFIXES = ['モイスト', 'スムース', 'CMC'];
 const ORGANIC_NOTE_NAMES = ['ホワイトオーキット詰替', 'トライアルセット'];
 
-/** n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% z=割引なし */
+/** n=通常 a=アルマダ(さらに5%) r5=リファ固定5% f5=最大5% f10=最大10% z=割引なし */
 function price_kind(?string $category, ?string $name): string
 {
     $name = $name ?? '';
+    if (str_contains((string)$category, 'リファ') || str_contains($name, 'リファ') || stripos((string)$category, 'refa') !== false || stripos($name, 'refa') !== false) return 'r5';
     if (str_contains($name, '詰替えホルダー') || in_array(str_replace(' ', '', $name), NO_DISCOUNT_NAMES, true)) {
         return 'z';
     }
@@ -193,6 +194,7 @@ function kind_rate(string $kind, float|int $tier, int $unit = 0): float
     if ($kind === 'z') {
         return 0.0;
     }
+    if ($kind === 'r5') return 5.0;
     if ($kind === 'f5') {
         return (float)min($tier, 5);
     }

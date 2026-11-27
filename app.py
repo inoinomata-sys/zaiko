@@ -1100,8 +1100,10 @@ ORGANIC_NOTE_NAMES = ('ホワイトオーキット詰替', 'トライアルセ�
 
 
 def price_kind(category, name):
-    """n=通常 a=アルマダ(さらに5%) f5=最大5% f10=最大10% z=割引なし"""
+    """n=通常 a=アルマダ(さらに5%) r5=リファ固定5% f5=最大5% f10=最大10% z=割引なし"""
     name = name or ''
+    if 'リファ' in (category or '') or 'リファ' in name or 'refa' in (category or '').lower() or 'refa' in name.lower():
+        return 'r5'
     if '詰替えホルダー' in name or name.replace(' ', '') in NO_DISCOUNT_NAMES:
         return 'z'
     if 'ステラボーテ' in name:
@@ -1115,6 +1117,8 @@ def price_kind(category, name):
 
 
 def kind_rate(kind, tier, unit=0):
+    if kind == 'r5':
+        return 5
     if kind == 'a' and unit > 460:   # アルマダ1000ml・エグータムプレミアムは、レジの「アルマダ5%」＝1本460円引き
         p100 = int(round(tier * 100))
         pay = (unit * (10000 - p100) + 99999) // 100000 * 10 - 460

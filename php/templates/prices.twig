@@ -195,7 +195,7 @@ function kindRate(k, t, u) {
   }
   return kindRate0(k, t);
 }
-function kindRate0(k, t) { return k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : k === 'z' ? 0 : t; }
+function kindRate0(k, t) { return k === 'r5' ? 5 : k === 'a' ? Math.round((100 - (100 - t) * 0.95) * 100) / 100 : k === 'f5' ? Math.min(t, 5) : k === 'f10' ? Math.min(t, 10) : k === 'z' ? 0 : t; }
 let curStore = {{ (((editing) ? (editing.store) : ('イノ')))|tojson }};
 function showStore() { document.querySelectorAll('#c-store button').forEach(b => b.classList.toggle('on', b.dataset.store === curStore)); }
 document.querySelectorAll('#c-store button').forEach(b => b.addEventListener('click', () => { curStore = b.dataset.store; showStore(); saveLocal(); }));

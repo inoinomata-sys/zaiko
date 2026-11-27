@@ -7993,6 +7993,41 @@
    "rate": 20.2
   },
   {
+   "kind": "r5",
+   "tier": 0,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 8,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 10,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 12,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 13,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 14,
+   "rate": 5
+  },
+  {
+   "kind": "r5",
+   "tier": 16,
+   "rate": 5
+  },
+  {
    "kind": "f5",
    "tier": 0,
    "rate": 0
@@ -8196,19 +8231,29 @@
    "kind": "n"
   },
   {
+   "category": "ReFaシリーズ",
+   "name": "ハートブラシ",
+   "kind": "r5"
+  },
+  {
+   "category": "その他",
+   "name": "ReFa BEAUTECH",
+   "kind": "r5"
+  },
+  {
    "category": "リファシリーズ",
    "name": "MTGパワーガン",
-   "kind": "f5"
+   "kind": "r5"
   },
   {
    "category": "リファシリーズ",
    "name": "リファドライヤー",
-   "kind": "f5"
+   "kind": "r5"
   },
   {
    "category": "その他商品",
    "name": "リファカールアイロン",
-   "kind": "f5"
+   "kind": "r5"
   },
   {
    "category": "ステラボーテシリーズ",
