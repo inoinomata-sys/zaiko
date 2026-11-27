@@ -444,6 +444,8 @@ page_ok("/prices?order={$cid}", 'id="edit-save"');
 page_ok("/prices?order={$cid}", '変更を保存');
 ok((int)db_val("SELECT ordered FROM customer_order_items WHERE order_id={$cid} AND price_id=2") === 1, '直して保存しても、発注済みの印は残る');
 ok((int)db_val("SELECT COUNT(*) FROM customer_order_items WHERE order_id={$cid}") === 5, '商品が増えた分だけ行が増える');
+ok((float)db_val("SELECT discount_pct FROM customer_order_items WHERE order_id={$cid} AND price_id=4")===5.0,'リファの年末キャンペーンは通常割引率にかかわらず5%で保存');
+pdf_ok("/customer-orders/{$cid}/pdf",['5%引き']);
 ok((int)db_val("SELECT ready FROM customer_order_items WHERE order_id={$cid} AND price_id=2")===1, '編集しても数量が同じ商品の準備済みは残る');
 $cust['items'][1]['qty']=8;
 [$st] = api('/customer-orders/save',$cust);
