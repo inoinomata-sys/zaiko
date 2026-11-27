@@ -2,7 +2,7 @@
 /**
  * Plugin Name: INO ブログ管理室
  * Description: 施術メモをMakeに送り、WordPressの下書きをLINEで承認します。
- * Version: 0.1.9
+ * Version: 0.1.10
  * Requires PHP: 7.4
  */
 
@@ -378,8 +378,8 @@ final class Ino_Blog_Workflow {
         }
         delete_transient($stage);
         $preview = get_preview_post_link($post);
-        $approval_data = 'ino_ok:' . $post->ID . ':' . $id;
-        $label = $instagram ? 'この投稿案でOK' : 'この下書きでOK';
+        $approval_data = ($shop === 'INO' ? 'ino_publish:' : 'ino_ok:') . $post->ID . ':' . $id;
+        $label = $shop === 'INO' ? 'OK・ホームページに公開' : 'この投稿案でOK';
         $plain_title = html_entity_decode(wp_strip_all_tags($post->post_title), ENT_QUOTES, 'UTF-8');
         $plain_body = html_entity_decode(wp_strip_all_tags($post->post_content), ENT_QUOTES, 'UTF-8');
         return rest_ensure_response([
@@ -401,7 +401,7 @@ final class Ino_Blog_Workflow {
                     'altText' => $instagram ? $shop . ' SNS投稿案の確認' : 'INO ブログ下書きの確認',
                     'template' => [
                         'type' => 'buttons',
-                        'text' => $instagram ? '投稿案を確認してください。' : '下書きを確認してください。',
+                        'text' => $shop === 'INO' ? '内容を確認し、公開する場合は下の公開ボタンを押してください。' : '投稿案を確認してください。',
                         'actions' => [
                             ['type' => 'uri', 'label' => $instagram ? '投稿案をプレビュー' : '記事をプレビュー', 'uri' => $preview],
                             ['type' => 'postback', 'label' => $label, 'data' => $approval_data, 'displayText' => $label],
@@ -635,7 +635,7 @@ final class Ino_Blog_Workflow {
                 }
                 continue;
             }
-            if (!preg_match('/\Aino_ok:([1-9][0-9]{0,17}):([0-9a-f-]{36})\z/D', $data, $parts)) {
+            if (!preg_match('/\A(?:ino_ok|ino_publish):([1-9][0-9]{0,17}):([0-9a-f-]{36})\z/D', $data, $parts)) {
                 continue;
             }
             $post = get_post((int) $parts[1]);
@@ -647,6 +647,12 @@ final class Ino_Blog_Workflow {
             $key = 'ino_blog_approved_' . $post->ID;
             if (!get_option($key, false) && !add_option($key, $record, '', false) && !get_option($key, false)) {
                 return new WP_Error('approval_write', '承認を記録できませんでした。', ['status' => 503]);
+            }
+            if (strpos($data, 'ino_publish:') === 0 && get_post_meta($post->ID, '_ino_blog_shop', true) === 'INO') {
+                $result = wp_update_post(['ID' => $post->ID, 'post_status' => 'publish'], true);
+                if (is_wp_error($result) || get_post_status($post->ID) !== 'publish') {
+                    return new WP_Error('publication_failed', '記事を公開できませんでした。', ['status' => 503]);
+                }
             }
         }
         return rest_ensure_response(['ok' => true]);
